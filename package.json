@@ -1,0 +1,32 @@
+{
+  "name": "jbb",
+  "version": "0.1.0",
+  "description": "Javascript Binary Bundle",
+  "main": "dist/jbb.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wavesoft/jbb.git"
+  },
+  "keywords": [
+    "javascript",
+    "binary",
+    "bundle"
+  ],
+  "author": "Ioannis Charalampidis <johnys2@gmail.com>",
+  "license": "GPL-2.0",
+  "bugs": {
+    "url": "https://github.com/wavesoft/jbb/issues"
+  },
+  "homepage": "https://github.com/wavesoft/jbb#readme",
+  "devDependencies": {
+    "binary-search-tree": "^0.2.4",
+    "colors": "^1.1.2",
+    "mime": "^1.3.4",
+    "mock-browser": "^0.91.34",
+    "node-getopt": "^0.2.3",
+    "xmlhttprequest": "^1.8.0"
+  }
+}
