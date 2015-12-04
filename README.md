@@ -1,4 +1,4 @@
-# Javascript Binary Bundle (.jbb)
+# Javascript Binary Bundles (.jbb)
 
 Javascript Binary Bundle is a binary bundle format for packing data structures for the web. To be more precise, `jbb` is a javascript serialization format with the ability to embed additional resources.
 
