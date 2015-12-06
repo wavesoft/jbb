@@ -159,15 +159,18 @@ try {
 	console.error("Could not find profile ( try: npm install jbb-profile-"+opt.options['profile']+" )");
 	process.exit(1);
 }
+
+// Access the profile-compiler.js, since the package should
+// always expose only the run-time (user-friendly interface).
 var profile = require( require.resolve("jbb-profile-"+opt.options['profile']).split('/dist/')[0]+'/js/profile-compiler.js' );
 
-// Parse options once again with profile
+// Parse options once again, this time with profile extensions
 opt = createOptions(profile);
 
 // Initialize environment according to the profile
 if (profile.initialize) profile.initialize();
 
-// Make sure we have a load and save function
+// Make sure we have a load function
 if (!profile.load) {
 	console.error("This profile is missing a 'load' function!");
 	process.exit(1);
