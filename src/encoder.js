@@ -1638,7 +1638,7 @@ function encodeObject( encoder, object ) {
 			eid_lo = eid & 0xFF;
 
 		// Write entity
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | eid_hi | 0x10 ) );
+		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | 0x10 | eid_hi ) );
 		encoder.stream8.write( pack1b( eid_lo ) );
 		encoder.counters.op_prm+=2;
 
@@ -1977,20 +1977,20 @@ BinaryEncoder.prototype = {
 			console.info("-----------------------------------");
 			console.info(" Binary Protocol Overhead Analysis");
 			console.info("-----------------------------------");
-			console.info(" Control Op-Codes   : ", this.counters.op_ctr);
-			console.info(" Primitive Op-Codes : ", this.counters.op_prm);
-			console.info(" String References  : ", this.counters.ref_str);
-			console.info(" I-Refs             : ", this.counters.op_iref);
-			console.info(" X-Refs             : ", this.counters.op_xref);
-			console.info(" Array Headers      : ", this.counters.arr_hdr);
-			console.info(" Array Chunks       : ", this.counters.arr_chu);
-			console.info(" Buffer Headers     : ", this.counters.dat_hdr);
+			console.info(" Control Op-Codes   : ", this.counters.op_ctr, "b");
+			console.info(" Primitive Op-Codes : ", this.counters.op_prm, "b");
+			console.info(" String References  : ", this.counters.ref_str, "b");
+			console.info(" I-Refs             : ", this.counters.op_iref, "b");
+			console.info(" X-Refs             : ", this.counters.op_xref, "b");
+			console.info(" Array Headers      : ", this.counters.arr_hdr, "b");
+			console.info(" Array Chunks       : ", this.counters.arr_chu, "b");
+			console.info(" Buffer Headers     : ", this.counters.dat_hdr, "b");
 			var sum = this.counters.op_ctr + this.counters.op_prm +
 					  this.counters.ref_str + this.counters.op_iref + this.counters.op_xref +
 					  this.counters.arr_hdr + this.counters.arr_chu + this.counters.dat_hdr;
 			console.info("-----------------------------------");
 			var perc = ((sum / finalStream.offset) * 100).toFixed(2);
-			console.info(" Total Overhead     : ",sum," ("+perc+" %)");
+			console.info(" Total Overhead     : ",sum,"b ("+perc+" %)");
 		}
 
 	},
