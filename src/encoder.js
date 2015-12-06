@@ -93,6 +93,7 @@ var LOG = {
 	EMB: 	0x0080, // Embedded resource
 	PLO: 	0x0100, // Simple objects
 	BULK: 	0x0200, // Bulk-encoded objects
+	SUMM: 	0x2000,	// Log summary
 	WRT: 	0x4000, // Debug writes
 	PDBG: 	0x8000, // Protocol debug messages
 };
@@ -111,6 +112,7 @@ var LOG_PREFIX_STR = {
 	0x0080	: 'EMB',
 	0x0100  : 'PLO',
 	0x0200  : 'BLK',
+	0x2000  : 'SUM',
 	0x8000 	: 'DBG',
 };
 
@@ -660,16 +662,20 @@ function getNumType( v ) {
 				return NUMTYPE.INT8;
 			} else if (v >= -32768) {
 				return NUMTYPE.INT16;
-			} else {
+			} else if (v >= -2147483648) {
 				return NUMTYPE.INT32;
+			} else {
+				return NUMTYPE.FLOAT64;
 			}
 		} else {
 			if (v < 256) {
 				return NUMTYPE.UINT8;
 			} else if (v < 65536) {
 				return NUMTYPE.UINT16;
-			} else {
+			} else if (v < 4294967296) {
 				return NUMTYPE.UINT32;
+			} else {
+				return NUMTYPE.FLOAT64;
 			}
 		}
 	}
@@ -762,6 +768,11 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		is_repeated = true, rep_v = array[0], // Same values
 		last_v = array[0], min_delta = null, max_delta = null; // Deltas
 
+	// Bypass alloxMixFloats when we have FloatXX arrays
+	if ((array instanceof Float32Array) || (array instanceof Float64Array)) {
+		allowMixFloats = true;
+	}
+
 	// Iterate over array entries
 	for (var i=0; i<array.length; i++) {
 		var n = array[i], d=0;
@@ -798,11 +809,6 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		return [ ARR_OP.REPEATED, NUMTYPE.UINT8 ];
 	}
 
-	// If same value repeated, that's a repeated array
-	if (is_repeated) {
-		return [ ARR_OP.REPEATED, getNumType(rep_v) ];
-	}
-
 	// Pick a numerical type according to bounds
 	var type = null;
 	if (is_float) {
@@ -819,8 +825,10 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 				type = NUMTYPE.INT8;
 			} else if ((min >= -32768) && (max <= 32767)) {
 				type = NUMTYPE.INT16;
-			} else {
+			} else if ((min >= -2147483648) && (max <= 2147483647)) {
 				type = NUMTYPE.INT32;
+			} else {
+				type = NUMTYPE.FLOAT64;
 			}
 		} else {
 			// Check unsigned bounds
@@ -828,8 +836,10 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 				type = NUMTYPE.UINT8;
 			} else if (max < 65536) {
 				type = NUMTYPE.UINT16;
-			} else {
+			} else if (max < 4294967296) {
 				type = NUMTYPE.UINT32;
+			} else {
+				type = NUMTYPE.FLOAT64;
 			}
 		}
 	}
@@ -838,7 +848,13 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	var originalType = getTypedArrayType( array );
 	if (originalType == NUMTYPE.UNKNOWN) originalType = type;
 
-	// If length is small enough, use short array representation
+	// If same value repeated, that's a repeated array
+	if (is_repeated) {
+		return [ ARR_OP.REPEATED, originalType ];
+	}
+
+	// If length is small enough and downscaling is not really
+	// helping much, prefer chunking and/or downscaling
 	if (array.length < 256) {
 		var originalSize = sizeOfType( originalType ) * array.length,
 			downscaleSize = sizeOfType( type ) * array.length + 2;
@@ -903,7 +919,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 function deltaEncodeIntegers( array, arrayClass ) {
 	var delta = new arrayClass( array.length - 1 ), l = array[0];
 	for (var i=1; i<array.length; i++) {
-		var v = array[i]; delta[i-1] = l - v; l = v;
+		var v = array[i]; delta[i-1] = v - l; l = v;
 	}
 	return delta;
 }
@@ -1489,7 +1505,17 @@ function encodeBuffer( encoder, buffer_type, mime_type, buffer ) {
 	}
 
 	// Write buffer
-	encoder.stream8.write( packTypedArray(buffer) );
+	if (buffer_type == PRIM_BUFFER_TYPE.STRING_UTF8) {
+
+		// NOTE: UTF-8 is a special case. For optimisation
+		// purposes it's better to use the 16-bit stream
+		// rather than downcasting to 8-bit and then 
+		// re-constructing the 16-bit stream at decoding time.
+		encoder.stream16.write( packTypedArray(buffer) );
+
+	} else {
+		encoder.stream8.write( packTypedArray(buffer) );
+	}
 
 }
 
@@ -1971,6 +1997,11 @@ BinaryEncoder.prototype = {
 		this.stream16.close(); fs.unlink( this.filename + '_b16.tmp' );
 		this.stream32.close(); fs.unlink( this.filename + '_b32.tmp' );
 		this.stream64.close(); fs.unlink( this.filename + '_b64.tmp' );
+
+		// Write summar header
+		if ((this.logFlags & LOG.SUMM)) {
+			console.info("Encoding size =",finalStream.offset,"bytes");
+		}
 
 		// Write protocol overhead table
 		if ((this.logFlags & LOG.PDBG) != 0) {

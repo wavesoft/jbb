@@ -734,13 +734,16 @@ BinaryBundle.prototype.where = function() {
 /**
  * Binary bundle loader
  */
-var BinaryLoader = function() {
+var BinaryLoader = function( objectTable ) {
 
 	this.dbObjects = [];
 	this.database = {};
 
 	// Collection of parsers pending
 	this.pendingBundleParsers = [];
+
+	// Keep object table
+	this.objectTable = objectTable;
 
 };
 
@@ -787,7 +790,7 @@ BinaryLoader.prototype = {
 			try {
 
 				// Setup the parser callback
-				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( req.response ) );
+				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( req.response, this.objectTable ) );
 				// Update bundle status
 				pendingBundle.status = PBUND_LOADED;
 
@@ -803,6 +806,23 @@ BinaryLoader.prototype = {
 
 			}
 		}
+
+	},
+
+	/**
+	 * Load from buffer
+	 */
+	'loadBuffer': function( buffer ) {
+
+		// Prepare pending bundle
+		var pendingBundle = {
+			'callback': parseBundle.bind( {}, new BinaryBundle( buffer, this.objectTable ) ),
+			'status': PBUND_LOADED,
+			'meta': {},
+		};
+
+		// Keep this pending action
+		this.pendingBundleParsers.push( pendingBundle );
 
 	},
 
