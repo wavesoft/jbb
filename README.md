@@ -2,7 +2,7 @@
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
-__WARNING:__ This format is Architecture-Dependant! If you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines. _(Theoretically it's possible to use `DataView` for abstracting this, but it slows down the loading time)._
+__WARNING:__ This format is Architecture-Dependant. This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
 ## Compiling with Profiles (CLI)
 
