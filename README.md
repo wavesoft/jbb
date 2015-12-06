@@ -46,6 +46,8 @@ bundle.close();
 
 The bundle format is optimised for use in conjunction with javascript `TypedArray`. Therefore, it's contents are laid out appropriately in order to minimise alignment padding.
 
+That's why the bundle is organised in four streams laid one after the other, as seen in the table below. Each stream has it's own index, and is incremented every time an op-code fetches an item or an array from them.
+
 <table>
     <tr>
         <th>Offset</th>
@@ -76,6 +78,8 @@ The bundle format is optimised for use in conjunction with javascript `TypedArra
         <td>Strings (NULL Terminated)</td>
     </tr>
 </table>
+
+The entry point of the bundle is the beginning of the 8-bit elements, since all the op-codes are 8-bit long (`UInt8`).
 
 ## Header
 
