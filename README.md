@@ -71,5 +71,49 @@ In addition to de-duplication, there are some cases that we can benefit from num
 * __Repeated__ is used when the values of the array is simply a single value repeated.
 * __Chunked Primitive__ is used when an array mixes primitives and numerical values. The encoding algorithm will try to split the array in chunks if similar types that can be further optimised with one of the above techniques.
 
+## Opcodes
 
+The following table explains the binary opcodes found in the bundle format:
 
+### Control Opcodes
+The control opcodes prefix primitives or other control/information data in the file.
+
+<img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_CTL.png" />
+
+### Primitive Opcodes
+The primitive opcodes define the type of the primitive being encoded:
+
+<img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_PRIM.png" />
+
+### Array Opcodes
+This is a specialisation of the ARRAY primitive.
+
+<img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_ARR.png" />
+
+### Other Types
+The following tables contain the values of other properties of the opcodes.
+
+<table>
+    <tr>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_NUM_TYPE.png" />
+        </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LEN.png" />
+        </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LN.png" />
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OT.png" />
+        </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_S_TYPE.png" />
+        </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_SCALE.png" />
+        </td>
+    </tr>
+</table>
