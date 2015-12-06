@@ -1,8 +1,14 @@
 
 var util   = require('util');
-var ot 	   = require('jbb-profile-three');
 var assert = require('assert');
 var common = require('./common');
+
+// Blank object table for tests
+var ot 	   = {
+	'ID' 		: 0,
+	'ENTITIES' 	: [],
+	'PROPERTIES': [],
+};
 
 ////////////////////////////////////////////////////////////////
 // Generator helpers
