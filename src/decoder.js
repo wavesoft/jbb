@@ -609,6 +609,21 @@ var BinaryBundle = function( buffer, objectTable ) {
 	this.max8  		= this.u32[4];
 	this.maxST 		= this.u32[5];
 
+	// Validate magic
+	if (this.magic == 0x3342) {
+		throw {
+			'name' 		: 'EndianessError',
+			'message'	: 'Unfortunately the JBB format is currently only compatible with Little-Endian CPUs',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+	} else if (this.magic != 0x4233) {
+		throw {
+			'name' 		: 'DecodingError',
+			'message'	: 'This does not look like a JBB archive! (Magic is 0x'+this.magic.toString(16)+')',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+	}
+
 	// Validate object table id
 	if (this.table_id != this.ot.ID) {
 		throw {

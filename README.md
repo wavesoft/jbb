@@ -1,6 +1,8 @@
 # Javascript Binary Bundles (.jbb)
 
-Javascript Binary Bundle is a binary bundle format for packing data structures for the web. To be more precise, `jbb` is a javascript serialization format with the ability to embed resources.
+Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
+
+__WARNING:__ This format is **Architecture-Dependant**! If you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines. _(Theoretically it's possible to use `DataView` for abstracting this, but it slows down the loading time)._
 
 ## Getting Started
 
@@ -17,6 +19,51 @@ jbb -p three -o bundle.jbb /path/to/resource.js ...
 ```
 
 # Bundle Format Specifications
+
+The bundle format is optimised for use in conjunction with javascript `TypedArray`. Therefore, it's contents are laid out appropriately in order to minimise alignment padding.
+
+## Header
+
+The file header is organised as shown below. The `Magic` number for the JBB file format is `0x4233` or `3B`.
+
+The `OT.ID` is the ID of the Object Table used to compile this bundle. This table contains the information required to re-construct the objects in the bundle and should be provided by the loader arguments.
+
+<table>
+    <tr>
+        <th>Offset</th>
+        <th>+1</th>
+        <th>+2</th>
+        <th>+3</th>
+        <th>+4</th>
+    </tr>    
+    <tr>
+        <th>0x00</th>
+        <td colspan="2"><code>Magic</code></td>
+        <td colspan="2"><code>OT.ID</code></td>
+    </tr>
+    <tr>
+        <th>0x04</th>
+        <td colspan="4"><code>64-Bit Table Size</code></td>
+    </tr>
+    <tr>
+        <th>0x08</th>
+        <td colspan="4"><code>32-Bit Table Size</code></td>
+    </tr>
+    <tr>
+        <th>0x0C</th>
+        <td colspan="4"><code>16-Bit Table Size</code></td>
+    </tr>
+    <tr>
+        <th>0x10</th>
+        <td colspan="4"><code>8-Bit Table Size</code></td>
+    </tr>
+    <tr>
+        <th>0x14</th>
+        <td colspan="4"><code>String Table Size</code></td>
+    </tr>
+</table>
+
+## Primitives 
 
 The binary bundle is a compacted representation of javascript objects, with size and speed optimisations. In addition, it offers a symbol import/export functionality for sharing resources among different bundles.
 
