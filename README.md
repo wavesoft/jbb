@@ -176,11 +176,11 @@ The following tables contain the values of other properties of the opcodes.
         <td>
             <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_NUM_TYPE.png" />
         </td>
-        <td>
-            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LEN.png" />
+        <td colspan="2">
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_DWS_TYPE.png" />
         </td>
         <td>
-            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LN.png" />
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_BUF_TYPE.png" />
         </td>
     </tr>
     <tr>
@@ -193,5 +193,17 @@ The following tables contain the values of other properties of the opcodes.
         <td>
             <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_SCALE.png" />
         </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_CHUNK.png" />
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LEN.png" />
+        </td>
+        <td>
+            <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_LN.png" />
+        </td>
+        <td colspan="2"></td>
     </tr>
 </table>
