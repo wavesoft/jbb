@@ -1,8 +1,8 @@
 
-var util = require('util');
-var common = require('./common');
-var ot = require('jbb-profile-three');
+var util   = require('util');
+var ot 	   = require('jbb-profile-three');
 var assert = require('assert');
+var common = require('./common');
 
 ////////////////////////////////////////////////////////////////
 // Generator helpers

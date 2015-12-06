@@ -2019,6 +2019,11 @@ BinaryEncoder.prototype = {
 			console.info("-----------------------------------");
 			console.info(" Binary Protocol Overhead Analysis");
 			console.info("-----------------------------------");
+			console.info(" 64-bit Stream      : ", this.stream64.offset, "b");
+			console.info(" 32-bit Stream      : ", this.stream32.offset, "b");
+			console.info(" 16-bit Stream      : ", this.stream16.offset, "b");
+			console.info("  8-bit Stream      : ", this.stream8.offset, "b");
+			console.info("-----------------------------------");
 			console.info(" Control Op-Codes   : ", this.counters.op_ctr, "b");
 			console.info(" Primitive Op-Codes : ", this.counters.op_prm, "b");
 			console.info(" String References  : ", this.counters.ref_str, "b");

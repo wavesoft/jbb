@@ -51,19 +51,6 @@ var createOptions = function( profile ) {
 	  "\n" +
 	  "[[OPTIONS]]\n" +
 	  "\n" +
-	  "Optimisation options:\n" +
-	  "\n" +
-	  "  -O0                      Disable all optimisations (Safest)\n" +
-	  "                            - Perserve TypedArrays as-is\n" +
-	  "  -O1                      Very safe optimisations\n" +
-	  "                            - ByRef De-Duplication\n" +
-	  "                            - Compact consecutive opcodes\n" +
-	  "  -O2                      Safe optimisations (Default)\n" +
-	  "                            - ByVal De-Duplication\n" +
-	  "                            - Integer differential encoding\n" +
-	  "  -O3                      Unsafe optimisations (Smallest)\n" +
-	  "                            - Float differential encoding\n" +
-	  "\n" +
 	  "Logging Flags:\n" +
 	  "\n" +
 	  "  p                        Log primitive opcodes\n" +
