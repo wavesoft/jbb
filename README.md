@@ -16,13 +16,13 @@ The binary bundle is a compacted representation of javascript objects, with size
 
 The data in a bundle file are organised in _Primitives_, each one being one of the following:
 
-* `PRIM_OP.SIMPLE` - A simple primitive, that being:
+* __SIMPLE__ - A simple primitive, that being:
     - `UNDEFINED` - The value `undefined`
     - `NULL` - The value `null`
     - `FALSE` - The boolean value `false`
     - `TRUE` - The boolean value `true`
     - `NAN` - The value `NaN`
-* `PRIM_OP.ARRAY` - Array of primitives, further specialised as:
+* __ARRAY__ - Array of primitives, further specialised as:
     - `EMPTY` - Empty Array
     - `DELTA` - Delta-Encoded TypedArray
     - `REPEATED` - Repeated TypedArray
@@ -30,18 +30,18 @@ The data in a bundle file are organised in _Primitives_, each one being one of t
     - `SHORT`  - Short TypedArray (1-256 numbers)
     - `PRIMITIVE` - Primitive Array (further optimised in chunks)
     - `RAW` - RAW Typed Array
-* `PRIM_OP.OBJECT` - A Javascript object, further specialised as:
+* __OBJECT__ - A Javascript object, further specialised as:
     - `PREDEFINED` - A predefined object from the object table
     - `PLAIN` - A plain object
-* `PRIM_OP.BUFFER` - Buffered contents, further specialised as:
+* __BUFFER__ - Buffered contents, further specialised as:
     - `STRING_LATIN` - A string in LATIN-1 (ISO-8859-1) encoding
     - `STRING_UTF8` - A string un UTF-8 encoding
     - `BUF_IMAGE` - An embedded image (ImageDOMElement)
     - `BUF_SCRIPT` - An embedded script (ScriptDOMElement)
     - `RESOURCE` - An arbitrary payload embedded as resource
-* `PRIM_OP.NUMBER` - A single number
-* `PRIM_OP.IMPORT` - Import a primitive from another bundle
-* `PRIM_OP.REF` - Reference to a primitive in the same bundle
+* __NUMBER__ - A single number
+* __IMPORT__ - Import a primitive from another bundle
+* __REF__ - Reference to a primitive in the same bundle
 
 The object primitives are composites. Internally the use array primitives to represent the series of property names and the property values. Therefore the object properties can be further optimised by the array optimisation functions.
 
