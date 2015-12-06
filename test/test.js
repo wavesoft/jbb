@@ -2,6 +2,7 @@
 var util = require('util');
 var common = require('./common');
 var ot = require('jbb-profile-three');
+var assert = require('assert');
 
 ////////////////////////////////////////////////////////////////
 // Generator helpers
@@ -55,7 +56,7 @@ function gen_array_rep( typeName, length, value ) {
  * Accelerator function for primitive checking
  */
 function it_should_return(primitive, repr) {
-	var text = repr || util.inspect(primitive,{'depth':1});
+	var text = repr || util.inspect(primitive,{'depth':0});
 	it('should return `'+text+'`, as encoded', function () {
 		var ans = common.encode_decode( primitive, ot );
 		if (isNaN(ans) && isNaN(primitive)) return;
@@ -112,7 +113,6 @@ function it_should_return_array_rep( typeName, length, value ) {
 // Test entry point
 ////////////////////////////////////////////////////////////////
 
-var assert = require('assert');
 describe('[Encoding/Decoding]', function() {
 
 	describe('Simple Primitives', function () {
@@ -299,6 +299,22 @@ describe('[Encoding/Decoding]', function() {
 			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
 		);
 		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]' );
+
+	});
+
+	describe('Objects', function () {
+
+		// Internal referencing of objects
+		var obj1 = { 'plain': 1, 'object': 2 },
+			obj2 = { 'complex': [1,2,3], 'object': obj1 },
+			obj3 = { 'multi': obj2, 'object': obj2, 'with': obj2, 'iref': obj1 },
+			obj4 = { 'many': gen_array_rep('Array', 1000, obj3), 'length': 1000 };
+
+		// Try to encode simple object
+		it_should_return( obj1 );
+		it_should_return( obj2 );
+		it_should_return( obj3, "{ multi: [Object], object: [Object], with: [Object], iref: [Object] }" );
+		it_should_return( obj4 );
 
 	});
 

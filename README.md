@@ -83,7 +83,7 @@ The entry point of the bundle is the beginning of the 8-bit elements, since all 
 
 ## Header
 
-The file header is organised as shown below. The `Magic` number is a 16-bit unsigned integer with value `0x4233`, so it's represented as `<33h,42h>` in little-endian architectures or `<42h,33h>` in big-endian architectures. It's therefore possible to detect incompatible endianess before loading the bundle. 
+The file header is organised as shown below. The `Magic` number is a 16-bit unsigned integer with value `0x4233`, so it's represented as `<33h,42h>` in machines with little-endian architecture or `<42h,33h>` in big-endian. It's therefore possible to detect incompatible endianess before loading the bundle. 
 
 The `Object Table ID` is the ID of the Object Table used to compile this bundle. This table contains the information required to re-construct the objects in the bundle and should be provided by the loader arguments.
 
