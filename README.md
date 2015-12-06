@@ -4,7 +4,7 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 __WARNING:__ This format is Architecture-Dependant! If you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines. _(Theoretically it's possible to use `DataView` for abstracting this, but it slows down the loading time)._
 
-## Getting Started
+## Compiling with Profiles (CLI)
 
 You will need the `jbb` compiler and some compile profile (such as `jbb-profile-three`). The profile specifies the object table to be used and the loading process to use:
 
@@ -12,10 +12,35 @@ You will need the `jbb` compiler and some compile profile (such as `jbb-profile-
 npm install -g jbb jbb-profile-three
 ```
 
-This will make the `jbb` compiler available to your system. You can then compile your bundles:
+This will make the `jbb` compiler available to your system. You can then compile your bundles like so:
 
 ```
 jbb -p three -o bundle.jbb /path/to/resource.js ...
+```
+
+## Getting Started (API)
+
+If you want to integrate `jbb` to your project or build system, use it like this:
+
+```javascript
+var BinaryEncoder = require("jbb").BinaryEncoder;
+
+// You will need to load a releavant object table
+var THREEObjectTable = require("jbb-profile-three");
+
+// Create a new bundle
+var bundle = new BinaryEncoder('path/to/bundle.jbb', {
+    'name': 'bundle',                 // Bundle Name (For x-ref)
+    'object_table': THREEObjectTable, // Object Table to Use
+})
+```
+
+// Encode your objects
+bundle.encode( new THREE.Vector3(0,0,0), "scene/zero" );
+bundle.encode( { "scene_name": "Test Scene" }, "scene/config" );
+
+// Finalize and close
+bundle.close();
 ```
 
 # Bundle Format Specifications
