@@ -366,7 +366,7 @@ function decodePrimitiveArray( bundle, database, length ) {
 			flag = op & 0x03;
 			switch (flag) {
 				case 0: // REPEAT
-					flen = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+					flen = bundle.readTypedNum[ NUMTYPE.UINT8 ]() + 1;
 					break;
 				case 1: // NUMERIC
 					break;
@@ -470,10 +470,9 @@ function decodeArray( bundle, database, op ) {
 		var l = bundle.readTypedNum[ ln3 ](),
 			v0 = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[typ] ](),
 			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DWS[typ] ]( l ),
-			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ]( l );
+			// Type-cast constructor
+			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ]( vArr );
 
-		// Type-cast array
-		for (var i=0; i<l; i++) nArr[i]=vArr[i];
 		return nArr;
 
 	} else if ((op & 0x78) == 0x70) { // Short
@@ -830,7 +829,7 @@ BinaryLoader.prototype = {
 	 * Parse the stack of bundles currently loaded
 	 */
 	'parse': function( onsuccess, onerror ) {
-		console.time( 'BinaryBundle' );
+		// console.time( 'BinaryBundle' );
 
 		// Parse everything
 		for (var i=0; i<this.pendingBundleParsers.length; i++) {
@@ -843,7 +842,7 @@ BinaryLoader.prototype = {
 		// Release parser scope
 		this.pendingBundleParsers = [];
 
-		console.timeEnd( 'BinaryBundle' );
+		// console.timeEnd( 'BinaryBundle' );
 	}
 
 };

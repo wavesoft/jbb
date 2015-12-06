@@ -12,8 +12,11 @@ var ot = require('jbb-profile-three');
  */
 function gen_array_seq( typeName, length, min, step ) {
 	var arr = new global[typeName](length);
+	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
 	for (var i=0, v=min; i<length; i++) {
-		arr[i] = v; v+=step;
+		rarr[0] = v;
+		arr[i] = rarr[0];
+		v+=step;
 	}
 	return arr;
 }
@@ -23,18 +26,23 @@ function gen_array_seq( typeName, length, min, step ) {
  */
 function gen_array_rand( typeName, length, min, max ) {
 	var arr = new global[typeName](length), range = max-min;
-	if (typeName.substr(0,5) == 'Float') {
-		// To avoid rounding errors
-		var rarr = new global[typeName](1);
-		// Create array
-		for (var i=0; i<length; i++) {
-			rarr[0] = Math.random() * range;
-			arr[i] = rarr[0];
-		}
-	} else {
-		for (var i=0; i<length; i++) {
-			arr[i] = parseInt(Math.random() * range) + min;
-		}
+	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
+	for (var i=0; i<length; i++) {
+		rarr[0] = Math.random() * range + min;
+		arr[i] = rarr[0];
+	}
+	return arr;
+}
+
+/**
+ * Repeated array generator
+ */
+function gen_array_rep( typeName, length, value ) {
+	var arr = new global[typeName](length);
+	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
+	rarr[0] = value;
+	for (var i=0; i<length; i++) {
+		arr[i] = rarr[0];
 	}
 	return arr;
 }
@@ -46,8 +54,9 @@ function gen_array_rand( typeName, length, min, max ) {
 /**
  * Accelerator function for primitive checking
  */
-function it_should_return(primitive) {
-	it('should return `'+util.inspect(primitive,{'depth':1})+'`, as encoded', function () {
+function it_should_return(primitive, repr) {
+	var text = repr || util.inspect(primitive,{'depth':1});
+	it('should return `'+text+'`, as encoded', function () {
 		var ans = common.encode_decode( primitive, ot );
 		if (isNaN(ans) && isNaN(primitive)) return;
 		assert.deepEqual( primitive, ans );
@@ -84,12 +93,27 @@ function it_should_return_array_rand( typeName, length, min, max ) {
 	});
 }
 
+/**
+ * Accelerator function for repeared array checking
+ */
+function it_should_return_array_rep( typeName, length, value ) {
+	var array = gen_array_rep(typeName, length, value);
+	it('should return `'+typeName+'('+length+') = [... ('+util.inspect(value,{'depth':1})+' x '+length+') ...]`, as encoded', function () {
+		var ans = common.encode_decode( array, ot );
+		// Perform strong type checks on typed arrays
+		if (typeName != 'Array')
+			assert.equal( array.constructor, ans.constructor );
+		// Otherwise just check values
+		assert.deepEqual( array, ans );
+	});
+}
+
 ////////////////////////////////////////////////////////////////
 // Test entry point
 ////////////////////////////////////////////////////////////////
 
 var assert = require('assert');
-describe('BinaryEncoder -> BinaryLoader', function() {
+describe('[Encoding/Decoding]', function() {
 
 	describe('Simple Primitives', function () {
 
@@ -167,14 +191,116 @@ describe('BinaryEncoder -> BinaryLoader', function() {
 		it_should_return_array_seq('Float32Array',256,4123.123,0);		// = 8bit
 		it_should_return_array_seq('Float64Array',256,4123.123,0);		// = 8bit
 
+		// Repeated tricky and simple primitives
+		it_should_return_array_rep('Array', 255, undefined);
+		it_should_return_array_rep('Array', 255, false);
+		it_should_return_array_rep('Array', 255, {'simple':'object'});
+
 	});
 
 	describe('Delta-Encoded Arrays', function () {
 
-		// Min-max bounds of 16-bit index with 8-bit delta
-		it_should_return_array_seq('Array',256	,256,1);					// Smallest of 16-bit
-		it_should_return_array_seq('Array',65535,256,1);					// Smallest of 16-bit
+		//// Integer delta-encoding ////
+
+		// UINT16	-> INT8
+		it_should_return_array_seq('Uint16Array',256,	256,	1);
+		// INT16	-> INT8
+		it_should_return_array_seq('Int16Array', 256,	-127,	1);
+		// UINT32	-> INT8
+		it_should_return_array_seq('Uint32Array',256,	65535,	1);	
+		// INT32	-> INT8
+		it_should_return_array_seq('Int32Array', 256,	-32768,	1);
+
+		// UINT32	-> INT16
+		it_should_return_array_seq('Uint32Array',256,	0,		256);
+		// INT32	-> INT16
+		it_should_return_array_seq('Int32Array',256,	-1024,	256);
+
+		//// Float delta-encoding ////
+
+		// FLOAT32	-> INT8
+		it_should_return_array_seq('Float32Array',256,	0,	1);	
+		// FLOAT32	-> INT16
+		it_should_return_array_seq('Float32Array',256,	0,	256);
+
+		//// Incomplete types ////
+
+		// FLOAT64	-> (Should opt out from Delta-Encoding without issues)
+		it_should_return_array_seq('Float64Array',256,	0,	256);
+
+		//// Test if the 32-bit index works ////
+
+		it_should_return_array_seq('Uint16Array',65536,	0, 		1);
 
 	});
+
+	describe('Downscaled Arrays', function () {	
+
+		//// Integer downscaling ////
+
+		// UINT16	-> UINT8
+		it_should_return_array_rand('Uint16Array',1024,	0,	255);
+		// INT16	-> INT8
+		it_should_return_array_rand('Int16Array', 1024,	-127, 127);
+
+		// INT16	-> UINT8 (Shout opt-out from downscaling)
+		it_should_return_array_rand('Int16Array', 1024,	0,	255);
+
+		// UINT32	-> UINT8
+		it_should_return_array_rand('Uint32Array',1024,	0,	255);
+		// INT32	-> INT8
+		it_should_return_array_rand('Int32Array', 1024,	-127, 127);
+
+		// INT32	-> UINT8 (Should opt-out from downscaling)
+		it_should_return_array_rand('Int32Array', 1024,	0,	255);
+
+		// UINT32	-> UINT16
+		it_should_return_array_rand('Uint32Array',1024,	0,	65535);
+		// INT32	-> INT16
+		it_should_return_array_rand('Int32Array',1024,	-32768, 32768);
+
+		//// Float downscaling ////
+
+		// FLOAT32	-> INT8
+		it_should_return_array_rand('Float32Array',1024,	0,	127);
+		// FLOAT32	-> INT16
+		it_should_return_array_rand('Float32Array',1024,	0,	32768);
+
+	});
+
+	describe('Chunked Arrays', function () {
+		var values;
+
+		// Simple composite case
+		values = [].concat(
+			gen_array_seq( 'Array', 100, 0, 1 ),
+			'Break',
+			gen_array_seq( 'Array', 100, 0, 1 ),
+			'Break',
+			gen_array_seq( 'Array', 100, 0, 1 ),
+			'Break'
+		);
+		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]' );
+
+		// Repeated composites (Ideally future-optimised)
+		values = [];
+		var rep = [true, false, undefined, 255, 65535, 4294967295, {'plain':'object'}];
+		for (var i=0; i<100; i++)
+			values = values.concat(rep);
+		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]' );
+
+		// Create multi-chunked array
+		values = [].concat(
+			gen_array_rep( 'Array', 100, false ),
+			gen_array_rep( 'Array', 50, true ),
+			gen_array_rep( 'Array', 5, undefined ),
+			gen_array_rep( 'Array', 128, {'object':'with_a_simple','structure':4} ),
+			gen_array_rep( 'Array', 255, {'limit_of_objects':255} ),
+			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
+		);
+		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]' );
+
+	});
+
 
 });

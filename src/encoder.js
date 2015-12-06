@@ -781,11 +781,16 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		if (n < min) min = n;
 		// Update delta
 		if (i>0) {
-			d = last_v - n;
-			if (d > max_delta) max_delta = d;
-			if (d < min_delta) min_delta = d;
-			last_v = n;
+			d = Math.abs(last_v - n);
+			if (i ==1) {
+				min_delta = d;
+				max_delta = d;
+			} else {
+				if (d > max_delta) max_delta = d;
+				if (d < min_delta) min_delta = d;
+			}
 		}
+		last_v = n;
 		// Same values
 		if (is_repeated && (n != rep_v)) is_repeated = false;
 		// Skip zeros from type detection
@@ -853,16 +858,14 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		return [ ARR_OP.REPEATED, originalType ];
 	}
 
+	// Calculate original vs downscaled size
+	var originalSize = sizeOfType( originalType ) * array.length,
+		downscaleSize = sizeOfType( type ) * array.length + 2;
+
 	// If length is small enough and downscaling is not really
 	// helping much, prefer chunking and/or downscaling
-	if (array.length < 256) {
-		var originalSize = sizeOfType( originalType ) * array.length,
-			downscaleSize = sizeOfType( type ) * array.length + 2;
-
-		// If we do not have a downscaling of better type
-		if (downscaleSize >= originalSize)
-			return [ ARR_OP.SHORT, originalType ]; 
-
+	if ((array.length < 256) && (downscaleSize >= originalSize)) {
+		return [ ARR_OP.SHORT, originalType ]; 
 	}
 
 	// Check if we can apply delta encoding with better type than the current
@@ -874,8 +877,16 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		if (delta_type == undefined) {
 			console.warn("Consider protocol revision: No compact type match for delta from="+_NUMTYPE[originalType]+", to="+_NUMTYPE[delta[1]]);
 		} else {
-			// Return delta encoding
-			return [ ARR_OP.DELTA, delta_type, delta[0] ];
+
+			// Calculate downscaled size
+			var deltaSize = sizeOfType( NUMTYPE_DOWNSCALE.TO_DELTA[delta_type] ) * array.length 
+							+ sizeOfType( originalType );
+
+			// Prefer delta encoding only if it optimises for size, since
+			// downscaling can be faster!
+			if (deltaSize < originalSize)
+				return [ ARR_OP.DELTA, delta_type, delta[0] ];
+
 		}
 
 	}
@@ -888,6 +899,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 			var dws_type = downscaleType( originalType, type );
 			if (dws_type == undefined) {
 				console.warn("Consider protocol revision: No compact type match for downscaling from="+_NUMTYPE[originalType]+", to="+_NUMTYPE[type]);
+				type = originalType;
 			} else {
 				// We are downscaling
 				return [ ARR_OP.DOWNSCALED, dws_type ];
@@ -936,7 +948,7 @@ function deltaEncodeIntegers( array, arrayClass ) {
 function deltaEncodeFloats( array, arrayClass, scale ) {
 	var delta = new arrayClass( array.length - 1 ), l = array[0];
 	for (var i=1; i<array.length; i++) {
-		var v = array[i]; delta[i-1] = ((l - v) * scale) | 0; l = v;
+		var v = array[i]; delta[i-1] = ((v - l) * scale) | 0; l = v;
 	}
 	return delta;
 }
@@ -1229,7 +1241,7 @@ function encodeNumArray( encoder, data ) {
 					.write( packTypedArray( 
 						deltaEncodeIntegers(
 							data,
-							NUMTYPE_CLASS[arrType]
+							NUMTYPE_DOWNSCALE_DELTA_CLASS[arrType]
 							) 
 					) );
 			}
@@ -1403,7 +1415,7 @@ function encodeArray( encoder, data ) {
 				// Write header
 				encoder.log(LOG.CHU, "repeated x"+chunkSize);
 				encoder.stream8.write( pack1b( ARR_OP.PRIM_FLAG | ARR_CHUNK.REPEAT ) );
-				encoder.stream8.write( pack1b( chunkSize ) );
+				encoder.stream8.write( pack1b( chunkSize-1 ) );
 				encoder.counters.arr_chu+=2;
 
 				// Write the repeated primitive
@@ -1960,7 +1972,6 @@ BinaryEncoder.prototype = {
 	'close': function() {
 
 		// Finalize individual streams
-		console.info("Finalising bundle");
 		this.stream64.finalize();
 		this.stream32.finalize();
 		this.stream16.finalize();

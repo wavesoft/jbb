@@ -43,7 +43,7 @@ function encode_decode( structure, ot ) {
 	// Create an encoder
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
-		'log'			: 0x3FFF,
+		'log'			: 0,
 		'object_table' 	: ot
 	});
 
