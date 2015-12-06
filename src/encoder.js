@@ -1899,6 +1899,9 @@ var BinaryEncoder = function( filename, config ) {
 	// Get bundle name
 	this.bundleName = this.config['name'] || filename.split("/").pop().replace(".3bd","");
 
+	// Get object table
+	this.objectTable = this.config['object_table'];
+
 	// Database properties
 	this.dbTags = [];
 	this.dbObjects = [];

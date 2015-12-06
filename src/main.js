@@ -20,14 +20,15 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var BinaryEncoder = require("./encoder.js");
-
 /**
  * Export binary encoder
  */
 module.exports = {
 
 	// Expose binary encoder
-	'BinaryEncoder' : BinaryEncoder
+	'BinaryEncoder' : require("./encoder.js"),
+
+	// Expose binary decoder
+	'BinaryDecoder': require("./decoder.js")
 
 };
