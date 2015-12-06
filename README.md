@@ -7,7 +7,13 @@ Javascript Binary Bundle is a binary bundle format for packing data structures f
 You will need the `jbb` compiler and some compile profile (such as `jbb-profile-three`). The profile specifies the object table to be used and the loading process to use:
 
 ```
-npm install jbb jbb-profile-three
+npm install -g jbb jbb-profile-three
+```
+
+This will make the `jbb` compiler available to your system. You can then compile your bundles:
+
+```
+jbb -p three -o bundle.jbb /path/to/resource.js ...
 ```
 
 # Bundle Format Specifications
