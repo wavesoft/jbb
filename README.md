@@ -137,7 +137,7 @@ There are a series of optimisations used in this file format. The goal is to hav
 
 Most of the times, some objects can be represented with less properties than appear in their instance. In addition, to further reduce the amount of information stored in the file, this information is stored in a separate table, called `Object Table`. 
 
-This table is specific to the application and therefore maintained separately from the `jbb` project. For example, have a look to the [https://github.com/wavesoft/jbb-profile-three](jbb-profile-three).
+This table is specific to the application and therefore maintained separately from the `jbb` project. For example, have a look on the [jbb-profile-three](https://github.com/wavesoft/jbb-profile-three) profile.
 
 ### De-duplication
 
