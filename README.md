@@ -2,7 +2,7 @@
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
-__WARNING:__ This format is **Architecture-Dependant**! If you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines. _(Theoretically it's possible to use `DataView` for abstracting this, but it slows down the loading time)._
+__WARNING:__ This format is Architecture-Dependant! If you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines. _(Theoretically it's possible to use `DataView` for abstracting this, but it slows down the loading time)._
 
 ## Getting Started
 
@@ -22,11 +22,42 @@ jbb -p three -o bundle.jbb /path/to/resource.js ...
 
 The bundle format is optimised for use in conjunction with javascript `TypedArray`. Therefore, it's contents are laid out appropriately in order to minimise alignment padding.
 
+<table>
+    <tr>
+        <th>Offset</th>
+        <th>Region</th>
+    </tr>
+    <tr>
+        <th>0x0000</th>
+        <td>Header (see below)</td>
+    </tr>
+    <tr>
+        <th>0x0018</th>
+        <td>64-Bit Elements (<code>Float64</code>)</td>
+    </tr>
+    <tr>
+        <th>...</th>
+        <td>32-Bit Elements (<code>Float32</code>, <code>Int32</code>, <code>UInt32</code>)</td>
+    </tr>
+    <tr>
+        <th>...</th>
+        <td>16-Bit Elements (<code>Int16</code>, <code>UInt16</code>)</td>
+    </tr>
+    <tr>
+        <th>...</th>
+        <td>8-Bit Elements (<code>Int8</code>, <code>UInt8</code>)</td>
+    </tr>
+    <tr>
+        <th>...</th>
+        <td>Strings (NULL Terminated)</td>
+    </tr>
+</table>
+
 ## Header
 
-The file header is organised as shown below. The `Magic` number for the JBB file format is `0x4233` or `3B`.
+The file header is organised as shown below. The `Magic` number for the JBB file format is `0x4233` or `"3B"`.
 
-The `OT.ID` is the ID of the Object Table used to compile this bundle. This table contains the information required to re-construct the objects in the bundle and should be provided by the loader arguments.
+The `Object Table ID` is the ID of the Object Table used to compile this bundle. This table contains the information required to re-construct the objects in the bundle and should be provided by the loader arguments.
 
 <table>
     <tr>
@@ -38,28 +69,28 @@ The `OT.ID` is the ID of the Object Table used to compile this bundle. This tabl
     </tr>    
     <tr>
         <th>0x00</th>
-        <td colspan="2"><code>Magic</code></td>
-        <td colspan="2"><code>OT.ID</code></td>
+        <td colspan="2">Magic (0x4233)</td>
+        <td colspan="2">Object Table ID</td>
     </tr>
     <tr>
         <th>0x04</th>
-        <td colspan="4"><code>64-Bit Table Size</code></td>
+        <td colspan="4">64-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x08</th>
-        <td colspan="4"><code>32-Bit Table Size</code></td>
+        <td colspan="4">32-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x0C</th>
-        <td colspan="4"><code>16-Bit Table Size</code></td>
+        <td colspan="4">16-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x10</th>
-        <td colspan="4"><code>8-Bit Table Size</code></td>
+        <td colspan="4">8-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x14</th>
-        <td colspan="4"><code>String Table Size</code></td>
+        <td colspan="4">String Table Size (Items)</td>
     </tr>
 </table>
 
