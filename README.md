@@ -1,6 +1,6 @@
 # Javascript Binary Bundles (.jbb)
 
-<img src="https://img.shields.io/travis/wavesoft/jbb.svg" />
+[![Build Status](https://travis-ci.org/wavesoft/jbb.svg?branch=master)](https://travis-ci.org/wavesoft/jbb)
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
@@ -243,3 +243,21 @@ The following tables contain the values of other properties of the opcodes.
         <td colspan="2"></td>
     </tr>
 </table>
+
+# License
+
+```
+Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```

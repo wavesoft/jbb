@@ -16,7 +16,7 @@
     "bundle"
   ],
   "author": "Ioannis Charalampidis <johnys2@gmail.com>",
-  "license": "GPL-2.0",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/wavesoft/jbb/issues"
   },
