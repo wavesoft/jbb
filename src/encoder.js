@@ -1,6 +1,6 @@
 "use strict";
 /**
- * THREE Bundles - Binary Encoder
+ * JBB - Javascript Binary Bundles - Binary Encoder
  * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,6 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var THREE 		= require("three");
 var bst 		= require("binary-search-tree");
 var fs 			= require("fs");
 var util		= require("util");
@@ -1893,7 +1892,7 @@ var FileResource = function( filename, mime_type ) {
 //////////////////////////////////////////////////////////////////
 
 /**
- * THREE Bundles Binary encoder
+ * Binary Bundles Encoder
  *
  * @param {string} filename - The output filename
  * @param {object} config - Configurtion parameters for the binary encoder

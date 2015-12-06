@@ -1,6 +1,6 @@
 "use strict";
 /**
- * THREE Bundles - Binary Decoder
+ * JBB - Javascript Binary Bundles - Binary Decoder
  * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
  * 
  * This program is free software; you can redistribute it and/or modify
