@@ -33,7 +33,6 @@ var bundle = new BinaryEncoder('path/to/bundle.jbb', {
     'name': 'bundle',                 // Bundle Name (For x-ref)
     'object_table': THREEObjectTable, // Object Table to Use
 })
-```
 
 // Encode your objects
 bundle.encode( new THREE.Vector3(0,0,0), "scene/zero" );
