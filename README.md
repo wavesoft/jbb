@@ -133,6 +133,12 @@ The object primitives are composites. Internally the use array primitives to rep
 
 There are a series of optimisations used in this file format. The goal is to have the smallest file size possible that will not impact the parsing speed. This means avoiding `for` loops, using TypedArrays when possible and de-duplicating entries in the file. In addition, to further reduce the file size, the type of the TypedArray is chosen dynamically by analysing the values of the array.
 
+### Table of Known Objects
+
+Most of the times, some objects can be represented with less properties than appear in their instance. In addition, to further reduce the amount of information stored in the file, this information is stored in a separate table, called `Object Table`. 
+
+This table is specific to the application and therefore maintained separately from the `jbb` project. For example, have a look to the [https://github.com/wavesoft/jbb-profile-three](jbb-profile-three).
+
 ### De-duplication
 
 De-duplication occurs only for the `OBJECT` primitives, by internally referencing same or similar object in the bundle. The detection of the duplicate items is achieved either by reference or by value:
