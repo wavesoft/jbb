@@ -4,25 +4,39 @@
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
+__IMPORTANT:__ This is NOT an archiving format! Even though you *could* pack binary blobs in a `jbb `bundle, it's designed  to optimally store serialized javascript structures!
+
 __WARNING:__ This format is Architecture-Dependant. This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
-## Compiling with Profiles (CLI)
+## Compiling with CLI
 
-You will need the `jbb` compiler and some compile profile (such as `jbb-profile-three`). The profile specifies the object table to be used and the loading process to use:
+A `jbb` bundle contains serialized javascript data structures. This means that they must first be loaded in memory before dumped in the file. The `jbb` compiler can help you on this task. 
 
-```
-npm install -g jbb jbb-profile-three
-```
+In order for the compiler to know how to handle your resources, you will need to specify a particular `jbb` profile. Each *profile* contains a Table of Known Objects, along with parsing and encoding instructions for the compiler.
 
-This will make the `jbb` compiler available to your system. You can then compile your bundles like so:
+In case of a `three.js` project, you can use the `jbb-profile-three`:
 
 ```
-jbb -p three -o bundle.jbb /path/to/resource.js ...
+~$ npm install -g jbb jbb-profile-three
 ```
 
-## Getting Started (API)
+This will make the `jbb` compiler and the `jbb-profile-three` available to your system. You can then compile your bundles like so:
 
-If you want to integrate `jbb` to your project or build system, use it like this:
+```
+~$ jbb -p three -o bundle.jbb /path/to/resource.js ...
+```
+
+Note that the files passed to the jbb compiler must be supported by the profile, otherwise you will get errors. For more details have a look on your profile description, for example of [jbb-profile-three](https://github.com/wavesoft/jbb-profile-three).
+
+## Compiling with API
+
+If you want more fine-grained control on the creation of your bundle, you can use the API version. You will still need to install `jbb` and your profile:
+
+```
+~$ npm install -g jbb jbb-profile-three
+```
+
+But you can now do something like this:
 
 ```javascript
 var BinaryEncoder = require("jbb").BinaryEncoder;
