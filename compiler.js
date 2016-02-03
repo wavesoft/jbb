@@ -70,7 +70,7 @@ function applyFullPath( baseDir, config ) {
  */
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
-	var encoder, profileTable, profileCompiler;
+	var encoder, profileTable, profileLoader;
 
 	// Identify some important information
 	var profile = config['profile'] || bundleData['profile'];
@@ -175,7 +175,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 				} else {
 
 					// Use profile loader to load this
-					profileCompiler.load( loader, loaderConfig, key, 
+					profileLoader.load( loaderConfig, key, loader,
 						function(err, objects) {
 
 							// Encode objects
@@ -207,10 +207,10 @@ function compile( bundleData, bundleFile, config, callback ) {
 
 	// Load profile table and compiler helper
 	profileTable = require('jbb-profile-'+profile);
-	profileCompiler = require('jbb-profile-'+profile+"/compiler");
+	profileLoader = require('jbb-profile-'+profile+"/loader");
 
 	// Initialize profile compiler
-	profileCompiler.initialize( 
+	profileLoader.initialize( 
 		openBundle(
 			loadImports(
 				compileExports(
