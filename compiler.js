@@ -1,6 +1,6 @@
 "use strict";
 /**
- * JBB - Javascript Binary Bundles - Binary Decoder
+ * JBB - Javascript Binary Bundles - Binary Compiler
  * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
