@@ -30,6 +30,7 @@ var path = require('path');
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
 	var importDB = {}, exportDB = {};
+	var encoder, profileTable, profileCompiler;
 
 	// Identify some important information
 	var profile = config['profile'] || bundleData['profile'];
@@ -39,6 +40,25 @@ function compile( bundleData, bundleFile, config, callback ) {
 	}
 
 	// Compile stages
+	var openBundle = function( cb ) {
+		return function() {
+
+			// Create encoder
+			encoder = new BinaryEncoder(
+					bundleFile,
+					{
+						'name' 			: bundleData['name'],
+						'base_dir' 		: baseDir,
+						'object_table' 	: profileTable,
+						'log'			: config['log'] || 0x2000,
+					}
+				);
+
+			// We are ready
+			cb();
+		}
+	}
+
 	var loadImports = function( cb ) {
 		return function() {
 			var imports = bundleData['imports'];
@@ -46,8 +66,8 @@ function compile( bundleData, bundleFile, config, callback ) {
 
 			// TODO: Import imports
 
-			// Keep keys to ignore and continue
-			ignoreKeys = Object.keys(database);
+			// Update encoder db
+			encoder.setDatabase(importDB);
 			cb();
 		}
 	}
@@ -71,20 +91,47 @@ function compile( bundleData, bundleFile, config, callback ) {
 			var getNext = function() {
 				if (items.length == 0) { cb(); return; }
 				var item = items.shift(),
-					loader = item[0], key = item[1], file = item[2];
+					loader = item[0], key = item[1], loaderConfig = item[2];
 
 				// Convert relative path to full-path
-				if (file.substr(0,1) != "/") {
-					file = path.join(baseDir, file);
+				if (typeof(loaderConfig) == "string") {
+					if (loaderConfig.substr(0,1) != "/") {
+						loaderConfig = path.join(baseDir, loaderConfig);
+					}
 				}
 
-				// Use profile loader to load this
-				profileCompiler.load( file, key, exportDB, 
-					function(err) {
-						// Schedule next item
-						setTimeout(getNext, 1);
+				// If this is a binary blob, don't go through the profile compiler
+				if (loader.toLowerCase() == "blob") {
+
+					// Check if we have mime details
+					var file = null, mime = null;
+					if (typeof(loaderConfig) == "string") {
+						file = loaderConfig;
+					} else {
+						file = loaderConfig[0];
+						mime = loaderConfig[1];
 					}
-				);
+
+					// Encode blob
+					encoder.embed( file, mime );
+
+				} else {
+
+					// Use profile loader to load this
+					profileCompiler.load( loaderConfig, key, 
+						function(err, objects) {
+
+							// Encode objects
+							for (var k in objects) {
+								encoder.encode( objects[k], k );
+							}
+
+							// Schedule next item
+							setTimeout(getNext, 1);
+						}
+					);
+
+				}
 			}
 
 			// Start loading exports
@@ -93,30 +140,8 @@ function compile( bundleData, bundleFile, config, callback ) {
 		}
 	}
 
-	var createBundle = function( cb ) {
+	var closeBundle = function( cb ) {
 		return function() {
-
-			// Create encoder
-			var encoder = new BinaryEncoder(
-					bundleFile,
-					{
-						'name' 			: bundleData['name'],
-						'base_dir' 		: baseDir,
-						'object_table' 	: profileTable,
-						'log'			: config['log'] || 0x2000,
-					}
-				);
-
-			// Set import database
-			encoder.setDatabase(importDB);
-
-			// Export items
-			var keys = Object.keys(exportDB);
-			for (var i=0; i<keys.length; i++) {
-				var o = exportDB[keys[i]];
-				encoder.encode( exportDB[keys[i]], keys[i] );
-			}
-
 			// Close & Complete
 			encoder.close();
 			cb();
@@ -124,12 +149,18 @@ function compile( bundleData, bundleFile, config, callback ) {
 	}
 
 	// Load profile table and compiler helper
-	var profileTable = require('jbb-profile-'+profile);
-	var profileCompiler = require('jbb-profile-'+profile+"/compiler");
+	profileTable = require('jbb-profile-'+profile);
+	profileCompiler = require('jbb-profile-'+profile+"/compiler");
 
 	// Initialize profile compiler
 	profileCompiler.initialize( 
-		loadImports( compileExports ( createBundle( callback ) ) ) 
+		openBundle(
+			loadImports(
+				compileExports(
+					closeBundle( callback )
+					) 
+				) 
+			)
 	);
 
 }
