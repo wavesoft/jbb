@@ -23,6 +23,47 @@ var BinaryDecoder = require("./decoder");
 var path = require('path');
 
 /**
+ * Apply full path by replacing the ${BUNDLE} macro or
+ * by prepending the path to the path if config is only a string
+ */
+function applyFullPath( baseDir, config ) {
+	if (typeof(config) == "string") {
+		// Check for full path
+		if (config.substr(0,1) != "/")
+			return path.join(baseDir, config);
+		// Check for macros
+		if (config.indexOf('${') > 0) {
+			config = config.replace(/\${(.+?)}/g, function(match, contents, offset, s)
+				{
+					var key = contents.toLowerCase();
+					if (key == "bundle") {
+						return baseDir
+					} else {
+						console.warn("Unknown macro '"+key+"' encountered in: "+config);
+						return "";
+					}
+				});
+		}
+		// Otherwise we are good
+		return config;
+	} else {
+		if (config.constructor == ({}).constructor) {
+			var ans = {};
+			for (var k in config)
+				ans[k] = applyFullPath( config[k] );
+			return ans;
+		} else if (config.length !== undefined) {
+			var ans = [];
+			for (var k in config)
+				ans.push(applyFullPath( config[k] ));
+			return ans;
+		} else {
+			return config;
+		}
+	}
+}
+
+/**
  * Compile the specifie bundle data to the specified bundle file.
  * Additional information, such as profile or other compile-time parameters
  * can be specified through the config object.
@@ -50,7 +91,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 						'name' 			: bundleData['name'],
 						'base_dir' 		: baseDir,
 						'object_table' 	: profileTable,
-						'log'			: config['log'] || 0x2000,
+						'log'			: config['log'] || 0x00,
 					}
 				);
 
@@ -64,7 +105,11 @@ function compile( bundleData, bundleFile, config, callback ) {
 			var imports = bundleData['imports'];
 			if (!imports) { cb(); return; };
 
-			// TODO: Import imports
+			// Create a new binary loader
+			var binaryLoader = new BinaryLoader( profileTable );
+
+			// Process all imports
+
 
 			// Update encoder db
 			encoder.setDatabase(importDB);
@@ -91,14 +136,10 @@ function compile( bundleData, bundleFile, config, callback ) {
 			var getNext = function() {
 				if (items.length == 0) { cb(); return; }
 				var item = items.shift(),
-					loader = item[0], key = item[1], loaderConfig = item[2];
+					loader = item[0], key = item[1],
+					loaderConfig = applyFullPath( baseDir, item[2] );
 
-				// Convert relative path to full-path
-				if (typeof(loaderConfig) == "string") {
-					if (loaderConfig.substr(0,1) != "/") {
-						loaderConfig = path.join(baseDir, loaderConfig);
-					}
-				}
+				console.log("Loading '"+key+"':", loaderConfig);
 
 				// If this is a binary blob, don't go through the profile compiler
 				if (loader.toLowerCase() == "blob") {
