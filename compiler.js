@@ -118,7 +118,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 				} else {
 
 					// Use profile loader to load this
-					profileCompiler.load( loaderConfig, key, 
+					profileCompiler.load( loader, loaderConfig, key, 
 						function(err, objects) {
 
 							// Encode objects
