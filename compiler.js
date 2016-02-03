@@ -70,7 +70,6 @@ function applyFullPath( baseDir, config ) {
  */
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
-	var importDB = {}, exportDB = {};
 	var encoder, profileTable, profileCompiler;
 
 	// Identify some important information
@@ -108,11 +107,28 @@ function compile( bundleData, bundleFile, config, callback ) {
 			// Create a new binary loader
 			var binaryLoader = new BinaryLoader( profileTable );
 
-			// Process all imports
+			// Synchronously load all buffers 
+			for (var i=0; i<imports.length; i++) {
 
+				// Get full path
+				var fullPath = applyFullPath( baseDir, imports[i] );
+				console.log("Loading", fullPath);
+
+				// Read file
+				var file = fs.readFileSync( fullPath ),
+					u8 = new Uint8Array(file),
+					buf = u8.buffer;
+
+				// Push buffer
+				binaryLoader.loadBuffer(buf);
+			}
+
+			// Parse all buffers
+			binaryLoader.parse();
 
 			// Update encoder db
-			encoder.setDatabase(importDB);
+			encoder.setDatabase( binaryLoader.database );
+
 			cb();
 		}
 	}
