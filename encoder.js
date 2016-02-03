@@ -31,17 +31,31 @@ Known Limitations
 
 * A TypedArray cannot have more than 4,294,967,296 items 
 * There cannot be more than 65,536 string literals in the bundle (dictionary keys, import/export labels)
-* 
 
 */
 
 /**
- * Get MockBrowser element style
+ * Fake DOM environment when from node
  */
-var mock = new MockBrowser.mocks.MockBrowser(),
-	mockDocument = mock.getDocument(),
-	ImageElement = mockDocument.createElement('img').constructor,
-	ScriptElement = mockDocument.createElement('script').constructor;
+if (typeof(document) == "undefined") {
+
+	// Prepare a fake browser
+	var MockBrowser = require('mock-browser').mocks.MockBrowser;
+	var mock = new MockBrowser();
+
+	// Fake 'self', 'document' and 'window'
+	global.document = mock.getDocument(),
+	global.self = MockBrowser.createWindow(),
+	global.window = global.self;
+
+	// Fake 'XMLHttpRequest' (shall not be used)
+	global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+
+}
+
+// Get references to DOM element classes
+var ImageElement = document.createElement('img').constructor;
+var ScriptElement = document.createElement('script').constructor;
 
 /**
  * Binary Search Tree Helpers
@@ -1635,6 +1649,7 @@ function encodeObject( encoder, object ) {
 
 	// If no such entity exists, raise exception
 	if (eid < 0) {
+		console.log(Object);
 		console.log(object);
 		throw {
 			'name' 		: 'EncodingError',

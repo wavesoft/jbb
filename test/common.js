@@ -19,8 +19,8 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var BinaryEncoder = require("../src/encoder.js");
-var BinaryLoader = require("../src/decoder.js");
+var BinaryEncoder = require("../encoder.js");
+var BinaryLoader = require("../decoder.js");
 var temp = require("temp").track();
 var fs   = require('fs');
 

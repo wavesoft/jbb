@@ -2,7 +2,7 @@
   "name": "jbb",
   "version": "0.1.0",
   "description": "Javascript Binary Bundle",
-  "main": "src/main.js",
+  "main": "index.js",
   "scripts": {
     "test": "./node_modules/.bin/mocha"
   },

@@ -10,7 +10,7 @@ console.info("Initializing compiler");
 // Import dependencies
 var path = require('path');
 var getopt = require('node-getopt');
-var BinaryEncoder = require("jbb").BinaryEncoder;
+var BinaryEncoder = require("jbb/encoder");
 
 ///////////////////////////////////////////////////////////////////////
 // Parse input
