@@ -57,12 +57,21 @@ function compile( bundleData, bundleFile, config, callback ) {
 			var exports = bundleData['exports'];
 			if (!exports) { cb(); return; };
 
-			// Iterate over the objects to export
-			var items = Object.keys(exports);
+			// Serialize items/loaders
+			var loaders = Object.keys(exports),
+				items = [];
+			for (var i=0; i<loaders.length; i++) {
+				var keys = Object.keys(exports[loaders[i]]);
+				for (var j=0; j<keys.length; j++) {
+					items.push([ loaders[i], keys[j], exports[loaders[i]][keys[j]] ]);
+				}
+			}
+
+			// Process items
 			var getNext = function() {
 				if (items.length == 0) { cb(); return; }
-				var key = items.shift(),
-					file = exports[key];
+				var item = items.shift(),
+					loader = item[0], key = item[1], file = item[2];
 
 				// Convert relative path to full-path
 				if (file.substr(0,1) != "/") {
