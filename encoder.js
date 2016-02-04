@@ -2190,19 +2190,19 @@ BinaryEncoder.prototype = {
 	 * Encode entity
 	 */
 	'encode': function( entity, name ) {
+		var tn = this.bundleName + "/" + name;
 
 		// Write control operation
 		this.stream8.write( pack1b( CTRL_OP.EXPORT ) );
 		this.counters.op_ctr++;
 		// Write string ID from the string lookup table
-		this.stream16.write( pack2b( this.stringID(name) ) );
+		this.stream16.write( pack2b( this.stringID(tn) ) );
 		this.counters.ref_str+=2;
 
 		// Encode primitive
 		encodePrimitive( this, entity );
 
 		// Keep on xref database
-		var tn = this.bundleName + "/" + name;
 		this.dbTags.push(tn);
 		this.dbObjects.push(entity);
 		this.database[tn] = entity;
@@ -2223,7 +2223,7 @@ BinaryEncoder.prototype = {
 		this.stream8.write( pack1b( CTRL_OP.EMBED ) );
 		this.counters.op_ctr++;
 		// Write string ID from the string lookup table
-		this.stream16.write( pack2b( this.stringID(relPath) ) );
+		this.stream16.write( pack2b( this.stringID(this.bundleName + "/" + relPath) ) );
 		this.counters.ref_str+=2;
 		// Encode primitive
 		encodePrimitive( this, new FileResource( filename, mime_type) );
@@ -2239,7 +2239,7 @@ BinaryEncoder.prototype = {
 		this.stream8.write( pack1b( CTRL_OP.EMBED ) );
 		this.counters.op_ctr++;
 		// Write string ID from the string lookup table
-		this.stream16.write( pack2b( this.stringID(name) ) );
+		this.stream16.write( pack2b( this.stringID(this.bundleName + "/" + name) ) );
 		this.counters.ref_str+=2;
 		// Encode primitive
 		encodePrimitive( this, new BlobResource( buffer, mime_type) );

@@ -119,7 +119,7 @@ function encode_decode( structure, ot ) {
 	console.info = c_info;
 
 	// Return decoded structure
-	return decoder.database['test'];
+	return decoder.database['test/test'];
 
 }
 

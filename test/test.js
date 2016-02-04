@@ -410,46 +410,68 @@ describe('[Encoding/Decoding]', function() {
 		var obj1 = new ObjectA(),
 			obj2 = new ObjectB( 12345, "check" ),
 			obj3 = new ObjectC( obj1, "part-object-1" ),
-			obj4 = new ObjectC( obj2, "part-object-2" );
+			obj4 = new ObjectC( obj2, "part-object-2" ),
+			obj5 = new ObjectB( obj2, "nested" ),
+			obj6 = new ObjectC( obj5, "part-object-3" );
 
-		// Create externals database
-		var db = {
+		// Create an encoder with 2 objects
+		var encoder1 = common.open_encoder( ot );
+		var db1 = {
 			'x/obj1': obj1,
 			'x/obj2': obj2
 		};
+		encoder1.setDatabase( db1 );
+		encoder1.encode( obj3, 'obj3' );
+		encoder1.encode( obj4, 'obj4' );
+		encoder1.close();
 
-		// Create an encoder
-		var encoder = common.open_encoder( ot );
-		encoder.setDatabase( db );
+		// Create an encoder with 2 objects with nested depencencies
+		var encoder2 = common.open_encoder( ot );
+		var db2 = {
+			'x/obj1': obj1,
+			'x/obj2': obj2,
+			'x/obj5': obj5
+		};
+		encoder2.setDatabase( db2 );
+		encoder2.encode( obj3, 'obj3' );
+		encoder2.encode( obj6, 'obj6' );
+		encoder2.close();
 
-		// Encode two objects that point to xrefs
-		encoder.encode( obj3, 'obj3' );
-		encoder.encode( obj4, 'obj4' );
-		encoder.close();
-
-		it('should fail when oppening a bundle with xrefs, without db', function() {
+		it('should except when oppening a bundle with xrefs, but with undefined db', function() {
 			assert.throws(function() {
-				var openBundle = common.open_decoder( encoder, ot );
+				var openBundle = common.open_decoder( encoder1, ot );
 			}, function(err) {
 				return (err.name == 'ImportError');
 			}, 'bundle decoder did not thorw an ImportError while loading');
 		});
 
-		it('should encode only the specified objects', function() {
+		it('should properly import the correct XRef dependencies', function() {
 			// Open bundle with xref table
-			var openBundle = common.open_decoder( encoder, ot, {
+			var openBundle = common.open_decoder( encoder1, ot, {
 				'x/obj1': "yes-imported-1",
 				"x/obj2": "yes-imported-2"
 			});
 
 			// Make sure xrefs are correct
-			assert( openBundle.database['obj3'].propA == "yes-imported-1" );
-			assert( openBundle.database['obj4'].propA == "yes-imported-2" );
+			assert( openBundle.database['test/obj3'].propA == "yes-imported-1" );
+			assert( openBundle.database['test/obj4'].propA == "yes-imported-2" );
+		});
+
+		it('should properly import the correct nested XRef dependencies', function() {
+
+			// Open bundle with xref table
+			delete db2['test/obj3']; delete db2['test/obj6'];
+			var openBundle = common.open_decoder( encoder2, ot, db2);
+
+			// Make sure xrefs are correct
+			assert( openBundle.database['test/obj3'].propA.propA == obj1.propA );
+			assert( openBundle.database['test/obj6'].propA.propA.propA == obj2.propA );
 		});
 
 		// Cleanup at the end
 		after(function() {
-			common.cleanup_encoder( encoder );
+			common.cleanup_encoder( encoder1 );
+			common.cleanup_encoder( encoder2 );
 		});
 
 	});
