@@ -22,6 +22,30 @@ var BinaryEncoder = require("./encoder");
 var BinaryDecoder = require("./decoder");
 var BundlesLoader = require("./loader");
 var path = require('path');
+var fs = require('fs');
+
+/**
+ * Wrapper function for the compile function, that first loads the
+ * bundle specs from the source bundle file specified.
+ */
+function compileFile( sourceBundle, bundleFile, config, callback ) {
+	var fname = sourceBundle + "/bundle.json";
+	fs.readFile(fname, 'utf8', function (err,data) {
+		if (err) {
+			console.error("Unable to load file",fname);
+			if (callback) callback( err, null );
+			return;
+		}
+
+		// Update path if missing
+		if (!config['path'])
+			config['path'] = path.dirname( bundleFile );
+
+		// Compile
+		compile( JSON.parse(data), bundleFile, config, callback );
+
+	});
+}
 
 /**
  * Compile the specifie bundle data to the specified bundle file.
@@ -31,13 +55,6 @@ var path = require('path');
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
 	var encoder, profileTable, profileLoader, bundleLoader;
-
-	// Identify some important information
-	var profile = config['profile'] || bundleData['profile'];
-	if (!profile) {
-		callback( "No jbb profile was specified!");
-		return;
-	}
 
 	// Compile stages
 	var openBundle = function( cb ) {
@@ -96,9 +113,39 @@ function compile( bundleData, bundleFile, config, callback ) {
 		}
 	}
 
+	// Check for profileTable/profileLoader
+	if (config['profileTable'] || config['profileLoader']) {
+
+		// Check for missing arguments
+		if (!config['profileTable']) {
+			callback( "No got 'profileLoader' but missing 'profileTable' in the arguments" );
+			return;
+		}
+		if (!config['profileLoader']) {
+			callback( "No got 'profileTable' but missing 'profileLoader' in the arguments" );
+			return;
+		}
+
+		// Fetch
+		profileTable = config['profileTable'];
+		profileLoader = config['profileLoader'];
+
+	} else {
+
+		// Identify some important information
+		var profile = config['profile'] || bundleData['profile'];
+		if (!profile) {
+			callback( "No jbb profile was specified!");
+			return;
+		}
+
+		// Fetch
+		profileTable = require('jbb-profile-'+profile);
+		profileLoader = require('jbb-profile-'+profile+"/loader");
+
+	}
+
 	// Load profile table and compiler helper
-	profileTable = require('jbb-profile-'+profile);
-	profileLoader = require('jbb-profile-'+profile+"/loader");
 	bundleLoader = new BundlesLoader( profileLoader, baseDir );
 
 	// Initialize profile compiler
@@ -106,7 +153,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 		openBundle(
 			loadBundles(
 				compileExports(
-					closeBundle( callback )
+					closeBundle( callback || function(){} )
 					) 
 				) 
 			)
@@ -118,5 +165,6 @@ function compile( bundleData, bundleFile, config, callback ) {
  * Export the 'compile' function
  */
 module.exports = {
-	'compile': compile
+	'compile': compile,
+	'compileFile': compileFile,
 };

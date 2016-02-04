@@ -10,7 +10,8 @@ console.info("Initializing compiler");
 // Import dependencies
 var path = require('path');
 var getopt = require('node-getopt');
-var BinaryEncoder = require("jbb/encoder");
+var BinaryEncoder = require("../encoder");
+var BinaryCompiler = require("../compiler");
 
 ///////////////////////////////////////////////////////////////////////
 // Parse input
@@ -145,6 +146,10 @@ if (opt.options['out'] == undefined) {
 	console.error("You need to specify an output file (ex. -o bundle.jbb)");
 	process.exit(1);
 }
+if (opt.argv.length == 0) {
+	console.error("You need to specify at least one source bundle to compile");
+	process.exit(1);
+}
 
 // Check for base dir
 var baseDir = ".";
@@ -160,93 +165,27 @@ try {
 	process.exit(1);
 }
 
-// Access the profile-compiler.js, since the package should
-// always expose only the run-time (user-friendly interface).
-var profile = require( require.resolve("jbb-profile-"+opt.options['profile']).split('/dist/')[0]+'/js/profile-compiler.js' );
-
-// Parse options once again, this time with profile extensions
-opt = createOptions(profile);
+// Access the profile object table and file loader
+var profile_ot = require("jbb-profile-"+opt.options['profile']);
+var profile_loader = require("jbb-profile-"+opt.options['profile']+'/loader');
 
 // Initialize environment according to the profile
-if (profile.initialize) profile.initialize();
+if (profile_loader.initialize) profile_loader.initialize();
 
-// Make sure we have a load function
-if (!profile.load) {
-	console.error("This profile is missing a 'load' function!");
-	process.exit(1);
-}
+// Get bundle name
+var nameparts = opt.options['out'].split("."); nameparts.pop();
+var name = nameparts.join(".");
 
-// Load object from profile
-profile.load( opt, 
+// Calcualte full path to the bundle
+var bundlePath = opt.argv[0];
+if (bundlePath.substr(0,1) != "/") bundlePath = baseDir + '/' + bundlePath;
 
-	// Callback fired when objects are loaded
-	function( objects ) {
-
-		// Get splitter function
-		var splitter = profile.split || function( opt, objects ) {
-
-			// If objects is an array, merge individual objects
-			var exports = {};
-			if (objects instanceof Array) {
-				for (var i=0; i<objects.length; i++) {
-					var o = objects[i];
-					for (var k in o)
-						exports[k] = o[k];
-				}
-			} else {
-				exports = objects;
-			}
-
-			// Get name
-			var nameparts = opt.options['out'].split("."); nameparts.pop();
-			var name = nameparts.join(".");
-
-			// Default is to pipe everything on the same bundle
-			var streams = { };
-			streams[name] = exports;
-			return streams;
-		};
-
-		// Get processor function
-		var processor = profile.process || function( opt, encoder, stream ) {
-
-			// Encode all keys from stream
-			for (var ks=Object.keys(stream),i=0,l=ks.length; i<l; i++)
-				encoder.encode( stream[ks[i]], ks[i] );
-
-		}
-
-		// Use splitter to get streams
-		var streams = splitter( opt, objects );
-		for (var ks=Object.keys(streams),i=0,l=ks.length; i<l; i++) {
-			var name = ks[i],
-				filename = path.dirname( opt.options['out'] ) + "/" + 
-								name + ( path.extname( opt.options['out'] ) || ".jbb" );
-
-			// Create encoder
-			var encoder = new BinaryEncoder(
-					filename,
-					{
-						'name' 			: name,
-						'base_dir' 		: baseDir,
-						'object_table' 	: profile_ot,
-						'log'			: getLogFlags(opt.options['log']),
-					}
-				);
-
-			// Pass through processor
-			processor( opt, encoder, streams[name] );
-
-			// Close
-			encoder.close();
-
-		}
-
-	},
-
-	// Handle loading errors
-	function(error) {
-		console.error(error);
-		process.exit(1);
+// Compile first file
+BinaryCompiler.compileFile(
+	bundlePath, opt.options['out'], {
+		'path'			: baseDir,
+		'log'			: getLogFlags(opt.options['log']),
+		'profileTable'	: profile_ot,
+		'profileLoader'	: profile_loader,
 	}
-)
+);
