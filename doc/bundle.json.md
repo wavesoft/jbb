@@ -1,3 +1,9 @@
+# bundle.json
+
+The following example describes the full parameter set that you can use
+in your own `bundle.json` file:
+
+```javascript
 {
     //
     // -= name =-
@@ -168,3 +174,4 @@
 
     }
 }
+```

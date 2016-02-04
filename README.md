@@ -47,7 +47,7 @@ In the root of the folder, create a `bundle.json` file and specify what resource
 }
 ```
 
-_For more details on how to use the `bundle.json` check the [doc/bundle.json](doc/bundle.json)._
+_For more details on how to use the `bundle.json` check the [doc/bundle.json.md](doc/bundle.json.md)._
 
 However the real benefit comes when you have resources that can be properly serialized in a JBB bundle. For example, if you are bundling resources for a `THREE.js` project, you will most probably have meshes, textures, materials etc. 
 
