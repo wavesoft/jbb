@@ -621,7 +621,7 @@ function downloadArrayBuffers( urls, callback ) {
 				scope = this;
 
 			// Place request
-			req.open('GET', url);
+			req.open('GET', urls[index]);
 			req.responseType = "arraybuffer";
 			req.send();
 
