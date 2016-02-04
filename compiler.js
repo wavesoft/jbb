@@ -20,48 +20,8 @@
 
 var BinaryEncoder = require("./encoder");
 var BinaryDecoder = require("./decoder");
+var BundleLoader  = require("./loader");
 var path = require('path');
-
-/**
- * Apply full path by replacing the ${BUNDLE} macro or
- * by prepending the path to the path if config is only a string
- */
-function applyFullPath( baseDir, config ) {
-	if (typeof(config) == "string") {
-		// Check for full path
-		if (config.substr(0,1) != "/")
-			return path.join(baseDir, config);
-		// Check for macros
-		if (config.indexOf('${') > 0) {
-			config = config.replace(/\${(.+?)}/g, function(match, contents, offset, s)
-				{
-					var key = contents.toLowerCase();
-					if (key == "bundle") {
-						return baseDir
-					} else {
-						console.warn("Unknown macro '"+key+"' encountered in: "+config);
-						return "";
-					}
-				});
-		}
-		// Otherwise we are good
-		return config;
-	} else {
-		if (config.constructor == ({}).constructor) {
-			var ans = {};
-			for (var k in config)
-				ans[k] = applyFullPath( config[k] );
-			return ans;
-		} else if (config.length !== undefined) {
-			var ans = [];
-			for (var k in config)
-				ans.push(applyFullPath( config[k] ));
-			return ans;
-		} else {
-			return config;
-		}
-	}
-}
 
 /**
  * Compile the specifie bundle data to the specified bundle file.

@@ -77,6 +77,16 @@ function applyFullPath( baseDir, config ) {
 var QueuedBundle = function( parent, name ) {
 
 	/**
+	 * State of the bundle item in queue
+	 *
+	 * 0 - Requested
+	 * 1 - Specs loaded
+	 * 2 - Imports satisfied
+	 * 3 - Loaded
+	 */ 
+	this.state = STATE_REQUESTED;
+
+	/**
 	 * Reference to the Bundles instance
 	 */
 	this.bundles = parent;
@@ -87,24 +97,15 @@ var QueuedBundle = function( parent, name ) {
 	this.name = name;
 
 	/**
-	 * The bundle filename
-	 */
-	this.file = null;
-
-	/**
 	 * The bundle base directory
 	 */
-	this.baseURL = null;
+	this.bundleURL = null;
 
 	/**
-	 * State of the bundle item in queue
-	 *
-	 * 0 - Requested
-	 * 1 - Specs loaded
-	 * 2 - Imports satisfied
-	 * 3 - Loaded
-	 */ 
-	this.state = STATE_REQUESTED;
+	 * Bundle-specific resources
+	 */
+	this.resources = {};
+	this.blobs = {};
 
 	/**
 	 * The bundle specifications
@@ -142,21 +143,7 @@ QueuedBundle.prototype.setURL = function( url ) {
 		url = parts[0];
 
 	// Separate to base dir and filename
-	this.baseURL = url;
-	this.file = "bundle.json"; // url.substr(this.baseURL.length+1) + suffix;
-
-}
-
-/**
- * Test if the URL is the one pointing to the bundle
- */
-QueuedBundle.prototype.testURL = function( url ) {
-
-	// Discard hash
-	url = url.split("#")[0];
-
-	// Test
-	return (url == (this.baseURL + '/' + this.file));
+	this.bundleURL = url;
 
 }
 
@@ -166,7 +153,6 @@ QueuedBundle.prototype.testURL = function( url ) {
 QueuedBundle.prototype.setSpecs = function( specs ) {
 
 	// Update state
-	console.log(" - Setting specs");
 	this.state = STATE_SPECS;
 	this.specs = specs;
 
@@ -178,9 +164,11 @@ QueuedBundle.prototype.setSpecs = function( specs ) {
 	if (imports.constructor === Array) {
 		for (var i=0; i<imports.length; i++) {
 			var bundleName = imports[i],
-				bundleFile = path.join(this.baseURL, bundleName);
+				bundleFile = bundleName;
 
-			console.log("Loading import",bundleName,"from",bundleFile);
+			// Optionally add prefix
+			if (this.bundles.baseURL)
+				bundleFile = path.join(this.bundles.baseURL, bundleFile);
 
 			// Express interest for loading the specified bundle
 			var item = this.bundles.__queuedBundle( bundleName );
@@ -198,10 +186,14 @@ QueuedBundle.prototype.setSpecs = function( specs ) {
 				bundleFile = imports[bundleName];
 
 			// Check for relative/full path
-			if ((bundleFile.substr(0,1) != "/") && (bundleFile.indexOf("://") == -1))
-				bundleFile = path.join(this.baseURL, bundleFile);
-
-			console.log("Loading import",bundleName,"from",bundleFile);
+			if ((bundleFile.substr(0,1) != "/") && (bundleFile.indexOf("://") == -1)) {
+				// Optionally add prefix
+				if (this.bundles.baseURL) {
+					bundleFile = path.join(this.bundles.baseURL, bundleFile);
+				} else {
+					bundleFile = path.join(this.bundleURL, bundleFile);
+				}
+			}
 
 			// Express interest for loading the specified bundle
 			var item = this.bundles.__queuedBundle( bundleName );
@@ -226,24 +218,12 @@ QueuedBundle.prototype.loadSpecs = function( loadFn, callback ) {
 	// Use the load function specified to load the specs
 	// from the URL we have stored (as text, not as blob)
 	//
-	console.log("Loading", this.baseURL + '/' + this.file);
-	loadFn( this.baseURL + '/' + this.file, false, function( err, fileBufer ) {
-		console.log(" - Got file buffer");
-
-		// Serialize specs
-		// try {
-
-			// Update specs
-			var specs = JSON.parse(fileBufer);
-			self.setSpecs( specs );
-
-		// } catch (e) {
-		// 	if (callback) callback( "Unable to de-serialize input!", null )
-		// }
-
+	loadFn( this.bundleURL + '/bundle.json', false, function( err, fileBufer ) {
+		// Update specs
+		var specs = JSON.parse(fileBufer);
+		self.setSpecs( specs );
 		// Trigger callback
 		if (callback) callback( null, self );
-
 	});
 
 };
@@ -277,12 +257,6 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 		}
 	}).bind(context);
 
-	// Collected response
-	var response = {
-		'embed': [],
-		'encode': [],
-	};
-
 	// Mark as loading
 	this.state = STATE_LOADING;
 
@@ -290,9 +264,7 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 	for (var i=0; i<items.length; i++) {
 		var item = items[i],
 			loader = item[0], key = item[1],
-			loaderConfig = applyFullPath( this.baseURL, item[2] );
-
-		console.log("Loading '"+key+"':", loaderConfig);
+			loaderConfig = applyFullPath( this.bundleURL, item[2] );
 
 		// If this is a binary blob, don't go through the profile compiler
 		if (loader.toLowerCase() == "blob") {
@@ -309,8 +281,9 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 			// Use loader function to load file contents
 			loadFn( file, true, function( err, fileBufer ) {
 
-				// Collect resource embeds
-				response.embed.push([ key, file, mime ]);
+				// Expose blob
+				self.blobs[key] = [fileBufer, mime];
+				self.bundles.blobs[self.name+'/'+key] = [fileBufer, mime];
 
 				// Decrement counter
 				setTimeout(load_callback, 1);
@@ -324,7 +297,11 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 				function(err, objects) {
 					// Collect resources
 					for (var k in objects) {
-						response.embed.push([ k, objects[k] ]);
+
+						// Expose resources
+						self.resources[k] = objects[k];
+						self.bundles.resources[self.name+'/'+k] = objects[k];
+
 					}
 					// Decrement counter
 					setTimeout(load_callback, 1);
@@ -396,7 +373,7 @@ QueuedBundle.prototype.triggerCallbacks = function( error ) {
 /**
  * Bundle manager
  */
-var Bundles = function( profileLoader ) {
+var BundlesLoader = function( profileLoader, baseURL ) {
 
 	/**
 	 * Queued bundles
@@ -409,63 +386,50 @@ var Bundles = function( profileLoader ) {
 	this.bundles = {};
 
 	/**
+	 * Loaded resources and blobs of all bundles
+	 */
+	this.resources = {};
+	this.blobs = {};
+
+	/**
 	 * Keep profile loader reference
 	 */
 	this.profileLoader = profileLoader;
 
 	/**
-	 * Overridable functions (for node flavors)
+	 * Load callbacks
 	 */
-	this.fnLoadFileContents = function( url, asBlob, callback ) {
-		var isBrowser=new Function("try {return this===window;}catch(e){ return false;}"); // browser exclude
-		if (!isBrowser() /* browser exclude */) {
-			// Load file contents
-			var fs = require('fs');
-			if (asBlob) {
-				var file = fs.readFileSync( url ),
-					u8 = new Uint8Array(file),
-					buf = u8.buffer;
-				callback(null, buf );
-			} else {
-				fs.readFile(url, {encoding: 'utf8'}, callback);
-			}
-		} else {
-			var req = new XMLHttpRequest(),
-				scope = this;
+	this.loadCallbacks = [];
 
-			// Place request
-			req.open('GET', url);
-			if (asBlob) {
-				req.responseType = "arraybuffer";
-			} else {
-				req.responseType = "text";
-			}
-			req.send();
-
-			// Wait until the file is loaded
-			req.onreadystatechange = function () {
-				if (req.readyState !== 4) return;
-				callback(null, req.response);
-			}
-		}
-	};
+	/**
+	 * Base URL for everything else
+	 */
+	this.baseURL = baseURL || "";
 
 };
 
 /**
- * Put a bundle in the queue
+ * Put a bundle in the queue, by it's name
  */
-Bundles.prototype.add = function( url, callback ) {
+BundlesLoader.prototype.add = function( url, callback ) {
 
-	// Guess bundle name 
+	// Extract bundle name from URL
 	var name = path.basename(url.split("?")[0]);
-	var nameParts = name.split("."); nameParts.pop();
+	var nameParts = name.split(".");
+	if (nameParts.length > 1) nameParts.pop();
 	name = nameParts.join(".");
 
 	// Get/Create bundle queue item
 	var item = this.__queuedBundle( name );
 	if (item.state == STATE_REQUESTED) {
+
+		// Add prefix if needed
+		if (this.baseURL)
+			url = this.baseURL + '/' + url;
+
+		// Set URL
 		item.setURL( url );
+
 	}
 
 	// Register callback
@@ -474,9 +438,72 @@ Bundles.prototype.add = function( url, callback ) {
 }
 
 /**
+ * Put a bundle in the queue, by it's specifiactions
+ */
+BundlesLoader.prototype.addSpecs = function( specs, callback ) {
+
+	// Get/Create bundle queue item
+	var item = this.__queuedBundle( specs['name'] );
+	if (item.state == STATE_REQUESTED) {
+		item.setSpecs( specs );
+	}
+
+	// Register callback
+	item.addCallback( callback );
+
+}
+
+/**
+ * Load all bundles in queue
+ */
+BundlesLoader.prototype.load = function( callback ) {
+	// Keep callback in loadCallbacks
+	this.loadCallbacks.push(callback);
+	// Start loading
+	this.__process();
+}
+
+/**
+ * Load file contents
+ */
+BundlesLoader.prototype.__loadFileContents = function( url, asBlob, callback ) {
+	var isBrowser=new Function("try {return this===window;}catch(e){ return false;}"); // browser exclude
+	if (!isBrowser() /* browser exclude */) {
+		// Load file contents
+		var fs = require('fs');
+		if (asBlob) {
+			var file = fs.readFileSync( url ),
+				u8 = new Uint8Array(file),
+				buf = u8.buffer;
+			callback(null, buf );
+		} else {
+			fs.readFile(url, {encoding: 'utf8'}, callback);
+		}
+	} else {
+		var req = new XMLHttpRequest(),
+			scope = this;
+
+		// Place request
+		req.open('GET', url);
+		if (asBlob) {
+			req.responseType = "arraybuffer";
+		} else {
+			req.responseType = "text";
+		}
+		req.send();
+
+		// Wait until the file is loaded
+		req.onreadystatechange = function () {
+			if (req.readyState !== 4) return;
+			callback(null, req.response);
+		}
+	}
+};
+
+/**
  * Get an item from the queue or express interest for a new item
  */
-Bundles.prototype.__queuedBundle = function( name ) {
+BundlesLoader.prototype.__queuedBundle = function( name ) {
 
 	// Get/Create bundle queue item
 	var item = this.bundles[name];
@@ -499,15 +526,13 @@ Bundles.prototype.__queuedBundle = function( name ) {
 /**
  * Process queue
  */
-Bundles.prototype.__process = function() {
+BundlesLoader.prototype.__process = function() {
 	var self = this;
-	console.log("--processing--");
 
 	// Check if we have at least one item in 'requested' state
 	var pendingRequested = false;
 	for (var i=0; i<this.queue.length; i++) {
 		if (this.queue[i].state == STATE_REQUESTED) {
-			console.log("Found pending");
 			pendingRequested = true;
 			break;
 		}
@@ -524,7 +549,13 @@ Bundles.prototype.__process = function() {
 	if (pendingRequested) {
 
 		var context = { 'counter': 0 };
-		var load_callback = (function() {
+		var load_callback = (function( err ) {
+			// Check fo errors
+			if (err) {
+				console.error("Error loading bundle", err);
+				return;
+			}
+
 			// When we reached 0, call process again
 			if (--this.counter == 0) {
 				setTimeout( self.__process.bind(self), 1 );
@@ -538,7 +569,7 @@ Bundles.prototype.__process = function() {
 			// Download pending requests in parallel
 			if (item.state == STATE_REQUESTED) {
 				context.counter++;
-				item.loadSpecs( this.fnLoadFileContents, load_callback );
+				item.loadSpecs( this.__loadFileContents, load_callback );
 			}
 		}
 
@@ -588,7 +619,7 @@ Bundles.prototype.__process = function() {
 			var item = nodepBundles[i];
 			// Download pending requests in parallel
 			context.counter++;
-			item.loadBundle( this.fnLoadFileContents, function(bundle) {
+			item.loadBundle( this.__loadFileContents, function(bundle) {
 				// Callback bundle callbacks
 				bundle.triggerCallbacks();
 				// Decrement counter
@@ -614,8 +645,11 @@ Bundles.prototype.__process = function() {
 		// Get next item
 		var item = this.bundles.shift();
 		if (!item) {
-			// We are done loading the bundle chain!
-			console.log("*** LOADED ***");
+			// We are done loading the bundle chain, fire callbacks
+			for (var i=0; i<self.loadCallbacks.length; i++)
+				self.loadCallbacks[i]();
+			// And reset them
+			self.loadCallbacks = [];
 			return;
 		}
 
@@ -626,7 +660,7 @@ Bundles.prototype.__process = function() {
 		}
 
 		// Load bundle
-		item.loadBundle( self.fnLoadFileContents, function(bundle) {
+		item.loadBundle( self.__loadFileContents, function(bundle) {
 			// Callback bundle callbacks
 			bundle.triggerCallbacks();
 			// Decrement counter
@@ -641,4 +675,4 @@ Bundles.prototype.__process = function() {
 }
 
 // Export bundles class
-module.exports = Bundles;
+module.exports = BundlesLoader;
