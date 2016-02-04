@@ -20,7 +20,7 @@
 
 var BinaryEncoder = require("./encoder");
 var BinaryDecoder = require("./decoder");
-var BundleLoader  = require("./loader");
+var BundlesLoader = require("./loader");
 var path = require('path');
 
 /**
@@ -30,7 +30,7 @@ var path = require('path');
  */
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
-	var encoder, profileTable, profileLoader;
+	var encoder, profileTable, profileLoader, bundleLoader;
 
 	// Identify some important information
 	var profile = config['profile'] || bundleData['profile'];
@@ -59,101 +59,32 @@ function compile( bundleData, bundleFile, config, callback ) {
 		}
 	}
 
-	var loadImports = function( cb ) {
+	var loadBundles = function( cb ) {
 		return function() {
-			var imports = bundleData['imports'];
-			if (!imports) { cb(); return; };
-
-			// Create a new binary loader
-			var binaryLoader = new BinaryLoader( profileTable );
-
-			// Synchronously load all buffers 
-			for (var i=0; i<imports.length; i++) {
-
-				// Get full path
-				var fullPath = applyFullPath( baseDir, imports[i] );
-				console.log("Loading", fullPath);
-
-				// Read file
-				var file = fs.readFileSync( fullPath ),
-					u8 = new Uint8Array(file),
-					buf = u8.buffer;
-
-				// Push buffer
-				binaryLoader.loadBuffer(buf);
-			}
-
-			// Parse all buffers
-			binaryLoader.parse();
-
-			// Update encoder db
-			encoder.setDatabase( binaryLoader.database );
-
-			cb();
+			// Load a bundle by specs
+			bundleLoader.addBySpecs( bundleData );
+			// Solve dependencies and load resources
+			bundleLoader.load( cb );
 		}
 	}
 
 	var compileExports = function( cb ) {
 		return function() {
-			var exports = bundleData['exports'];
-			if (!exports) { cb(); return; };
+			// Get the bundle to encode
+			var bundle = bundleLoader.bundles[ bundleData['name'] ];
 
-			// Serialize items/loaders
-			var loaders = Object.keys(exports),
-				items = [];
-			for (var i=0; i<loaders.length; i++) {
-				var keys = Object.keys(exports[loaders[i]]);
-				for (var j=0; j<keys.length; j++) {
-					items.push([ loaders[i], keys[j], exports[loaders[i]][keys[j]] ]);
-				}
+			// Encode resources
+			for (var k in bundle.resources) {
+				encoder.encode( bundle.resources[k], k );
 			}
 
-			// Process items
-			var getNext = function() {
-				if (items.length == 0) { cb(); return; }
-				var item = items.shift(),
-					loader = item[0], key = item[1],
-					loaderConfig = applyFullPath( baseDir, item[2] );
-
-				console.log("Loading '"+key+"':", loaderConfig);
-
-				// If this is a binary blob, don't go through the profile compiler
-				if (loader.toLowerCase() == "blob") {
-
-					// Check if we have mime details
-					var file = null, mime = null;
-					if (typeof(loaderConfig) == "string") {
-						file = loaderConfig;
-					} else {
-						file = loaderConfig[0];
-						mime = loaderConfig[1];
-					}
-
-					// Encode blob
-					encoder.embed( file, mime );
-
-				} else {
-
-					// Use profile loader to load this
-					profileLoader.load( loaderConfig, key, loader,
-						function(err, objects) {
-
-							// Encode objects
-							for (var k in objects) {
-								encoder.encode( objects[k], k );
-							}
-
-							// Schedule next item
-							setTimeout(getNext, 1);
-						}
-					);
-
-				}
+			// Embed blobs
+			for (var k in bundle.blobs) {
+				encoder.embedBlob( bundle.blobs[k][0], k, bundle.blobs[k][1] );
 			}
 
-			// Start loading exports
-			getNext();
-
+			// We are done
+			cb();
 		}
 	}
 
@@ -168,11 +99,12 @@ function compile( bundleData, bundleFile, config, callback ) {
 	// Load profile table and compiler helper
 	profileTable = require('jbb-profile-'+profile);
 	profileLoader = require('jbb-profile-'+profile+"/loader");
+	bundleLoader = new BundlesLoader( profileLoader, baseDir );
 
 	// Initialize profile compiler
 	profileLoader.initialize( 
 		openBundle(
-			loadImports(
+			loadBundles(
 				compileExports(
 					closeBundle( callback )
 					) 

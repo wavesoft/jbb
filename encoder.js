@@ -1558,6 +1558,19 @@ function encodeEmbeddedFileBuffer( encoder, buffer_type, filename, mime_type ) {
 }
 
 /**
+ * Enbod a blob as an embedded buffer
+ */
+function encodeEmbeddedBlobBuffer( encoder, buffer_type, buffer, mime_type ) {
+	// Get MIME And payload
+	var mime_id = encoder.stringID( mime_type );
+
+	// Write buffer header
+	encoder.log(LOG.EMB,"file=[blob]', mime="+mime+", len="+buffer.length);
+	encodeBuffer( encoder, buffer_type, mime_id, buffer );
+
+}
+
+/**
  * Encode a string as buffer
  */
 function encodeStringBuffer( encoder, str, utf8 ) {
@@ -1855,6 +1868,12 @@ function encodePrimitive( encoder, data ) {
 		encoder.log(LOG.PRM, "buffer[resource], file="+data.src+", mime="+data.mime);
 		encodeEmbeddedFileBuffer( encoder, PRIM_BUFFER_TYPE.RESOURCE, data.src, data.mime );
 
+	} else if (data instanceof BlobResource) {
+
+		// Embed file resource
+		encoder.log(LOG.PRM, "buffer[blob], mime="+data.mime);
+		encodeEmbeddedBlobBuffer( encoder, PRIM_BUFFER_TYPE.RESOURCE, data.buffer, data.mime );
+
 	} else if (data instanceof ImageElement) {
 
 		// Create a buffer from image
@@ -1897,6 +1916,14 @@ function encodePrimitive( encoder, data ) {
  */
 var FileResource = function( filename, mime_type ) {
 	this.src = filename;
+	this.mime = mime_type;
+}
+
+/**
+ * A reference to a blob, embedded in the bundle during build time
+ */
+var BlobResource = function( buffer, mime_type ) {
+	this.buffer = buffer;
 	this.mime = mime_type;
 }
 
@@ -2206,6 +2233,22 @@ BinaryEncoder.prototype = {
 	},
 
 	/**
+	 * Embed specified blob
+	 */
+	'embedBlob': function( buffer, name, mime_type ) {
+
+		// Write control operation
+		this.stream8.write( pack1b( CTRL_OP.EMBED ) );
+		this.counters.op_ctr++;
+		// Write string ID from the string lookup table
+		this.stream16.write( pack2b( this.stringID(name) ) );
+		this.counters.ref_str+=2;
+		// Encode primitive
+		encodePrimitive( this, new BlobResource( buffer, mime_type) );
+		
+	},
+
+	/**
 	 * Set log flags
 	 */
 	'setLogFlags': function(flags) {
@@ -2255,6 +2298,7 @@ BinaryEncoder.prototype = {
  * Expose FileResource class 
  */
 BinaryEncoder.FileResource = FileResource;
+BinaryEncoder.BlobResource = BlobResource;
 
 /**
  * Expose log flags

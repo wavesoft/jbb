@@ -20,6 +20,15 @@
 
 var toposort 	= require('toposort');
 var path 		= require('path');
+var mime 		= require('mime');
+
+/**
+ * Pick MIME type according to filename and known MIME Types
+ */
+function mimeTypeFromFilename( filename ) {
+	var ext = filename.split(".").pop().toLowerCase();
+	return mime.lookup(filename) || "application/octet-stream";
+}
 
 /**
  * State constants for the 
@@ -156,6 +165,13 @@ QueuedBundle.prototype.setSpecs = function( specs ) {
 	this.state = STATE_SPECS;
 	this.specs = specs;
 
+	// Update url if missing
+	if (this.bundleURL == null) {
+		this.bundleURL = this.bundles.baseURL;
+		if (this.bundleURL) this.bundleURL += "/";
+		this.bundleURL += specs['name'] + this.bundles.bundleSuffix;
+	}
+
 	// Lookup the depending nodes
 	this.depends = [];
 
@@ -164,7 +180,7 @@ QueuedBundle.prototype.setSpecs = function( specs ) {
 	if (imports.constructor === Array) {
 		for (var i=0; i<imports.length; i++) {
 			var bundleName = imports[i],
-				bundleFile = bundleName;
+				bundleFile = bundleName + this.bundles.bundleSuffix;
 
 			// Optionally add prefix
 			if (this.bundles.baseURL)
@@ -183,7 +199,7 @@ QueuedBundle.prototype.setSpecs = function( specs ) {
 		var keys = Object.keys( imports );
 		for (var i=0; i<keys.length; i++) {
 			var bundleName = keys[i],
-				bundleFile = imports[bundleName];
+				bundleFile = imports[bundleName] + this.bundles.bundleSuffix;
 
 			// Check for relative/full path
 			if ((bundleFile.substr(0,1) != "/") && (bundleFile.indexOf("://") == -1)) {
@@ -273,6 +289,7 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 			var file = null, mime = null;
 			if (typeof(loaderConfig) == "string") {
 				file = loaderConfig;
+				mime = mimeTypeFromFilename(loaderConfig);
 			} else {
 				file = loaderConfig[0];
 				mime = loaderConfig[1];
@@ -406,6 +423,11 @@ var BundlesLoader = function( profileLoader, baseURL ) {
 	 */
 	this.baseURL = baseURL || "";
 
+	/**
+	 * Default suffix for the bundles
+	 */
+	this.bundleSuffix = ".jbbsrc";
+
 };
 
 /**
@@ -440,7 +462,7 @@ BundlesLoader.prototype.add = function( url, callback ) {
 /**
  * Put a bundle in the queue, by it's specifiactions
  */
-BundlesLoader.prototype.addSpecs = function( specs, callback ) {
+BundlesLoader.prototype.addBySpecs = function( specs, callback ) {
 
 	// Get/Create bundle queue item
 	var item = this.__queuedBundle( specs['name'] );
@@ -472,10 +494,14 @@ BundlesLoader.prototype.__loadFileContents = function( url, asBlob, callback ) {
 		// Load file contents
 		var fs = require('fs');
 		if (asBlob) {
-			var file = fs.readFileSync( url ),
-				u8 = new Uint8Array(file),
-				buf = u8.buffer;
-			callback(null, buf );
+			var buf = fs.readFileSync( url ),		// Load Buffer
+				ab = new ArrayBuffer( buf.length ),	// Create an ArrayBuffer to fit the data
+				view = new Uint8Array(ab);			// Create an Uint8Array view
+
+			// Copy buffer into view
+			for (var i = 0; i < buf.length; ++i)
+			    view[i] = buf[i];
+			callback(null, view );
 		} else {
 			fs.readFile(url, {encoding: 'utf8'}, callback);
 		}
