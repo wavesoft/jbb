@@ -42,13 +42,10 @@ const STATE_LOADED 		= 3;
  * Apply full path by replacing the ${BUNDLE} macro or
  * by prepending the path to the path if config is only a string
  */
-function applyFullPath( baseDir, config ) {
+function applyFullPath( baseDir, config, skipRelative ) {
 	if (typeof(config) == "string") {
-		// Check for full path
-		if (config.substr(0,1) != "/")
-			return path.join(baseDir, config);
 		// Check for macros
-		if (config.indexOf('${') > 0) {
+		if (config.indexOf('${') >= 0) {
 			config = config.replace(/\${(.+?)}/g, function(match, contents, offset, s)
 				{
 					var key = contents.toLowerCase();
@@ -59,19 +56,22 @@ function applyFullPath( baseDir, config ) {
 						return "";
 					}
 				});
+		// Check for full path
+		} else if (!skipRelative && config.substr(0,1) != "/") {
+			return path.join(baseDir, config);
 		}
 		// Otherwise we are good
 		return config;
 	} else {
 		if (config.constructor == ({}).constructor) {
 			var ans = {};
-			for (var k in config)
-				ans[k] = applyFullPath( config[k] );
+			for (var k in config) 
+				ans[k] = applyFullPath( baseDir, config[k], true );
 			return ans;
 		} else if (config.length !== undefined) {
 			var ans = [];
-			for (var k in config)
-				ans.push(applyFullPath( config[k] ));
+			for (var i=0; i<config.length; i++)
+				ans.push(applyFullPath( baseDir, config[i], true ));
 			return ans;
 		} else {
 			return config;
