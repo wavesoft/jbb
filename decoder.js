@@ -312,6 +312,37 @@ function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
 }
 
 /**
+ * Decode plain bulk array
+ */
+function decodePlainBulkArray( bundle, database, len ) {
+
+	// Read plain object keys and create object
+	// factory class for faster parsing
+	var numKeys = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+		keys = [], factoryFn = "return {";
+	for (var i=0; i<numKeys; i++) {
+		var k = bundle.readStringLT(); keys.push( k );
+		factoryFn += "'"+k+"': props["+i+"][i],";
+	}
+	factoryFn += "}";
+
+	// Read property arrays
+	var props = [];
+	for (var i=0; i<numKeys; i++)
+		props.push(decodePrimitive( bundle, database ));
+
+	// Create factory function
+	var makeObject = Function("props","i", factoryFn);
+
+	// Create objects
+	var ans = [];
+	for (var i=0; i<len; i++)
+		ans.push( makeObject(props, i) );
+	return ans;
+	
+}
+
+/**
  * Decode bulk array of entities
  */
 function decodeBulkArray( bundle, database, len ) {
@@ -368,13 +399,13 @@ function decodePrimitiveArray( bundle, database, length ) {
 					break;
 				case 1: // NUMERIC
 					break;
-				case 2: // BULK
+				case 2: // PLAIN_BULK
 					flen = bundle.readTypedNum[ NUMTYPE.UINT16 ](); 
 
 					// This is a special case. We have a bit more complex
 					// parsing mechanism. The next object is NOT primitive
 					// TODO: Perhaps MAKE it primtive?
-					ans = ans.concat( decodeBulkArray( bundle, database, flen ) );
+					ans = ans.concat( decodePlainBulkArray( bundle, database, flen ) );
 					size += flen;
 
 					// Reset flag
@@ -802,7 +833,7 @@ BinaryLoader.prototype = {
 			try {
 
 				// Setup the parser callback
-				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( req.response, this.objectTable ) );
+				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( req.response, scope.objectTable ) );
 				// Update bundle status
 				pendingBundle.status = PBUND_LOADED;
 

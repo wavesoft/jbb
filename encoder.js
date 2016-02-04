@@ -25,6 +25,9 @@ var MockBrowser = require("mock-browser");
 var colors 		= require("colors");
 var mime 		= require("mime");
 
+// Turn this on for debugging
+const SAFE 		= 0;
+
 /*
 
 Known Limitations
@@ -359,6 +362,29 @@ var packBuffer = new ArrayBuffer(8),
 	packViewF64 = new Float64Array(packBuffer),
 	pack1b = function( num, signed ) {
 		var n = new Buffer(1);
+		if (SAFE) { if (signed) {
+			if (num < -128) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing number bigger than 8-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 127) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing number bigger than 8-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} else {
+			if (num < 0) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing negative number on unsigned 8-bit!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 255) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing number bigger than 8-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} }
 		if (signed) packViewI8[0] = num;
 		else packViewU8[0] = num;
 		n[0] = packViewU8[0];
@@ -366,6 +392,29 @@ var packBuffer = new ArrayBuffer(8),
 	},
 	pack2b = function( num, signed ) {
 		var n = new Buffer(2);
+		if (SAFE) { if (signed) {
+			if (num < -32768) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 16-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 32767) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 16-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} else {
+			if (num < 0) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing negative integer on unsigned 16-bit!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 65535) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 16-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} }
 		if (signed) packViewI16[0] = num;
 		else packViewU16[0] = num;
 		for (var i=0; i<2; i++) n[i]=packViewU8[i];
@@ -373,6 +422,29 @@ var packBuffer = new ArrayBuffer(8),
 	},
 	pack4b = function( num, signed ) {
 		var n = new Buffer(4);
+		if (SAFE) { if (signed) {
+			if (num < -2147483648) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 32-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 2147483647) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 32-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} else {
+			if (num < 0) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing negative integer on unsigned 32-bit!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+			else if (num > 4294967295) throw {
+				'name' 		: 'PackError',
+				'message'	: 'Packing integer bigger than 32-bits!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+		} }
 		if (signed) packViewI32[0] = num;
 		else packViewU32[0] = num;
 		for (var i=0; i<4; i++) n[i]=packViewU8[i];
@@ -380,12 +452,34 @@ var packBuffer = new ArrayBuffer(8),
 	},
 	pack4f = function( num ) {
 		var n = new Buffer(4);
+		if (SAFE) { if (num == 0.0) { }
+		else if (Math.abs(num) < 3.4E-38) throw {
+			'name' 		: 'PackError',
+			'message'	: 'Packing float bigger than 32-bits!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		};
+		else if (Math.abs(num) > 3.4E+38) throw {
+			'name' 		: 'PackError',
+			'message'	: 'Packing float bigger than 32-bits!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		} };
 		packViewF32[0] = num;
 		for (var i=0; i<4; i++) n[i]=packViewU8[i];
 		return n;
 	},
 	pack8f = function( num ) {
 		var n = new Buffer(8);
+		if (SAFE) { if (num == 0.0) { }
+		else if (Math.abs(num) < 1.7E-108) throw {
+			'name' 		: 'PackError',
+			'message'	: 'Packing float bigger than 32-bits!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		};
+		else if (Math.abs(num) > 1.7E+108) throw {
+			'name' 		: 'PackError',
+			'message'	: 'Packing float bigger than 32-bits!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		} };
 		packViewF64[0] = num;
 		for (var i=0; i<8; i++) n[i]=packViewU8[i];
 		return n;
@@ -1148,26 +1242,30 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 				}
 			}
 
+		// Check for same signature (or with minor changes) of plain objects
 		} else if (enableBulkDetection && break_candidate && (v != null) && (v.constructor === ({}).constructor)) {
 
 			// Check if signature is still the same
 			var v_keys = Object.keys(v), new_keys = [];
-			for (var i=0, llen=v_keys.length; i<llen; i++) {
+			for (var j=0, llen=v_keys.length; j<llen; j++) {
 				// Inject new keys (and count them)
-				if (plain_keys.indexOf(v_keys[i]) < 0)
-					new_keys.push( v_keys[i] );
+				if (plain_keys.indexOf(v_keys[j]) < 0)
+					new_keys.push( v_keys[j] );
 			}
 
-			// Break if we have added more than 25% of the original
+			// Break if we have added more than 25% keys of the original
 			var nk = new_keys.length;
 			if (nk < plain_keys.length * 0.25) {
 				// Merge new keys
 				if (nk>0) plain_keys = plain_keys.concat( new_keys );
 				// We are not breaking
 				break_candidate = false;
-				// Increment up to 65535
-				if (++plain_rep == 65535) break;
+			} else {
+				break_candidate = true;
 			}
+
+			// Increment plain object counter
+			if (++plain_rep > 65534) break;
 
 		}
 
@@ -1179,7 +1277,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 	// console.log(("-- CFWA ofs="+start+", rep_typ="+rep_typ+", rep_val="+rep_val).red);
 
 	// Return appropriate chunk
-	if ((plain_rep > 0) && (rep_val == 0)) {
+	if ((plain_rep > 1) && (rep_val == 0)) {
 		// Multiple plain objects are bulked
 		return [ ARR_CHUNK.BULK_PLAIN, plain_rep+1, plain_keys ];
 
@@ -1355,6 +1453,7 @@ function encodePlainBulkArray_v1( encoder, entities, properties ) {
 function encodePlainBulkArray( encoder, entities, properties ) {
 
 	// Write down the keys
+	var pl = properties.length;
 	encoder.stream8.write( pack1b( pl , false ) );
 	for (var i=0; i<pl; i++)
 		encoder.stream16.write( pack2b( encoder.stringID(properties[i]) ) );

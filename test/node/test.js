@@ -372,6 +372,16 @@ describe('[Encoding/Decoding]', function() {
 		);
 		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]' );
 
+		// Create bulk array
+		var bulkrep = [];
+		for (var i=0; i<65535; i++)
+			bulkrep.push({
+				'value': Math.floor(Math.random() * 255),
+				'same': 4,
+				'string': 'This is a string'
+			});
+		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]' );
+
 	});
 
 	describe('Objects', function () {
