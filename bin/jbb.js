@@ -36,6 +36,7 @@ var createOptions = function( profile ) {
 	  ['b' , 'basedir=DIR'  	   , 'Specify bundle base directory'],
 	].concat( profile_additions ).concat([
 	  [''  , 'log=FLAGS' 	 	   , 'Enable logging (see flags below)'],
+	  ['s' , 'sparse'              , 'Create a sparse bundle rather than a solid one'],
 	  ['h' , 'help'                , 'Display this help'],
 	  ['v' , 'version'             , 'Show version'],
 	]))
@@ -132,7 +133,7 @@ global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 // Parse options without profile first
 var opt = createOptions();
 if (opt.options['out'] == undefined) {
-	console.error("You need to specify an output file (ex. -o bundle.jbb)");
+	console.error("You need to specify an output file (ex. -o bundle)");
 	process.exit(1);
 }
 if (opt.argv.length == 0) {
@@ -140,18 +141,19 @@ if (opt.argv.length == 0) {
 	process.exit(1);
 }
 
-// Check for base dir
-var baseDir = ".";
-if (opt.options['basedir'] !== undefined)
-	baseDir = opt.options['basedir'];
-
 // Get bundle name
 var nameparts = opt.options['out'].split("."); nameparts.pop();
 var name = nameparts.join(".");
 
 // Calcualte full path to the bundle
 var bundlePath = opt.argv[0];
-if (bundlePath.substr(0,1) != "/") bundlePath = baseDir + '/' + bundlePath;
+
+// Check for base dir
+var baseDir = path.dirname(bundlePath);
+if (opt.options['basedir'] !== undefined) {
+	baseDir = opt.options['basedir'];
+	if (bundlePath.substr(0,1) != "/") bundlePath = baseDir + '/' + bundlePath;
+}
 
 // Try to load the bundle
 var fname = bundlePath + "/bundle.json";
@@ -198,6 +200,7 @@ fs.readFile(fname, 'utf8', function (err,data) {
 			'log'			: getLogFlags(opt.options['log']),
 			'profileTable'	: profile_ot,
 			'profileLoader'	: profile_loader,
+			'sparse'		: opt.options['sparse'] || false
 		}
 	);
 

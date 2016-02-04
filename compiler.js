@@ -68,6 +68,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 						'base_dir' 		: baseDir,
 						'object_table' 	: profileTable,
 						'log'			: config['log'] || 0x00,
+						'sparse'		: config['sparse'],
 					}
 				);
 

@@ -25,9 +25,6 @@ var MockBrowser = require("mock-browser");
 var colors 		= require("colors");
 var mime 		= require("mime");
 
-// Turn this on for debugging
-const SAFE 		= 0;
-
 /*
 
 Known Limitations
@@ -36,6 +33,12 @@ Known Limitations
 * There cannot be more than 65,536 string literals in the bundle (dictionary keys, import/export labels)
 
 */
+
+/**
+ * If this constant is true, the packing functions will do sanity checks,
+ * which might increase the build time.
+ */
+const SAFE = 1;
 
 /**
  * Fake DOM environment when from node
@@ -548,7 +551,7 @@ BinaryStream.prototype = {
 	},
 
 	/**
-	 * Write a number using the compile function
+	 * Write a buffer using the compile function
 	 */
 	'write': function( buffer ) {
 		if (this.logWrites) {
@@ -559,6 +562,20 @@ BinaryStream.prototype = {
 		this.__writeChunks.push( buffer );
 		this.offset += buffer.length;
 		this.__sync();
+	},
+
+	/**
+	 * Write a buffer at a particular offset, bypassing counters
+	 */
+	'writeAt': function( offset, buffer ) {
+		if (this.logWrites) {
+			var bits = String(this.__alignSize*8);
+			if (bits.length == 1) bits=" "+bits;
+			console.log((bits+"b ").yellowBG+("@"+offset).bold.yellowBG+": "+util.inspect(buffer));
+		}
+
+		// Write at the specified offset
+		fs.writeSync( this.__fd, buffer, 0, buffer.length, offset );
 	},
 
 	/**
@@ -689,6 +706,84 @@ function isEmptyArray(v) {
  */
 function isFloatType(t) {
 	return (t >= NUMTYPE.FLOAT32);
+}
+
+/**
+ * Check if the specified number is a subclass of an other
+ */
+function isNumericSubclass( t, of_t ) {
+	if (t > of_t) return false;
+	switch (of_t) {
+		case NUMTYPE.UINT8:
+		case NUMTYPE.INT8:
+			return (of_t == t);
+
+		case NUMTYPE.UINT16:
+			switch (t) {
+				case NUMTYPE.UINT8:
+				case NUMTYPE.UINT16:
+					return true;
+				default:
+					return false;
+			}
+		case NUMTYPE.INT16:
+			switch (t) {
+				case NUMTYPE.UINT8:
+				case NUMTYPE.INT8:
+				case NUMTYPE.INT16:
+					return true;
+				default:
+					return false;
+			}
+
+		case NUMTYPE.UINT32:
+			switch (t) {
+				case NUMTYPE.UINT8:
+				case NUMTYPE.UINT16:
+				case NUMTYPE.UINT32:
+					return true;
+				default:
+					return false;
+			}
+		case NUMTYPE.INT32:
+			switch (t) {
+				case NUMTYPE.UINT8:
+				case NUMTYPE.INT8:
+				case NUMTYPE.UINT16:
+				case NUMTYPE.INT16:
+				case NUMTYPE.INT32:
+					return true;
+				default:
+					return false;
+			}
+
+		case NUMTYPE.FLOAT32:
+			switch (t) {
+				case NUMTYPE.UINT8:
+				case NUMTYPE.INT8:
+				case NUMTYPE.UINT16:
+				case NUMTYPE.INT16:
+				case NUMTYPE.INT32:
+				case NUMTYPE.FLOAT32:
+					return true;
+				default:
+					return false;
+			}
+
+		case NUMTYPE.FLOAT64:
+			return true;
+	}
+	return false;
+}
+
+/**
+ * Check if we are mixing floats
+ */
+function isFloatMixing( a, b ) {
+	return (
+		((a < NUMTYPE.FLOAT32 ) && (b >= NUMTYPE.FLOAT32 )) ||
+		((a >= NUMTYPE.FLOAT32 ) && (b < NUMTYPE.FLOAT32 ))
+	);
 }
 
 /**
@@ -1230,12 +1325,19 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 
 			// Check for same type
 			var t = getNumType( v );
+			// console.log( last_t, t );
 			// console.log(("-- CFWA array["+i+"]="+v+", t="+t).red);
 			if (last_t != NUMTYPE.NAN) { // Check for numeric type repetition only
-				if (t <= last_t) {
-					// Make sure we are not mixing floats with integers
-					if ((last_t >= NUMTYPE.FLOAT32) && (t < NUMTYPE.FLOAT32)) break;
-					// We are not breaking
+				// Do not mix floats
+				if (isFloatMixing(last_t, t)) {
+					break;
+				}
+				// Allow type upscale
+				if (isNumericSubclass(last_t, t)) {
+					last_t = t;
+				}
+				// Accept only numeric subclasses
+				if (isNumericSubclass(t, last_t)) {
 					break_candidate = false;
 					// Increment up to 255
 					if (++rep_typ == 255) break;
@@ -1543,7 +1645,7 @@ function encodeArray( encoder, data ) {
 				if (!encodeNumArray(encoder, data.slice(i, i+chunkSize))) {
 					throw {
 						'name' 		: 'AssertError',
-						'message'	: 'Forward analysis reported numeric chunk but numeric encoding failed! Data:'+util.inspect(data.slice(i, i+chunkSize)),
+						'message'	: 'Forward analysis reported numeric chunk but numeric encoding failed! Data: '+util.inspect(data.slice(i, i+chunkSize)),
 						toString 	: function(){return this.name + ": " + this.message;}
 					}
 				}					
@@ -2044,12 +2146,13 @@ var BinaryEncoder = function( filename, config ) {
 	this.logFlags = this.config['log'] || 0x00;
 
 	// Open parallel streams in order to avoid memory exhaustion.
-	// The final file is assembled from these chunks
+	// The final file is assembled from these chunks, or kept as-is if
+	// requested to separate into multiple bundles (sparse bundle).
 	this.filename = filename;
-	this.stream64 = new BinaryStream( filename + '_b64.tmp', 8, ((this.logFlags & LOG.WRT) != 0) );
-	this.stream32 = new BinaryStream( filename + '_b32.tmp', 4, ((this.logFlags & LOG.WRT) != 0) );
-	this.stream16 = new BinaryStream( filename + '_b16.tmp', 2, ((this.logFlags & LOG.WRT) != 0) );
-	this.stream8  = new BinaryStream( filename + '_b8.tmp' , 1, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream64 = new BinaryStream( filename + '.b64.jbbp', 8, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream32 = new BinaryStream( filename + '.b32.jbbp', 4, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream16 = new BinaryStream( filename + '.b16.jbbp', 2, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream8  = new BinaryStream( filename + '.jbbp', 	  1, ((this.logFlags & LOG.WRT) != 0) );
 
 	// Counters for optimising the protocol
 	this.counters = {
@@ -2058,6 +2161,22 @@ var BinaryEncoder = function( filename, config ) {
 		ref_str: 0, op_iref: 0,
 		arr_hdr: 0, op_xref: 0,
 	};
+
+	// If we are requested to use sparse bundless, add some space for header in the stream8
+	this.sparse = (config['sparse'] == undefined) ? false : config['sparse'];
+	if (this.sparse) {
+
+		this.stream8.write( pack2b( 0x4233 ) ); // Magic header
+
+		// Start by writing an empty header (this will be re-built at close time)
+		this.stream8.write( pack2b( 0 ) ); // Object Table ID
+		this.stream8.write( pack4b( 0 ) ); // 64-bit buffer lenght
+		this.stream8.write( pack4b( 0 ) ); // 32-bit buffer lenght
+		this.stream8.write( pack4b( 0 ) ); // 16-bit buffer length
+		this.stream8.write( pack4b( 0 ) ); // 8-bit buffer length
+		this.stream8.write( pack4b( 0 ) ); // String lookup table length
+
+	}
 
 	// Get base dir
 	this.baseDir = this.config['base_dir'] || false;
@@ -2111,43 +2230,97 @@ BinaryEncoder.prototype = {
 		this.stream64.finalize();
 		this.stream32.finalize();
 		this.stream16.finalize();
-		this.stream8.finalize();
 
-		// Open final stream
-		var finalStream = new BinaryStream( this.filename, 8 );
-		finalStream.write( pack2b( 0x4233 ) );  				 // Magic header
-		finalStream.write( pack2b( this.objectTable.ID ) ); 	 // Object Table ID
-		finalStream.write( pack4b( this.stream64.offset ) );     // 64-bit buffer lenght
-		finalStream.write( pack4b( this.stream32.offset ) );     // 32-bit buffer lenght
-		finalStream.write( pack4b( this.stream16.offset ) );     // 16-bit buffer length
-		finalStream.write( pack4b( this.stream8.offset ) );      // 8-bit buffer length
-		finalStream.write( pack4b( this.stringLookup.length ) ); // String lookup table length
+		// If sparse bundle update stream8
+		if (this.sparse) {
 
-		// Merge individual streams
-		finalStream.merge( this.stream64 );
-		finalStream.merge( this.stream32 );
-		finalStream.merge( this.stream16 );
-		finalStream.merge( this.stream8 );
+			// Get the current offset of stream8 offset
+			var stream8offset = this.stream8.offset - 24;
 
-		// Write down null-terminated string lookup table in the end
-		for (var i=0; i<this.stringLookup.length; i++) {
-			finalStream.write( new Buffer( this.stringLookup[i] ) );
-			finalStream.write( new Buffer( [0] ) );
+			// Write down null-terminated string lookup table in the end
+			for (var i=0; i<this.stringLookup.length; i++) {
+				this.stream8.write( new Buffer( this.stringLookup[i] ) );
+				this.stream8.write( new Buffer( [0] ) );
+			}
+
+			// Finalize stream8
+			this.stream8.finalize();
+
+			// Overwrite header
+			this.stream8.writeAt( 2,  pack2b( this.objectTable.ID ) );  // Object Table ID
+			this.stream8.writeAt( 4,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
+			this.stream8.writeAt( 8,  pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
+			this.stream8.writeAt( 12, pack4b( this.stream16.offset ) ); // 16-bit buffer length
+			this.stream8.writeAt( 16, pack4b( stream8offset ) );  // 8-bit buffer length (exclude header)
+			this.stream8.writeAt( 20, pack4b( this.stringLookup.length ) ); // String lookup table length
+
+			// Close streams
+			this.stream8.close();  this.stream16.close(); 
+			this.stream32.close(); this.stream64.close(); 
+
+			// Update filename
+			this.filename += ".jbbp";
+
+			// Write summar header
+			if ((this.logFlags & LOG.SUMM)) {
+				var sumSize = this.stream8.offset +  this.stream16.offset + 
+							  this.stream32.offset + this.stream64.offset;
+
+				// Write summary footer
+				console.info("Encoding size =",sumSize,"bytes");
+				console.info("     8b chunk =",this.stream8.offset,"bytes");
+				console.info("    16b chunk =",this.stream16.offset,"bytes");
+				console.info("    32b chunk =",this.stream32.offset,"bytes");
+				console.info("    64b chunk =",this.stream64.offset,"bytes");
+
+			}
+
 		}
 
-		// Close
-		finalStream.finalize();
-		finalStream.close();
+		// If not separating, merge everything
+		else {
 
-		// Close and delete helper stream files
-		this.stream8.close();  fs.unlink( this.filename + '_b8.tmp' );
-		this.stream16.close(); fs.unlink( this.filename + '_b16.tmp' );
-		this.stream32.close(); fs.unlink( this.filename + '_b32.tmp' );
-		this.stream64.close(); fs.unlink( this.filename + '_b64.tmp' );
+			// Finalize stream8
+			this.stream8.finalize();
 
-		// Write summar header
-		if ((this.logFlags & LOG.SUMM)) {
-			console.info("Encoding size =",finalStream.offset,"bytes");
+			// Open final stream
+			var finalStream = new BinaryStream( this.filename + '.jbb', 8 );
+			finalStream.write( pack2b( 0x4233 ) );  				 // Magic header
+			finalStream.write( pack2b( this.objectTable.ID ) ); 	 // Object Table ID
+			finalStream.write( pack4b( this.stream64.offset ) );     // 64-bit buffer lenght
+			finalStream.write( pack4b( this.stream32.offset ) );     // 32-bit buffer lenght
+			finalStream.write( pack4b( this.stream16.offset ) );     // 16-bit buffer length
+			finalStream.write( pack4b( this.stream8.offset ) );      // 8-bit buffer length
+			finalStream.write( pack4b( this.stringLookup.length ) ); // String lookup table length
+
+			// Merge individual streams
+			finalStream.merge( this.stream64 ); finalStream.merge( this.stream32 );
+			finalStream.merge( this.stream16 ); finalStream.merge( this.stream8 );
+
+			// Write down null-terminated string lookup table in the end
+			for (var i=0; i<this.stringLookup.length; i++) {
+				finalStream.write( new Buffer( this.stringLookup[i] ) );
+				finalStream.write( new Buffer( [0] ) );
+			}
+
+			// Close
+			finalStream.finalize();
+			finalStream.close();
+
+			// Close and delete helper stream files
+			this.stream8.close();  fs.unlink( this.filename + '.jbbp' );
+			this.stream16.close(); fs.unlink( this.filename + '.b16.jbbp' );
+			this.stream32.close(); fs.unlink( this.filename + '.b32.jbbp' );
+			this.stream64.close(); fs.unlink( this.filename + '.b64.jbbp' );
+
+			// Update filename
+			this.filename += ".jbb";
+
+			// Write summar header
+			if ((this.logFlags & LOG.SUMM)) {
+				console.info("Encoding size =",finalStream.offset,"bytes");
+			}
+
 		}
 
 		// Write protocol overhead table

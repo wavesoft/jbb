@@ -27,15 +27,16 @@ var fs   = require('fs');
 /**
  * Create a binary encoder pointing to a random file
  */
-function open_encoder( ot ) {
+function open_encoder( ot, sparse ) {
 	// Create a temporary file
-	var tempName = temp.path({suffix: '.jbb.tmp'});
+	var tempName = temp.path({suffix: '.tmp'});
 
 	// Create an encoder
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
 		'log'			: 0,
-		'object_table' 	: ot
+		'object_table' 	: ot,
+		'sparse'		: sparse || false
 	});
 
 	// Return encoder
@@ -61,11 +62,49 @@ function open_decoder( encoder, ot, db ) {
 }
 
 /**
+ * Create a binary decoder to read something created with open_encoder
+ */
+function open_decoder_sparse( encoder, ot, db ) {
+	var readChunk = function(filename) {
+		// Read into buffer
+		var file = fs.readFileSync(filename),
+			u8 = new Uint8Array(file);
+		// Return buffer
+		return u8.buffer;
+	}
+
+	// Load chunk buffers
+	var chunks = [
+		readChunk( encoder.filename ),
+		readChunk( encoder.filename.replace(".jbbp", ".b16.jbbp") ),
+		readChunk( encoder.filename.replace(".jbbp", ".b32.jbbp") ),
+		readChunk( encoder.filename.replace(".jbbp", ".b64.jbbp") )
+	];
+
+	// Create a decoder & Parse
+	var decoder = new BinaryLoader( ot, db );
+	decoder.addByBuffer( chunks );
+	decoder.load();
+
+	// Rerturn
+	return decoder;
+}
+
+/**
  * Cleanup 
  */
 function cleanup_encoder( encoder ) {
+
 	// Remove bundle
 	fs.unlink( encoder.filename );
+
+	// Remove sparse bundle chunks
+	if (encoder.filename.substr(encoder.filename.length-5) == ".jbbp") {
+		fs.unlink( encoder.filename.replace(".jbbp", ".b16.jbbp") ),
+		fs.unlink( encoder.filename.replace(".jbbp", ".b32.jbbp") ),
+		fs.unlink( encoder.filename.replace(".jbbp", ".b64.jbbp") )
+	}
+
 }
 
 /**
@@ -80,7 +119,7 @@ function encode_decode( structure, ot ) {
 	// console.info = function() {};
 
 	// Create a temporary file
-	var tempName = temp.path({suffix: '.jbb.tmp'});
+	var tempName = temp.path({suffix: '.tmp'});
 
 	// ===[ ENCODE ]=====================
 
@@ -100,12 +139,12 @@ function encode_decode( structure, ot ) {
 	// (Since XHRLoader does not work on node.js)
 
 	// Read into buffer
-	var file = fs.readFileSync(tempName),
+	var file = fs.readFileSync(encoder.filename),
 		u8 = new Uint8Array(file),
 		buf = u8.buffer;
 
 	// Remove bundle
-	fs.unlink( tempName );
+	fs.unlink( encoder.filename );
 
 	// ===[ DECODE ]=====================
 
@@ -128,5 +167,6 @@ module.exports = {
 	'encode_decode': encode_decode,
 	'open_encoder': open_encoder,
 	'open_decoder': open_decoder,
+	'open_decoder_sparse': open_decoder_sparse,
 	'cleanup_encoder': cleanup_encoder,
 };

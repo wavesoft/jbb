@@ -112,6 +112,16 @@ function gen_array_rep( typeName, length, value ) {
 ////////////////////////////////////////////////////////////////
 
 /**
+ * Accelerator function for comparing primitives checking
+ */
+function it_should_match(a, b, repr) {
+	var text = repr || util.inspect(a,{'depth':0});
+	it('should match `'+text+'`, as encoded', function () {
+		assert.deepEqual( a, b );
+	});
+}
+
+/**
  * Accelerator function for checking exceptions
  */
 function it_should_throw(primitive, repr, isCorrectException) {
@@ -485,5 +495,36 @@ describe('[Encoding/Decoding]', function() {
 		});
 
 	});
+
+	describe('Sparse Bundles', function () {
+
+		// Create some objects
+		var obj1 = new ObjectA(),
+			obj2 = new ObjectB( 128, "some-string" ),
+			obj3 = new ObjectC( 1024, 4.212E+40 );
+			obj4 = new ObjectC( 31247123, 0.6764000058174133 );
+
+		// Create a sparse encoder with few objects
+		var encoder1 = common.open_encoder( ot, true );
+		encoder1.encode( obj1, 'obj1' );
+		encoder1.encode( obj2, 'obj2' );
+		encoder1.encode( obj3, 'obj3' );
+		encoder1.encode( obj4, 'obj4' );
+		encoder1.close();
+
+		// Load the sparse file
+		var decoder1 = common.open_decoder_sparse( encoder1, ot );
+		it_should_match( obj1, decoder1.database['test/obj1'], '[ObjectA]' );
+		it_should_match( obj2, decoder1.database['test/obj2'], '[ObjectB( 128, "some-string" )]');
+		it_should_match( obj3, decoder1.database['test/obj3'], '[ObjectC( 1024, 4.212E+40 )]');
+		it_should_match( obj4, decoder1.database['test/obj4'], '[ObjectD( 31247123, 0.6764000058174133 )]' );
+
+		// Cleanup at the end
+		after(function() {
+			common.cleanup_encoder( encoder1 );
+		});
+
+	});
+
 
 });

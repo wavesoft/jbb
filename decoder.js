@@ -596,11 +596,43 @@ function parseBundle( bundle, database, onsuccess, onerror ) {
 			default:
 				throw {
 					'name' 		: 'AssertError',
-					'message'	: 'Unknown control operator #'+op+'!',
+					'message'	: 'Unknown control operator #'+op+' at @'+bundle.i8+'!',
 					toString 	: function(){return this.name + ": " + this.message;}
 				}
 		}
 	}
+}
+
+/**
+ * Download helper
+ */
+function downloadArrayBuffers( urls, callback ) {
+
+	var pending = urls.length, buffers = Array(pending);
+	var continue_callback = function( response, index ) {
+		buffers[index] = response;
+		if (--pending == 0) callback( buffers );
+	};
+
+	for (var i=0; i<urls.length; i++) {
+		(function(index) {
+			// Request binary bundle
+			var req = new XMLHttpRequest(),
+				scope = this;
+
+			// Place request
+			req.open('GET', url);
+			req.responseType = "arraybuffer";
+			req.send();
+
+			// Wait until the bundle is loaded
+			req.onreadystatechange = function () {
+				if (req.readyState !== 4) return;
+				continue_callback( req.response, index );
+			};
+		})(i);
+	}
+
 }
 
 //////////////////////////////////////////////////////////////////
@@ -618,25 +650,59 @@ var BinaryBundle = function( buffer, objectTable ) {
 	// Exported properties prefix
 	this.prefix = "";
 
-	// Setup views to the buffer
-	this.u8  = new Uint8Array(buffer);
-	this.s8  = new Int8Array(buffer);
-	this.u16 = new Uint16Array(buffer);
-	this.s16 = new Int16Array(buffer);
-	this.u32 = new Uint32Array(buffer);
-	this.s32 = new Int32Array(buffer);
-	this.f32 = new Float32Array(buffer);
-	this.f64 = new Float64Array(buffer);
+	// If we are given an array as buffer, it means
+	// that we loaded separate chunks rather than a 
+	// single, unifide buffer.
+	this.sparse = (buffer instanceof Array);
+	var hv16, hv32, primBufLen, header_size = 24;
+	if (this.sparse) {
+
+		// Setup views to the buffer
+		this.u8  = new Uint8Array(buffer[0]);
+		this.s8  = new Int8Array(buffer[0]);
+		this.u16 = new Uint16Array(buffer[1]);
+		this.s16 = new Int16Array(buffer[1]);
+		this.u32 = new Uint32Array(buffer[2]);
+		this.s32 = new Int32Array(buffer[2]);
+		this.f32 = new Float32Array(buffer[2]);
+		this.f64 = new Float64Array(buffer[3]);
+
+		// Header views
+		hv16 = new Uint16Array(buffer[0], 0, header_size);
+		hv32 = new Uint32Array(buffer[0], 0, header_size);
+
+		// Length of the primary buffer
+		primBufLen = buffer[0].byteLength;
+
+	} else {
+
+		// Setup views to the buffer
+		this.u8  = new Uint8Array(buffer);
+		this.s8  = new Int8Array(buffer);
+		this.u16 = new Uint16Array(buffer);
+		this.s16 = new Int16Array(buffer);
+		this.u32 = new Uint32Array(buffer);
+		this.s32 = new Int32Array(buffer);
+		this.f32 = new Float32Array(buffer);
+		this.f64 = new Float64Array(buffer);
+
+		// Header views
+		hv16 = new Uint16Array(buffer);
+		hv32 = new Uint32Array(buffer);
+
+		// Length of the primary buffer
+		primBufLen = buffer.byteLength;
+
+	}
 
 	// Read header
-	var header_size = 24;
-	this.magic  	= this.u16[0];
-	this.table_id  	= this.u16[1];
-	this.max64  	= this.u32[1];
-	this.max32 		= this.u32[2];
-	this.max16 		= this.u32[3];
-	this.max8  		= this.u32[4];
-	this.maxST 		= this.u32[5];
+	this.magic  	= hv16[0];
+	this.table_id  	= hv16[1];
+	this.max64  	= hv32[1];
+	this.max32 		= hv32[2];
+	this.max16 		= hv32[3];
+	this.max8  		= hv32[4];
+	this.maxST 		= hv32[5];
 
 	// Validate magic
 	if (this.magic == 0x3342) {
@@ -663,22 +729,42 @@ var BinaryBundle = function( buffer, objectTable ) {
 	}
 
 	// Setup indices
-	this.i64 = header_size;
-	this.i32 = this.i64 + this.max64;
-	this.i16 = this.i32 + this.max32;
-	this.i8  = this.i16 + this.max16;
-	this.iEnd= this.i8 + this.max8;
+	if (this.sparse) {
 
-	// Offsets of array beginning (for getting array portions)
-	this.ofs8  = this.i8;
-	this.ofs16 = this.i16;
-	this.ofs32 = this.i32;
-	this.ofs64 = this.i64;
+		// Setup indices
+		this.i64 = 0;
+		this.i32 = 0;
+		this.i16 = 0;
+		this.i8  = header_size;
+		this.iEnd= this.i8 + this.max8;
 
-	// Convert to element index
-	this.i16 /= 2;
-	this.i32 /= 4;
-	this.i64 /= 8;
+		// Offsets of array beginning (for getting array portions)
+		this.ofs8  = this.i8;
+		this.ofs16 = this.i16;
+		this.ofs32 = this.i32;
+		this.ofs64 = this.i64;
+
+	} else {
+
+		// Setup indices
+		this.i64 = header_size;
+		this.i32 = this.i64 + this.max64;
+		this.i16 = this.i32 + this.max32;
+		this.i8  = this.i16 + this.max16;
+		this.iEnd= this.i8 + this.max8;
+
+		// Offsets of array beginning (for getting array portions)
+		this.ofs8  = this.i8;
+		this.ofs16 = this.i16;
+		this.ofs32 = this.i32;
+		this.ofs64 = this.i64;
+
+		// Convert to element index
+		this.i16 /= 2;
+		this.i32 /= 4;
+		this.i64 /= 8;
+
+	}
 
 	// Internal reference table
 	this.iref_table = [];
@@ -691,7 +777,7 @@ var BinaryBundle = function( buffer, objectTable ) {
 
 	// Populate string lookup table
 	var str = "";
-	for (var i=this.iEnd, llen=buffer.byteLength; i<llen; i++) {
+	for (var i=this.iEnd; i<primBufLen; i++) {
 		var c = this.u8[i];
 		if (c == 0) {
 			this.string_table.push(str);
@@ -727,16 +813,29 @@ var BinaryBundle = function( buffer, objectTable ) {
 	// ];
 
 	// Create fast typed array read function
-	this.readTypedArray = [
-		function (l) { var o = scope.i8;  	scope.i8  += l; return new Uint8Array(buffer, o, l); },
-		function (l) { var o = scope.i8;  	scope.i8  += l; return new Int8Array(buffer, o, l); },
-		function (l) { var o = 2*scope.i16; scope.i16 += l; return new Uint16Array(buffer, o, l); },
-		function (l) { var o = 2*scope.i16; scope.i16 += l; return new Int16Array(buffer, o, l); },
-		function (l) { var o = 4*scope.i32; scope.i32 += l; return new Uint32Array(buffer, o, l); },
-		function (l) { var o = 4*scope.i32; scope.i32 += l; return new Int32Array(buffer, o, l); },
-		function (l) { var o = 4*scope.i32; scope.i32 += l; return new Float32Array(buffer, o, l); },
-		function (l) { var o = 8*scope.i64; scope.i64 += l; return new Float64Array(buffer, o, l); },
-	];
+	if (this.sparse) {
+		this.readTypedArray = [
+			function (l) { var o = scope.i8;  	scope.i8  += l; return new Uint8Array(buffer[0], o, l); },
+			function (l) { var o = scope.i8;  	scope.i8  += l; return new Int8Array(buffer[0], o, l); },
+			function (l) { var o = 2*scope.i16; scope.i16 += l; return new Uint16Array(buffer[1], o, l); },
+			function (l) { var o = 2*scope.i16; scope.i16 += l; return new Int16Array(buffer[1], o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Uint32Array(buffer[2], o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Int32Array(buffer[2], o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Float32Array(buffer[2], o, l); },
+			function (l) { var o = 8*scope.i64; scope.i64 += l; return new Float64Array(buffer[3], o, l); },
+		];
+	} else {
+		this.readTypedArray = [
+			function (l) { var o = scope.i8;  	scope.i8  += l; return new Uint8Array(buffer, o, l); },
+			function (l) { var o = scope.i8;  	scope.i8  += l; return new Int8Array(buffer, o, l); },
+			function (l) { var o = 2*scope.i16; scope.i16 += l; return new Uint16Array(buffer, o, l); },
+			function (l) { var o = 2*scope.i16; scope.i16 += l; return new Int16Array(buffer, o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Uint32Array(buffer, o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Int32Array(buffer, o, l); },
+			function (l) { var o = 4*scope.i32; scope.i32 += l; return new Float32Array(buffer, o, l); },
+			function (l) { var o = 8*scope.i64; scope.i64 += l; return new Float64Array(buffer, o, l); },
+		];
+	}
 
 }
 
@@ -806,15 +905,6 @@ BinaryLoader.prototype = {
 	 */
 	'add': function( url, callback ) {
 
-		// Request binary bundle
-		var req = new XMLHttpRequest(),
-			scope = this;
-
-		// Place request
-		req.open('GET', url);
-		req.responseType = "arraybuffer";
-		req.send();
-
 		// Load bundle header and keep a callback
 		// for the remainging loading operations
 		var pendingBundle = {
@@ -826,28 +916,43 @@ BinaryLoader.prototype = {
 		// Keep this pending action
 		this.pendingBundleParsers.push( pendingBundle );
 
-		// Wait until the bundle is loaded
-		req.onreadystatechange = function () {
-			if (req.readyState !== 4) return;
-			try {
+		// Check for sparse bundle
+		var parts = url.split("?"), suffix = "", reqURL = [];
+		if (parts.length > 1) suffix = "?"+parts[1];
+		if (parts[0].substr(parts[0].length - 5).toLowerCase() == ".jbbp") {
+			var base = parts[0].substr(0, parts[0].length - 5);
+			reqURL = [
+				base + '.jbbp',
+				base + '.b16.jbbp',
+				base + '.b32.jbbp',
+				base + '.b64.jbbp'
+			];
+		} else {
+			reqURL = [
+				parts[0] + suffix
+			];
+		}
 
+		// Download bundle from URL
+		downloadArrayBuffers(reqURL, function( response ) {
+			try {
+				// If response contains only one item, remove array
+				if (response.length == 1) response = response[0];
 				// Setup the parser callback
-				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( req.response, scope.objectTable ) );
+				pendingBundle.callback = parseBundle.bind( {}, new BinaryBundle( response, scope.objectTable ) );
 				// Update bundle status
 				pendingBundle.status = PBUND_LOADED;
-
 				// Fire callback
 				if (callback) callback( null, this );
 
 			} catch (e) {
-
 				// Update bundle status
 				pendingBundle.status = PBUND_ERROR;
 				// Fire error callback
 				if (callback) callback("Error parsing bundle "+url+": "+e.toString(), null);
 
 			}
-		}
+		});
 
 	},
 
