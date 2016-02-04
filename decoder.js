@@ -802,10 +802,9 @@ BinaryLoader.prototype = {
 	 * If an error occures, call the onerror callback.
 	 *
 	 * @param {string} url - The URL to load
-	 * @param {function} onsuccess - The callback to fire when the bundle is loaded
-	 * @param {function} onerror - The callback to fire an error occures
+	 * @param {function} callback - The callback to fire when the bundle is loaded
 	 */
-	'load': function( url, onsuccess, onerror ) {
+	'add': function( url, callback ) {
 
 		// Request binary bundle
 		var req = new XMLHttpRequest(),
@@ -838,14 +837,14 @@ BinaryLoader.prototype = {
 				pendingBundle.status = PBUND_LOADED;
 
 				// Fire callback
-				if (onsuccess) onsuccess();
+				if (callback) callback( null, this );
 
 			} catch (e) {
 
 				// Update bundle status
 				pendingBundle.status = PBUND_ERROR;
 				// Fire error callback
-				if (onerror) onerror("Error parsing bundle "+url+": "+e.toString());
+				if (callback) callback("Error parsing bundle "+url+": "+e.toString(), null);
 
 			}
 		}
@@ -855,7 +854,7 @@ BinaryLoader.prototype = {
 	/**
 	 * Load from buffer
 	 */
-	'loadBuffer': function( buffer ) {
+	'addByBuffer': function( buffer ) {
 
 		// Prepare pending bundle
 		var pendingBundle = {
@@ -872,21 +871,20 @@ BinaryLoader.prototype = {
 	/**
 	 * Parse the stack of bundles currently loaded
 	 */
-	'parse': function( onsuccess, onerror ) {
-		// console.time( 'BinaryBundle' );
+	'load': function( callback ) {
 
 		// Parse everything
 		for (var i=0; i<this.pendingBundleParsers.length; i++) {
-
 			// Parse into the database
 			this.pendingBundleParsers[i].callback( this.database );
-
 		}
 
 		// Release parser scope
 		this.pendingBundleParsers = [];
 
-		// console.timeEnd( 'BinaryBundle' );
+		// We are done
+		if (callback) callback( null, this );
+
 	}
 
 };

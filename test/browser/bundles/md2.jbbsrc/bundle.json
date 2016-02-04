@@ -1,0 +1,24 @@
+{
+	"name": "md2",
+	"exports": {
+		"THREE.MD2CharacterLoader": {
+			"ratamahatta": {
+				"baseUrl": "${BUNDLE}/ratamahatta/",
+				"body": "ratamahatta.md2",
+				"skins": [ "ratamahatta.png", "ctf_b.png", "ctf_r.png", "dead.png", "gearwhore.png" ],
+				"weapons":  [  [ "weapon.md2", "weapon.png" ],
+							 [ "w_bfg.md2", "w_bfg.png" ],
+							 [ "w_blaster.md2", "w_blaster.png" ],
+							 [ "w_chaingun.md2", "w_chaingun.png" ],
+							 [ "w_glauncher.md2", "w_glauncher.png" ],
+							 [ "w_hyperblaster.md2", "w_hyperblaster.png" ],
+							 [ "w_machinegun.md2", "w_machinegun.png" ],
+							 [ "w_railgun.md2", "w_railgun.png" ],
+							 [ "w_rlauncher.md2", "w_rlauncher.png" ],
+							 [ "w_shotgun.md2", "w_shotgun.png" ],
+							 [ "w_sshotgun.md2", "w_sshotgun.png" ]
+						]
+			}
+		}
+	}
+}

@@ -53,8 +53,8 @@ function open_decoder( encoder, ot, db ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader( ot, db );
-	decoder.loadBuffer(buf);
-	decoder.parse();
+	decoder.addBuffer(buf);
+	decoder.load();
 
 	// Rerturn
 	return decoder;
