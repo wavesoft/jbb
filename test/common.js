@@ -19,8 +19,8 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var BinaryEncoder = require("../../encoder.js");
-var BinaryLoader = require("../../decoder.js");
+var BinaryEncoder = require("../encoder.js");
+var BinaryLoader = require("../decoder.js");
 var temp = require("temp").track();
 var fs   = require('fs');
 
@@ -53,7 +53,7 @@ function open_decoder( encoder, ot, db ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader( ot, db );
-	decoder.addBuffer(buf);
+	decoder.addByBuffer(buf);
 	decoder.load();
 
 	// Rerturn
@@ -111,8 +111,8 @@ function encode_decode( structure, ot ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader( ot );
-	decoder.loadBuffer(buf);
-	decoder.parse();
+	decoder.addByBuffer(buf);
+	decoder.load();
 
 	// Enable logging
 	console.log = c_log;
