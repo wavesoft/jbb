@@ -18,20 +18,37 @@ function run_test( bundle ) {
 	// Instantiate a new binary decoder
 	var binaryLoader = new BinaryDecoder( profileTable );
 
-	// First load from source
-	console.time("source["+bundle+"]");
-	sourceLoader.add( bundle );
-	sourceLoader.load( function() {
-		console.timeEnd("source["+bundle+"]");
+	// Run timing tests for source
+	var load_source = function( cb ){
+		console.time("source["+bundle+"]");
+		sourceLoader.add( bundle );
+		sourceLoader.load(function() {
+			console.timeEnd("source["+bundle+"]");
+			cb();
+		});
+	};
 
-		// Then load the binary
+	// Run timing tests for binary
+	var load_binary = function( cb ){
 		console.time("binary["+bundle+"]");
 		binaryLoader.add( 'build/bundles/'+bundle+'.jbb', function() {
 			binaryLoader.load(function() {
 				console.timeEnd("binary["+bundle+"]");
+				cb();
 			});
 		});
+	}
 
+
+	// Run binary first
+	load_binary(function() {
+		// Wait a sec
+		setTimeout(function() {
+			// Load source
+			load_source(function() {
+				console.log("-- test completed --");
+			});
+		}, 1000);
 	});
 
 }
