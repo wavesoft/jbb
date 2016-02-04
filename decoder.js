@@ -746,10 +746,10 @@ BinaryBundle.prototype.where = function() {
 /**
  * Binary bundle loader
  */
-var BinaryLoader = function( objectTable ) {
+var BinaryLoader = function( objectTable, database ) {
 
-	this.dbObjects = [];
-	this.database = {};
+	// Initialize properties
+	this.database = database || {};
 
 	// Collection of parsers pending
 	this.pendingBundleParsers = [];

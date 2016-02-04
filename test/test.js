@@ -3,11 +3,64 @@ var util   = require('util');
 var assert = require('assert');
 var common = require('./common');
 
-// Blank object table for tests
+// A coule of local objects, part of Object Table
+var ObjectA = function() {
+	this.propA = 125;
+	this.propB = 65532;
+	this.propC = "A string";
+};
+var ObjectB = function( propA, propB ) {
+	this.propA = propA;
+	this.propB = propB;
+	this.propC = [ 1, 4, 120, 4123 ]
+};
+var ObjectC = function( propA, propB ) {
+	this.propA = propA;
+	this.propB = propB;
+	this.propC = { 'some': { 'sub': 'object' } };
+	this.propD = "I am ignored :(";
+};
+var ObjectD = function() {
+	this.propA = 0;
+	this.propB = 1;
+	this.propC = "Not part of ObjectTable";
+};
+
+// Default & Unconstructed factories
+var DefaultFactory = function(ClassName) {
+	return new ClassName();
+}
+var UnconstructedFactory = function(ClassName) {
+	return Object.create(ClassName.prototype);
+}
+
+// Default init
+var DefaultInit = function( instance, properties, values ) {
+	for (var i=0; i<properties.length; i++) {
+		instance[properties[i]] = values[i];
+	}
+}
+var ObjectCInit = function( instance, properties, values ) {
+	DefaultInit( instance, properties, values );
+	instance.constructor.call(
+			instance, instance.propA,
+					  instance.propB
+		);
+}
+
+// Local object table for tests
 var ot 	   = {
 	'ID' 		: 0,
-	'ENTITIES' 	: [],
-	'PROPERTIES': [],
+	'ENTITIES' 	: [
+		[ ObjectA, DefaultFactory, DefaultInit ],
+		[ ObjectB, UnconstructedFactory, DefaultInit ],
+		[ ObjectC, UnconstructedFactory, ObjectCInit ]
+	],
+	'PROPERTIES': [
+		[ 'propA', 'propB', 'propC' ],
+		[ 'propA', 'propB', 'propC' ],
+		[ 'propA', 'propB', 'propC' ]
+	],
 };
 
 ////////////////////////////////////////////////////////////////
@@ -57,6 +110,19 @@ function gen_array_rep( typeName, length, value ) {
 ////////////////////////////////////////////////////////////////
 // Test helpers
 ////////////////////////////////////////////////////////////////
+
+/**
+ * Accelerator function for checking exceptions
+ */
+function it_should_throw(primitive, repr, isCorrectException) {
+	var text = repr || util.inspect(primitive,{'depth':0});
+	it('should except when encoding `'+text+'`', function () {
+		assert.throws(function() {
+			var ans = common.encode_decode( primitive, ot );
+			assert(isNaN(ans) || (ans == undefined), 'encoder return an error after exception');
+		}, isCorrectException)
+	});
+}
 
 /**
  * Accelerator function for primitive checking
@@ -322,7 +388,70 @@ describe('[Encoding/Decoding]', function() {
 		it_should_return( obj3, "{ multi: [Object], object: [Object], with: [Object], iref: [Object] }" );
 		it_should_return( obj4 );
 
+		// Try to encode known object instances
+		var obj5 = new ObjectA(),
+			obj6 = new ObjectB( 12345, "check" ),
+			obj7 = new ObjectC( 23456, "check-too" ),
+			obj8 = new ObjectD();
+
+		// Try to encode objects part of OT
+		it_should_return( obj5, '[ObjectA] (DefaultFactory, DefaultInit)' );
+		it_should_return( obj6, '[ObjectB] (UnconstructedFactory, DefaultInit)' );
+		it_should_return( obj7, '[ObjectC] (UnconstructedFactory, CustomInit)' );
+		it_should_throw ( obj8, '[ObjectD] (Not part of OT)', function(err) {
+			return (err.name == 'EncodingError');
+		});
+
 	});
 
+	describe('External References (XRef)', function () {
+
+		// Create some objects
+		var obj1 = new ObjectA(),
+			obj2 = new ObjectB( 12345, "check" ),
+			obj3 = new ObjectC( obj1, "part-object-1" ),
+			obj4 = new ObjectC( obj2, "part-object-2" );
+
+		// Create externals database
+		var db = {
+			'x/obj1': obj1,
+			'x/obj2': obj2
+		};
+
+		// Create an encoder
+		var encoder = common.open_encoder( ot );
+		encoder.setDatabase( db );
+
+		// Encode two objects that point to xrefs
+		encoder.encode( obj3, 'obj3' );
+		encoder.encode( obj4, 'obj4' );
+		encoder.close();
+
+		it('should fail when oppening a bundle with xrefs, without db', function() {
+			assert.throws(function() {
+				var openBundle = common.open_decoder( encoder, ot );
+			}, function(err) {
+				return (err.name == 'ImportError');
+			}, 'bundle decoder did not thorw an ImportError while loading');
+		});
+
+		it('should encode only the specified objects', function() {
+			// Open bundle with xref table
+			var openBundle = common.open_decoder( encoder, ot, {
+				'x/obj1': "yes-imported-1",
+				"x/obj2": "yes-imported-2"
+			});
+
+			// Make sure xrefs are correct
+			assert( openBundle.database['obj3'].propA == "yes-imported-1" );
+			assert( openBundle.database['obj4'].propA == "yes-imported-2" );
+		});
+
+		// Cleanup at the end
+		after(function() {
+			common.cleanup_encoder( encoder );
+		});
+
+	});
 
 });

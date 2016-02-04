@@ -25,6 +25,50 @@ var temp = require("temp").track();
 var fs   = require('fs');
 
 /**
+ * Create a binary encoder pointing to a random file
+ */
+function open_encoder( ot ) {
+	// Create a temporary file
+	var tempName = temp.path({suffix: '.jbb.tmp'});
+
+	// Create an encoder
+	var encoder = new BinaryEncoder(tempName, {
+		'name' 			: 'test',
+		'log'			: 0,
+		'object_table' 	: ot
+	});
+
+	// Return encoder
+	return encoder;
+}
+
+/**
+ * Create a binary decoder to read something created with open_encoder
+ */
+function open_decoder( encoder, ot, db ) {
+	// Read into buffer
+	var file = fs.readFileSync(encoder.filename),
+		u8 = new Uint8Array(file),
+		buf = u8.buffer;
+
+	// Create a decoder & Parse
+	var decoder = new BinaryLoader( ot, db );
+	decoder.loadBuffer(buf);
+	decoder.parse();
+
+	// Rerturn
+	return decoder;
+}
+
+/**
+ * Cleanup 
+ */
+function cleanup_encoder( encoder ) {
+	// Remove bundle
+	fs.unlink( encoder.filename );
+}
+
+/**
  * Perform encoding and decoding of the specified structure
  */
 function encode_decode( structure, ot ) {
@@ -79,9 +123,10 @@ function encode_decode( structure, ot ) {
 
 }
 
+// Export functions
 module.exports = {
-
-	// Encode/Decode
 	'encode_decode': encode_decode,
-
+	'open_encoder': open_encoder,
+	'open_decoder': open_decoder,
+	'cleanup_encoder': cleanup_encoder,
 };

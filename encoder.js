@@ -1662,8 +1662,6 @@ function encodeObject( encoder, object ) {
 
 	// If no such entity exists, raise exception
 	if (eid < 0) {
-		console.log(Object);
-		console.log(object);
 		throw {
 			'name' 		: 'EncodingError',
 			'message'	: 'An object trying to encode was not declared in the object table!',
