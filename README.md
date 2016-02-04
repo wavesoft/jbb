@@ -10,107 +10,65 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 :warning: This format is Architecture-Dependant: This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
+## Installation
+
+JBB is available as npm module, so you can install it globally like so:
+
+```
+npm install -g jbb
+```
+
+Or make it part of your project like so:
+
+```
+npm install --save jbb
+```
+
+You will also need a jbb profile according to the resources you are going to bundle. For example, if you are bundling resources for a three.js project you will **also** need:
+
+```
+npm install jbb-profile-three
+```
+
 ## Creating a Bundle
 
-First, collect all your resources in a folder and then create a `bundle.json` in it's base. This file describes what resources to pack and has the following format:
+Create a new directory with the name of your bundle, for example `mybundle.jbbsrc` and place all your resources there.
 
+In the root of the folder, create a `bundle.json` file and specify what resources are exported by this bundle:
 ```js
 {
-    //
-    // The name of the bundle [Required]
-    //
-    "name"      : "bundle-name",
-
-    //
-    // Which JBB Profile (Object Table) to use [Optional]
-    //
-    "profile"   : "three",
-
-    //
-    // Depending modules [Optional]
-    //
-    "imports"   : [ 'dependant-module-1', 'dependant-module-2' ],
-
-    //
-    // What does this module export [Required]
-    //
-    "exports"   : {
-    
-        //
-        // Specify the loader to use
-        //
-        "THREE.JSONLoader": {
-
-            //
-            // Specify for each export the parameters the loader expects.
-            // In most of the cases it's just the path to the resource,
-            // but other loaders (see below) might require more complex
-            // configuration.
-            //
-            // The macro ${BUNDLE} is provided for convenience, and it
-            // expands to the base directory of the bundle.
-            //
-            "test-model": "${BUNDLE}/models/test.json",
-
-            //
-            // You can specify multiple models unter the same loader
-            //
-            "another-model": "modeuls/world.json"
-
-        },
-
-        //
-        // Other loaders require more complex configuration
-        // rather than just a filename.
-        //
-        "THREE.MD2CharacterLoader": {
-            
-            //
-            // For example, the MD2CharacterLoader requires detailed
-            // configuration for various parts:
-            //
-            "ratamahatta": {
-                baseUrl: "${BUNDLE}/mesh/ratamahatta/",
-                body: "ratamahatta.md2",
-                skins: [ "ratamahatta.png", "ctf_b.png", "ctf_r.png", "dead.png", "gearwhore.png" ],
-                weapons:  [  [ "weapon.md2", "weapon.png" ],
-                             [ "w_bfg.md2", "w_bfg.png" ],
-                             [ "w_blaster.md2", "w_blaster.png" ],
-                             [ "w_chaingun.md2", "w_chaingun.png" ],
-                             [ "w_glauncher.md2", "w_glauncher.png" ],
-                             [ "w_hyperblaster.md2", "w_hyperblaster.png" ],
-                             [ "w_machinegun.md2", "w_machinegun.png" ],
-                             [ "w_railgun.md2", "w_railgun.png" ],
-                             [ "w_rlauncher.md2", "w_rlauncher.png" ],
-                             [ "w_shotgun.md2", "w_shotgun.png" ],
-                             [ "w_sshotgun.md2", "w_sshotgun.png" ]
-                          ]
-            }
-
-        },
-
-        //
-        // And of course you can also pack binary blobs
-        //
+    "name" : "mybundle",
+    "exports": {
         "blob": {
-
-            //
-            // For each binary resource the MIME type will be
-            // automatically detected base on the extension
-            //
-            "background-audio": "sounds/background.mp3",
-
-            //
-            // You can also override the automatic MIME detection
-            // by specifying the MIME type yourself
-            //
-            "player-sound": [ "sounds/player.mp3", "audio/mpeg" ]
-
+            "images/background" : "background_image.jpg",
+            "audio/beep" : "sounds/beep.mp3"
         }
-
     }
 }
 ```
+
+_For more details on how to use the `bundle.json` check the [doc/bundle.json](doc/bundle.json)._
+
+However the real benefit comes when you have resources that can be properly serialized in a JBB bundle. For example, if you are bundling resources for a `THREE.js` project, you will most probably have meshes, textures, materials etc. 
+
+To properly describe these resources you will need to specify the correct loader class for each type, for example:
+
+```js
+{
+    "name" : "mybundle",
+    "exports": {
+        "blob": {
+            "images/background" : "background_image.jpg",
+            "audio/beep" : "sounds/beep.mp3"
+        },
+        "THREE.JSONLoader": {
+            "mesh/monster" : "models/monster/monster.js"
+        }
+    }
+}
+```
+
+You don't need to specify the images or other depending resources, since they will be automatically resolved at compile-time.
 
 ### Compiling with CLI
 
@@ -121,16 +79,36 @@ In order for the compiler to know how to handle your resources, you will need to
 In case of a `three.js` project, you can use the `jbb-profile-three`:
 
 ```
-~$ npm install -g jbb jbb-profile-three
+npm install -g jbb jbb-profile-three
 ```
 
 This will make the `jbb` compiler and the `jbb-profile-three` available to your system. You can then compile your bundles like so:
 
 ```
-~$ jbb -p three -o bundle.jbb /path/to/resource.js ...
+jbb -p three -o mybundle.jbb /path/to/mybundle.jbbsrc
 ```
 
 Note that the files passed to the jbb compiler must be supported by the profile, otherwise you will get errors. For more details have a look on your profile description, for example of [jbb-profile-three](https://github.com/wavesoft/jbb-profile-three).
+
+### Compiling with Gulp
+
+You can also use the [gulp-jbb](https://github.com/wavesoft/gulp-jbb) plugin to create binary bundles with Gulp.
+
+```
+var gulp  = require('gulp');
+var jbb   = require('gulp-jbb');
+
+gulp.task('bundles', function() {
+    return gulp
+        .src([
+            'mybundle.jbbsrc'
+        ])
+        .pipe(jbb({
+            'profile': 'three'
+        }))
+        .pipe(gulp.dest('build'));
+});
+```
 
 ### Compiling with API
 

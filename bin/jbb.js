@@ -8,18 +8,11 @@ console.info = function() { console.log.apply(console, ["INFO:".green].concat(Ar
 console.info("Initializing compiler");
 
 // Import dependencies
+var fs = require('fs');
 var path = require('path');
 var getopt = require('node-getopt');
 var BinaryEncoder = require("../encoder");
 var BinaryCompiler = require("../compiler");
-
-///////////////////////////////////////////////////////////////////////
-// Parse input
-///////////////////////////////////////////////////////////////////////
-
-var config = {
-	'profile' : 	'three'
-};
 
 ///////////////////////////////////////////////////////////////////////
 // Helper functions
@@ -138,10 +131,6 @@ global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 // Parse options without profile first
 var opt = createOptions();
-if (opt.options['profile'] == undefined) {
-	console.error("You need to specify a profile to compile for (ex. -p three)");
-	process.exit(1);
-}
 if (opt.options['out'] == undefined) {
 	console.error("You need to specify an output file (ex. -o bundle.jbb)");
 	process.exit(1);
@@ -156,22 +145,6 @@ var baseDir = ".";
 if (opt.options['basedir'] !== undefined)
 	baseDir = opt.options['basedir'];
 
-// Load profile
-console.info("Loading profile "+String(opt.options['profile']).bold);
-try {
-	var profile_ot = require("jbb-profile-"+opt.options['profile']);
-} catch (e) {
-	console.error("Could not find profile ( try: npm install jbb-profile-"+opt.options['profile']+" )");
-	process.exit(1);
-}
-
-// Access the profile object table and file loader
-var profile_ot = require("jbb-profile-"+opt.options['profile']);
-var profile_loader = require("jbb-profile-"+opt.options['profile']+'/loader');
-
-// Initialize environment according to the profile
-if (profile_loader.initialize) profile_loader.initialize();
-
 // Get bundle name
 var nameparts = opt.options['out'].split("."); nameparts.pop();
 var name = nameparts.join(".");
@@ -180,12 +153,54 @@ var name = nameparts.join(".");
 var bundlePath = opt.argv[0];
 if (bundlePath.substr(0,1) != "/") bundlePath = baseDir + '/' + bundlePath;
 
-// Compile first file
-BinaryCompiler.compileFile(
-	bundlePath, opt.options['out'], {
-		'path'			: baseDir,
-		'log'			: getLogFlags(opt.options['log']),
-		'profileTable'	: profile_ot,
-		'profileLoader'	: profile_loader,
+// Try to load the bundle
+var fname = bundlePath + "/bundle.json";
+fs.readFile(fname, 'utf8', function (err,data) {
+	if (err) {
+		console.error("Could not load bundle specifications from "+fname);
+		process.exit(1);
 	}
-);
+
+	// Parse data
+	var bundleSpecs = JSON.parse(data);
+
+	// Check for profile either from input or from bundle
+	var profile = opt.options['profile'];
+	if (profile == undefined) {
+		if (bundleSpecs['profile']) {
+			profile = bundleSpecs['profile'];
+		} else {
+			console.error("You need to specify a profile to compile for (ex. -p three)");
+			process.exit(1);
+		}
+	}
+
+	// Load profile
+	console.info("Loading profile "+String(profile).bold);
+	try {
+		var profile_ot = require("jbb-profile-"+profile);
+	} catch (e) {
+		console.error("Could not find profile ( try: npm install jbb-profile-"+profile+" )");
+		process.exit(1);
+	}
+
+	// Access the profile object table and file loader
+	var profile_ot = require("jbb-profile-"+profile);
+	var profile_loader = require("jbb-profile-"+profile+'/loader');
+
+	// Initialize environment according to the profile
+	if (profile_loader.initialize) profile_loader.initialize();
+
+	// Compile first file
+	BinaryCompiler.compile(
+		bundleSpecs, opt.options['out'], {
+			'path'			: baseDir,
+			'log'			: getLogFlags(opt.options['log']),
+			'profileTable'	: profile_ot,
+			'profileLoader'	: profile_loader,
+		}
+	);
+
+
+});
+
