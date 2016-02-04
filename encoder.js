@@ -2149,9 +2149,9 @@ var BinaryEncoder = function( filename, config ) {
 	// The final file is assembled from these chunks, or kept as-is if
 	// requested to separate into multiple bundles (sparse bundle).
 	this.filename = filename;
-	this.stream64 = new BinaryStream( filename + '.b64.jbbp', 8, ((this.logFlags & LOG.WRT) != 0) );
-	this.stream32 = new BinaryStream( filename + '.b32.jbbp', 4, ((this.logFlags & LOG.WRT) != 0) );
-	this.stream16 = new BinaryStream( filename + '.b16.jbbp', 2, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream64 = new BinaryStream( filename + '_b64.jbbp', 8, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream32 = new BinaryStream( filename + '_b32.jbbp', 4, ((this.logFlags & LOG.WRT) != 0) );
+	this.stream16 = new BinaryStream( filename + '_b16.jbbp', 2, ((this.logFlags & LOG.WRT) != 0) );
 	this.stream8  = new BinaryStream( filename + '.jbbp', 	  1, ((this.logFlags & LOG.WRT) != 0) );
 
 	// Counters for optimising the protocol
@@ -2309,9 +2309,9 @@ BinaryEncoder.prototype = {
 
 			// Close and delete helper stream files
 			this.stream8.close();  fs.unlink( this.filename + '.jbbp' );
-			this.stream16.close(); fs.unlink( this.filename + '.b16.jbbp' );
-			this.stream32.close(); fs.unlink( this.filename + '.b32.jbbp' );
-			this.stream64.close(); fs.unlink( this.filename + '.b64.jbbp' );
+			this.stream16.close(); fs.unlink( this.filename + '_b16.jbbp' );
+			this.stream32.close(); fs.unlink( this.filename + '_b32.jbbp' );
+			this.stream64.close(); fs.unlink( this.filename + '_b64.jbbp' );
 
 			// Update filename
 			this.filename += ".jbb";

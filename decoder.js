@@ -923,9 +923,9 @@ BinaryLoader.prototype = {
 			var base = parts[0].substr(0, parts[0].length - 5);
 			reqURL = [
 				base + '.jbbp',
-				base + '.b16.jbbp',
-				base + '.b32.jbbp',
-				base + '.b64.jbbp'
+				base + '_b16.jbbp',
+				base + '_b32.jbbp',
+				base + '_b64.jbbp'
 			];
 		} else {
 			reqURL = [

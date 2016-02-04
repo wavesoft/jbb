@@ -76,9 +76,9 @@ function open_decoder_sparse( encoder, ot, db ) {
 	// Load chunk buffers
 	var chunks = [
 		readChunk( encoder.filename ),
-		readChunk( encoder.filename.replace(".jbbp", ".b16.jbbp") ),
-		readChunk( encoder.filename.replace(".jbbp", ".b32.jbbp") ),
-		readChunk( encoder.filename.replace(".jbbp", ".b64.jbbp") )
+		readChunk( encoder.filename.replace(".jbbp", "_b16.jbbp") ),
+		readChunk( encoder.filename.replace(".jbbp", "_b32.jbbp") ),
+		readChunk( encoder.filename.replace(".jbbp", "_b64.jbbp") )
 	];
 
 	// Create a decoder & Parse
@@ -100,9 +100,9 @@ function cleanup_encoder( encoder ) {
 
 	// Remove sparse bundle chunks
 	if (encoder.filename.substr(encoder.filename.length-5) == ".jbbp") {
-		fs.unlink( encoder.filename.replace(".jbbp", ".b16.jbbp") ),
-		fs.unlink( encoder.filename.replace(".jbbp", ".b32.jbbp") ),
-		fs.unlink( encoder.filename.replace(".jbbp", ".b64.jbbp") )
+		fs.unlink( encoder.filename.replace(".jbbp", "_b16.jbbp") ),
+		fs.unlink( encoder.filename.replace(".jbbp", "_b32.jbbp") ),
+		fs.unlink( encoder.filename.replace(".jbbp", "_b64.jbbp") )
 	}
 
 }
