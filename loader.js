@@ -450,7 +450,7 @@ BundlesLoader.prototype.add = function( url, callback ) {
 			url = this.baseURL + '/' + url;
 
 		// Set URL
-		item.setURL( url );
+		item.setURL( url + this.bundleSuffix );
 
 	}
 
