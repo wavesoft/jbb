@@ -7,7 +7,7 @@ var PROD 		= JSON.parse(process.env.PROD_DEV || "0");
 // Compile the sources 
 //
 gulp.task('dist', function() {
-	return gulp.src('decoder.js')
+	return gulp.src('index.js')
 		.pipe(webpack({
 			module: {
 				loaders: [
@@ -19,20 +19,26 @@ gulp.task('dist', function() {
 		    },
 		    output: {
 		    	// The output filename
-		    	filename: 'jbb.min.js',
+		    	filename: PROD ? 'jbb-profile-three.min.js' : 'jbb-profile-three.js',
+				// Export itself to a global var
 				libraryTarget: 'var',
-				library: 'JBBLoader'
+				// Name of the global var: 'Foo'
+				library: 'JBBProfileThree'
 			},
 			externals: {
+				'jquery': 'jQuery',
+				'three': 'THREE',
 			},
-		    plugins: [
+		    plugins: PROD ? [
 		    	new webpack.webpack.optimize.DedupePlugin(),
 			    new webpack.webpack.optimize.UglifyJsPlugin({
 			    	minimize: true
 			    })
+		    ] : [
+		    	new webpack.webpack.optimize.DedupePlugin(),
 		    ]
 		}))
-		.pipe(header("/* Javascript Binary Bundles - Binary Loader - https://github.com/wavesoft/jbb */\n"))
+		.pipe(header("/* THREE.js profile for JBB - https://github.com/wavesoft/jbb-profile-three */\n"))
 		.pipe(gulp.dest('dist'));
 });
 
