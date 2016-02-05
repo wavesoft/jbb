@@ -24,10 +24,12 @@
   "devDependencies": {
     "binary-search-tree": "^0.2.4",
     "colors": "^1.1.2",
+    "gulp-header": "^1.7.1",
     "mocha": "^2.3.4",
     "mock-browser": "^0.91.34",
     "node-getopt": "^0.2.3",
     "temp": "^0.8.3",
+    "webpack-stream": "^3.1.0",
     "xmlhttprequest": "^1.8.0"
   },
   "dependencies": {
