@@ -1,6 +1,6 @@
 {
   "name": "jbb",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Javascript Binary Bundle",
   "main": "index.js",
   "scripts": {
