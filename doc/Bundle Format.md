@@ -38,6 +38,8 @@ That's why the bundle is organised in four streams laid one after the other, as 
 
 The entry point of the bundle is the beginning of the 8-bit elements, since all the op-codes are 8-bit long (`UInt8`).
 
+*NOTE:* When using sparse format, the four streams are separated in four different files that can be loaded in parallel.
+
 ## Header
 
 The file header is organised as shown below. The `Magic` number is a 16-bit unsigned integer with value `0x4233`, so it's represented as `<33h,42h>` in machines with little-endian architecture or `<42h,33h>` in big-endian. It's therefore possible to detect incompatible endianess before loading the bundle. 

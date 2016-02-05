@@ -4,11 +4,13 @@
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
-**Why Binary Bundles?** For *faster* loading time due to *fewer* requests and an *optimised* binary format, closely compatible with Javascript internals.
+**Why Binary Bundles?** For *faster* loading time due to *fewer* requests and an *optimised* binary format, closely compatible with Javascript internals. If you want to learn more, check [the specifications document](https://github.com/wavesoft/jbb/blob/master/doc/Bundle%20Format.md), [the FAQ](#frequently-asked-questions) in the end of this document or [this nice blog entry](http://wavesoft.github.io/javascript-binary-bundles/) that explains my reasoning for this project.
 
 :thumbsup: This is NOT an archiving format! Even though you *could* pack binary blobs in a `jbb `bundle, it's designed  to optimally store serialized javascript structures!
 
 :warning: This format is Architecture-Dependant: This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
+
+:warning: This project is still in development
 
 ## Installation
 
@@ -47,7 +49,7 @@ In the root of the folder, create a `bundle.json` file and specify what resource
 }
 ```
 
-_For more details on how to use the `bundle.json` check the [doc/bundle.json.md](doc/bundle.json.md)._
+_For more details on how to use the `bundle.json` check the [complete reference](https://github.com/wavesoft/jbb/blob/master/doc/bundle.json.md)._
 
 However the real benefit comes when you have resources that can be properly serialized in a JBB bundle. For example, if you are bundling resources for a `THREE.js` project, you will most probably have meshes, textures, materials etc. 
 
@@ -94,7 +96,7 @@ Note that the files passed to the jbb compiler must be supported by the profile,
 
 You can also use the [gulp-jbb](https://github.com/wavesoft/gulp-jbb) plugin to create binary bundles with Gulp.
 
-```
+```javascript
 var gulp  = require('gulp');
 var jbb   = require('gulp-jbb');
 
@@ -127,7 +129,7 @@ var BinaryEncoder = require("jbb").BinaryEncoder;
 var THREEObjectTable = require("jbb-profile-three");
 
 // Create a new bundle
-var bundle = new BinaryEncoder('path/to/bundle.jbb', {
+var bundle = new BinaryEncoder('path/to/bundle', {
     'name': 'bundle',                 // Bundle Name (For x-ref)
     'object_table': THREEObjectTable, // Object Table to Use
 })
@@ -139,6 +141,47 @@ bundle.encode( { "scene_name": "Test Scene" }, "scene/config" );
 // Finalize and close
 bundle.close();
 ```
+
+## Loading a Bundle
+
+The following snippet demonstrates how to load a binary bundle in your project:
+
+```javascript
+var BinaryDecoder = require("jbb/decoder");
+var profile = require("jbb-profile-three");
+
+// Create a decoder
+var loader = new BinaryDecoder();
+
+// Schedule one or more budles to load
+binaryLoader.add( 'path/to/bundle.jbb');
+
+// Load everything and call back
+binaryLoader.load(function() {
+    // All resources are now loaded in the database
+    console.log( binaryLoader.database );
+});
+```
+
+You can use [Webpack](https://webpack.github.io/) to compile the above example for the browser.
+
+# Frequently Asked Questions
+
+**Q. What's the benefit from using JBB?**
+
+A. JBB helps you organise your resources in reusable bundles, while in the same time can optimally compact them in binary bundles. These bundles are faster to load (about 30% faster) and easier to share and reuse.
+
+**Q. Is this like .tar for web?**
+
+A. No! JBB is not an archive format, but a _data serialization_ format with some bundling _additions_. This means that JBB aims to encode data structures in the most efficient manner possible, and if needed, it embeds resource blobs that cannot be further optimised. So please don't start packing only binary blobs in it.. it can do so much more :)
+
+**Q. How JBB compares to Binary-JSON (BSON)?**
+
+A. BSON can only encode primitive javascript data structures, such as arrays and plain objects. JBB on the other hand is aware of the objects being encoded, it preserves their type and encodes them more optimally.
+
+**Q. How JBB compares to MessagePack?**
+
+A. Both try to solve the same problem, to encode data structures. However JBB sticks closer to the native Javascript data types, making it faster to process in the browser, while in the same time provides an additional layer of type information and arbitrary resource embedding.
 
 # License
 
