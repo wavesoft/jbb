@@ -175,10 +175,11 @@ var BinaryDecoder = require("jbb/decoder");
 var profile = require("jbb-profile-three");
 
 // Create a decoder
-var loader = new BinaryDecoder();
+var loader = new BinaryDecoder( profile, "bundle/base/dir" );
 
 // Schedule one or more budles to load
-binaryLoader.add( 'path/to/bundle.jbb');
+binaryLoader.add( 'bundle1.jbb');
+binaryLoader.add( 'bundle2.jbbp'); // Sparse bundles (multiple files)
 
 // Load everything and call back
 binaryLoader.load(function() {
