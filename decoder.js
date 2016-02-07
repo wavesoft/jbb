@@ -262,7 +262,7 @@ function decodeObject( bundle, database, ot, eid_hi ) {
 		factoryFn += "}";
 
 		// Compile factory function
-		var factory = Function(factoryFn);
+		var factory = Function("values", factoryFn);
 		bundle.plain_factory_table.push( factory );
 
 		// Create object

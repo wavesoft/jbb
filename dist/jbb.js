@@ -310,7 +310,7 @@ var JBBBinaryLoader =
 			factoryFn += "}";
 
 			// Compile factory function
-			var factory = Function(factoryFn);
+			var factory = Function("values", factoryFn);
 			bundle.plain_factory_table.push( factory );
 
 			// Create object
@@ -1083,9 +1083,6 @@ var JBBBinaryLoader =
 
 		// Internal reference table
 		this.iref_table = [];
-
-		// Signature lookup table
-		this.signature_table = [];
 
 		// Plain object factory table
 		this.plain_factory_table = [];
