@@ -287,8 +287,8 @@ var JBBBinaryLoader =
 
 		} else if (ot == 2) { // Simple object with known signature
 			var eid = (eid_hi << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-				keys = bundle.signature_table[ eid ];
-			if (keys == undefined) {
+				factory = bundle.plain_factory_table[ eid ];
+			if (factory == undefined) {
 				throw {
 					'name' 		: 'AssertError',
 					'message'	: 'Could not found simple object signature with id #'+eid+'!',
@@ -296,39 +296,26 @@ var JBBBinaryLoader =
 				}
 			}
 
-			// Keep on irefs
-			var obj = {};
-			// bundle.iref_table.push( obj );
-
-			// Get values
-			var values = decodePrimitive( bundle, database );
-
 			// Create object
-			for (var i=0, llen=keys.length; i<llen; i++)
-				obj[keys[i]] = values[i];
-			return obj;
+			var values = decodePrimitive( bundle, database );
+			return factory( values );
 
 		} else if (ot == 3) { // New simple object, keep signature
 
-			// Keep on irefs
-			var obj = {};
-			// bundle.iref_table.push( obj );
+			// Build factory funtion
+			var factoryFn = "return {", llen = bundle.readTypedNum[ NUMTYPE.UINT16 ]();
+			for (var i=0; i<llen; i++) {
+				factoryFn += "'"+bundle.readStringLT()+"': values["+i+"],";
+			}
+			factoryFn += "}";
 
-			// Read length and keys
-			var keys = [], llen = bundle.readTypedNum[ NUMTYPE.UINT16 ]();
-			for (var i=0; i<llen; i++)
-				keys.push( bundle.readStringLT() );
-
-			// Keep signature in signature table
-			bundle.signature_table.push( keys );
-
-			// Read values
-			var values = decodePrimitive( bundle, database );
+			// Compile factory function
+			var factory = Function(factoryFn);
+			bundle.plain_factory_table.push( factory );
 
 			// Create object
-			for (var i=0, llen=keys.length; i<llen; i++)
-				obj[keys[i]] = values[i];
-			return obj;
+			var values = decodePrimitive( bundle, database );
+			return factory( values );
 
 		}
 
@@ -1099,6 +1086,9 @@ var JBBBinaryLoader =
 
 		// Signature lookup table
 		this.signature_table = [];
+
+		// Plain object factory table
+		this.plain_factory_table = [];
 
 		// String lookup table
 		this.string_table = [];
