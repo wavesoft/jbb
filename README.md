@@ -10,7 +10,7 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 :warning: This format is Architecture-Dependant: This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
-:warning: This project is still in development. Some protocol features might be buggy or might change in the future without prior notice. Also the build time in some case might be very slow. 
+:warning: This project is still in development. Some protocol features might be buggy or might change in the future without prior notice. Also the build time in some cases might be very slow. 
 
 ## Installation
 
@@ -31,6 +31,27 @@ You will also need a jbb profile according to the resources you are going to bun
 ```
 npm install jbb-profile-three
 ```
+
+### Non-NPM Builds
+
+You can also use `jbb` without npm. You can find the stand-alone builds in the `dist` directory. For example:
+
+```html
+<script src="build/jbb.min.js"></script>
+<script src="build/jbb-profile-three.min.js"></script>
+<script>
+var jbbLoader = new JBBBinaryLoader( JBBProfileThree, "base/dir/to/bundles" );
+
+// Specify bundles to load
+jbbLoader.add("bundle.jbb");
+
+// Load bundle
+jbbLoader.load(function() {
+
+});
+</script>
+```
+
 
 ## Creating a Bundle
 
