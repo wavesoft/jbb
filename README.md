@@ -12,6 +12,9 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 :warning: This project is still in development. Some protocol features might be buggy or might change in the future without prior notice. Also the build time in some cases might be very slow. 
 
+Curious to see some tests? [Timing Example](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_timing.html) - [Example 1](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_loader_1.html) - [Example 2](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_loader_2.html)
+
+
 ## Installation
 
 JBB is available as npm module, so you can install it globally like so:
