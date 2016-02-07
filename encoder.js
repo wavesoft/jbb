@@ -1572,7 +1572,7 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 			prop.push( entities[j][p] );
 		}
 
-		// Write optimised properties of all entities
+		// Align values of same property for optimal encoding
 		encodeArray( encoder, prop );
 
 	}
@@ -1863,6 +1863,7 @@ function encodeObject( encoder, object ) {
 
 	// If no such entity exists, raise exception
 	if (eid < 0) {
+		console.error("Unknown object:", object);
 		throw {
 			'name' 		: 'EncodingError',
 			'message'	: 'An object trying to encode was not declared in the object table!',

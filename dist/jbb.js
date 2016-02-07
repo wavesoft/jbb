@@ -44,7 +44,7 @@ var JBBBinaryLoader =
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ function(module, exports) {
+/***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 	/**
@@ -65,6 +65,8 @@ var JBBBinaryLoader =
 	 *
 	 * @author Ioannis Charalampidis / https://github.com/wavesoft
 	 */
+
+	var BinaryBundle = __webpack_require__(1);
 
 	var PBUND_REQUESTED = 0,
 		PBUND_LOADED = 1,
@@ -296,7 +298,7 @@ var JBBBinaryLoader =
 
 			// Keep on irefs
 			var obj = {};
-			bundle.iref_table.push( obj );
+			// bundle.iref_table.push( obj );
 
 			// Get values
 			var values = decodePrimitive( bundle, database );
@@ -310,7 +312,7 @@ var JBBBinaryLoader =
 
 			// Keep on irefs
 			var obj = {};
-			bundle.iref_table.push( obj );
+			// bundle.iref_table.push( obj );
 
 			// Read length and keys
 			var keys = [], llen = bundle.readTypedNum[ NUMTYPE.UINT16 ]();
@@ -696,6 +698,272 @@ var JBBBinaryLoader =
 	}
 
 	//////////////////////////////////////////////////////////////////
+	// Binary Loader
+	//////////////////////////////////////////////////////////////////
+
+	/**
+	 * Binary bundle loader
+	 */
+	var BinaryLoader = function( objectTable, baseDir, database ) {
+
+		// Check for missing baseDir
+		if (typeof(baseDir) == "object") {
+			database = baseDir;
+			baseDir = "";
+		}
+
+		// Initialize properties
+		this.database = database || {};
+
+		// Keep the base dir
+		this.baseDir = baseDir || "";
+
+		// Queued requests pending loading
+		this.queuedRequests = [];
+
+		// Keep object table
+		this.objectTable = objectTable;
+
+	};
+
+	/**
+	 * 
+	 */
+	BinaryLoader.prototype = {
+
+		'constructor': BinaryLoader,
+
+		/**
+		 * Load the specified bundle from URL and call the onsuccess callback.
+		 * If an error occures, call the onerror callback.
+		 *
+		 * @param {string} url - The URL to load
+		 * @param {function} callback - The callback to fire when the bundle is loaded
+		 */
+		'add': function( url, callback ) {
+
+			// Check for base dir
+			var prefix = "";
+			if (this.baseDir)
+				prefix = this.baseDir + "/";
+
+			// Check for sparse bundle
+			var parts = url.split("?"), suffix = "", reqURL = [];
+			if (parts.length > 1) suffix = "?"+parts[1];
+			if (parts[0].substr(parts[0].length - 5).toLowerCase() == ".jbbp") {
+				var base = prefix + parts[0].substr(0, parts[0].length - 5);
+				reqURL = [
+					base + '.jbbp',
+					base + '_b16.jbbp',
+					base + '_b32.jbbp',
+					base + '_b64.jbbp'
+				];
+			} else {
+				// Assume .jbb if missing (TODO: not a good idea)
+				var url = parts[0];
+				if (url.substr(url.length-4) != ".jbb") url += ".jbb";
+				reqURL = [ prefix + url + suffix ];
+			}
+
+			// Load bundle header and keep a callback
+			// for the remainging loading operations
+			var pendingBundle = {
+				'callback': callback,
+				'status': PBUND_REQUESTED,
+				'buffer': undefined,
+				'url': reqURL
+			};
+
+			// Keep this pending action
+			this.queuedRequests.push( pendingBundle );
+
+		},
+
+		/**
+		 * Load from buffer
+		 */
+		'addByBuffer': function( buffer ) {
+
+			// Prepare pending bundle
+			var pendingBundle = {
+				'callback': undefined,
+				'status': PBUND_LOADED,
+				'buffer': buffer,
+				'url': undefined,
+			};
+
+			// Keep this pending action
+			this.queuedRequests.push( pendingBundle );
+
+		},
+
+		/**
+		 * Load the bundle
+		 */
+		'load': function( callback ) {
+			this.__process( callback );
+		},
+
+		/**
+		 * Parse the stack of bundles currently loaded
+		 */
+		'__process': function( callback ) {
+			var self = this;
+			if (!callback) callback = function(){};
+
+			// If there are no queued requests, fire callback as-is
+			if (this.queuedRequests.length == 0) {
+				callback( null, this );
+				return;
+			}
+
+			// First make sure that there are no bundles pending loading
+			var pendingLoading = false;
+			for (var i=0; i<this.queuedRequests.length; i++) {
+				if (this.queuedRequests[i].status == PBUND_REQUESTED) {
+					pendingLoading = true;
+					break;
+				}
+			}
+
+			////////////////////////////////////////////////////////
+			// Iteration 1 - PBUND_REQUESTED -> PBUND_LOADED
+			// ----------------------------------------------------
+			// Download all bundles in pending state.
+			////////////////////////////////////////////////////////
+
+			if (pendingLoading) {
+
+				// Prepare the callbacks for when this is finished
+				var state = { 'counter': 0 }
+				var continue_callback = (function() {
+					// When reached 0, continue loading
+					if (--this.counter == 0)
+						self.__process( callback );
+				}).bind(state);
+
+				// Place all requests in parallel
+				var triggeredError = false;
+				for (var i=0; i<this.queuedRequests.length; i++) {
+					var req = this.queuedRequests[i];
+					if (req.status == PBUND_REQUESTED) {
+
+						// Download bundle from URL(s)
+						state.counter++;
+						downloadArrayBuffers(req.url, 
+							(function(req) {
+								return function( err, response ) {
+
+									// Handle errors
+									if (err) {
+										if (triggeredError) return;
+										var errMsg = "Error downloading bundle: "+err;
+										if (req.callback) req.callback( errMsg, null);
+										if (callback) callback(errMsg, null);
+										triggeredError = true;
+										return;
+									}
+
+									// Discard array if only 1 item
+									req.buffer = response;
+									if (response.length == 1) req.buffer = response[0];
+									// Keep buffer and mark as loaded
+									req.status = PBUND_LOADED;
+									// Continue
+									continue_callback();
+								}
+							})(req)
+						);
+
+					}
+				}
+
+				// Do not continue, we ar asynchronous
+				return;
+			}
+
+			////////////////////////////////////////////////////////
+			// Iteration 2 - PBUND_LOADED -> PBUND_PARSED
+			// ----------------------------------------------------
+			// Parse all loaded bundles (synchronous)
+			////////////////////////////////////////////////////////
+
+			for (var i=0; i<this.queuedRequests.length; i++) {
+				var req = this.queuedRequests[i];
+				if (req.status == PBUND_LOADED) {
+					// try {
+
+					// Create & parse bundle
+					var bundle = new BinaryBundle( req.buffer, self.objectTable );
+					parseBundle( bundle, self.database );
+
+					// Trigger bundle callback
+					if (req.callback) req.callback( null, req.bundle );
+
+					// } catch (e) {
+
+					// 	// Update bundle status
+					// 	req.status = PBUND_ERROR;
+
+					// 	// Fire error callbacks and exit
+					// 	var errMsg = "Error parsing bundle: "+e.toString();
+					// 	if (req.callback) req.callback( errMsg, null);
+					// 	if (callback) callback(errMsg, null);
+					// 	return;
+
+					// }
+				}
+			}
+
+			// We are ready
+			this.queuedRequests = [];
+			callback( null, this );
+
+		}
+
+
+	};
+
+	// Export the binary loader
+	module.exports = BinaryLoader;
+
+
+/***/ },
+/* 1 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Decoder
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+
+	/**
+	 * Numerical types
+	 */
+	var NUMTYPE = {
+		UINT8: 	 0, INT8:    1,
+		UINT16:  2, INT16:   3,
+		UINT32:  4, INT32:   5,
+		FLOAT32: 6, FLOAT64: 7
+	}
+
+	//////////////////////////////////////////////////////////////////
 	// Binary Bundle Representation
 	//////////////////////////////////////////////////////////////////
 
@@ -929,220 +1197,7 @@ var JBBBinaryLoader =
 		console.log( "i64=", this.i64 - this.ofs64/8, " [F:",this.f64[this.i64], "]");
 	}
 
-	//////////////////////////////////////////////////////////////////
-	// Binary Loader
-	//////////////////////////////////////////////////////////////////
-
-	/**
-	 * Binary bundle loader
-	 */
-	var BinaryLoader = function( objectTable, database ) {
-
-		// Initialize properties
-		this.database = database || {};
-
-		// Queued requests pending loading
-		this.queuedRequests = [];
-
-		// Keep object table
-		this.objectTable = objectTable;
-
-	};
-
-	/**
-	 * 
-	 */
-	BinaryLoader.prototype = {
-
-		'constructor': BinaryLoader,
-
-		/**
-		 * Load the specified bundle from URL and call the onsuccess callback.
-		 * If an error occures, call the onerror callback.
-		 *
-		 * @param {string} url - The URL to load
-		 * @param {function} callback - The callback to fire when the bundle is loaded
-		 */
-		'add': function( url, callback ) {
-
-			// Check for sparse bundle
-			var parts = url.split("?"), suffix = "", reqURL = [];
-			if (parts.length > 1) suffix = "?"+parts[1];
-			if (parts[0].substr(parts[0].length - 5).toLowerCase() == ".jbbp") {
-				var base = parts[0].substr(0, parts[0].length - 5);
-				reqURL = [
-					base + '.jbbp',
-					base + '_b16.jbbp',
-					base + '_b32.jbbp',
-					base + '_b64.jbbp'
-				];
-			} else {
-				reqURL = [
-					parts[0] + suffix
-				];
-			}
-
-			// Load bundle header and keep a callback
-			// for the remainging loading operations
-			var pendingBundle = {
-				'callback': callback,
-				'status': PBUND_REQUESTED,
-				'buffer': undefined,
-				'url': reqURL
-			};
-
-			// Keep this pending action
-			this.queuedRequests.push( pendingBundle );
-
-		},
-
-		/**
-		 * Load from buffer
-		 */
-		'addByBuffer': function( buffer ) {
-
-			// Prepare pending bundle
-			var pendingBundle = {
-				'callback': undefined,
-				'status': PBUND_LOADED,
-				'buffer': buffer,
-				'url': undefined,
-			};
-
-			// Keep this pending action
-			this.queuedRequests.push( pendingBundle );
-
-		},
-
-		/**
-		 * Load the bundle
-		 */
-		'load': function( callback ) {
-			this.__process( callback );
-		},
-
-		/**
-		 * Parse the stack of bundles currently loaded
-		 */
-		'__process': function( callback ) {
-			var self = this;
-			if (!callback) callback = function(){};
-
-			// If there are no queued requests, fire callback as-is
-			if (this.queuedRequests.length == 0) {
-				callback( null, this );
-				return;
-			}
-
-			// First make sure that there are no bundles pending loading
-			var pendingLoading = false;
-			for (var i=0; i<this.queuedRequests.length; i++) {
-				if (this.queuedRequests[i].status == PBUND_REQUESTED) {
-					pendingLoading = true;
-					break;
-				}
-			}
-
-			////////////////////////////////////////////////////////
-			// Iteration 1 - PBUND_REQUESTED -> PBUND_LOADED
-			// ----------------------------------------------------
-			// Download all bundles in pending state.
-			////////////////////////////////////////////////////////
-
-			if (pendingLoading) {
-
-				// Prepare the callbacks for when this is finished
-				var state = { 'counter': 0 }
-				var continue_callback = (function() {
-					// When reached 0, continue loading
-					if (--this.counter == 0)
-						self.__process( callback );
-				}).bind(state);
-
-				// Place all requests in parallel
-				var triggeredError = false;
-				for (var i=0; i<this.queuedRequests.length; i++) {
-					var req = this.queuedRequests[i];
-					if (req.status == PBUND_REQUESTED) {
-
-						// Download bundle from URL(s)
-						state.counter++;
-						downloadArrayBuffers(req.url, 
-							(function(req) {
-								return function( err, response ) {
-
-									// Handle errors
-									if (err) {
-										if (triggeredError) return;
-										var errMsg = "Error downloading bundle: "+err;
-										if (req.callback) req.callback( errMsg, null);
-										if (callback) callback(errMsg, null);
-										triggeredError = true;
-										return;
-									}
-
-									// Discard array if only 1 item
-									req.buffer = response;
-									if (response.length == 1) req.buffer = response[0];
-									// Keep buffer and mark as loaded
-									req.status = PBUND_LOADED;
-									// Continue
-									continue_callback();
-								}
-							})(req)
-						);
-
-					}
-				}
-
-				// Do not continue, we ar asynchronous
-				return;
-			}
-
-			////////////////////////////////////////////////////////
-			// Iteration 2 - PBUND_LOADED -> PBUND_PARSED
-			// ----------------------------------------------------
-			// Parse all loaded bundles (synchronous)
-			////////////////////////////////////////////////////////
-
-			for (var i=0; i<this.queuedRequests.length; i++) {
-				var req = this.queuedRequests[i];
-				if (req.status == PBUND_LOADED) {
-					// try {
-
-					// Create & parse bundle
-					var bundle = new BinaryBundle( req.buffer, self.objectTable );
-					parseBundle( bundle, self.database );
-
-					// Trigger bundle callback
-					if (req.callback) req.callback( null, req.bundle );
-
-					// } catch (e) {
-
-					// 	// Update bundle status
-					// 	req.status = PBUND_ERROR;
-
-					// 	// Fire error callbacks and exit
-					// 	var errMsg = "Error parsing bundle: "+e.toString();
-					// 	if (req.callback) req.callback( errMsg, null);
-					// 	if (callback) callback(errMsg, null);
-					// 	return;
-
-					// }
-				}
-			}
-
-			// We are ready
-			this.queuedRequests = [];
-			callback( null, this );
-
-		}
-
-
-	};
-
-	// Export the binary loader
-	module.exports = BinaryLoader;
+	module.exports = BinaryBundle;
 
 
 /***/ }

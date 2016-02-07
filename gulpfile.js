@@ -28,14 +28,17 @@ gulp.task('dist/jbb', function() {
 			externals: {
 				'three': 'THREE',
 			},
-		    plugins: PROD ? [
+		    plugins: ([
 		    	new webpack.webpack.optimize.DedupePlugin(),
+				new webpack.webpack.DefinePlugin({
+				    PROD 	  	: PROD,
+				    LOG_PARSING : false
+				})
+		    ]).concat(PROD ? [
 			    new webpack.webpack.optimize.UglifyJsPlugin({
 			    	minimize: true
 			    })
-		    ] : [
-		    	new webpack.webpack.optimize.DedupePlugin(),
-		    ]
+		    ] : [])
 		}))
 		.pipe(header("/* JBB Binary Bundle Loader - https://github.com/wavesoft/jbb-profile-three */\n"))
 		.pipe(gulp.dest('dist'));

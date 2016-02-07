@@ -22,6 +22,8 @@ var toposort 	= require('toposort');
 var path 		= require('path');
 var mime 		= require('mime');
 
+var IS_BROWSER  = true && (new Function("try {return this===window;}catch(e){ return false;}")());
+
 /**
  * Pick MIME type according to filename and known MIME Types
  */
@@ -300,7 +302,12 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 
 				// Expose blob
 				self.blobs[key] = [fileBufer, mime];
-				self.bundles.blobs[self.name+'/'+key] = [fileBufer, mime];
+
+				// Expose blobs to the database only if accessing from the browser
+				if (IS_BROWSER) {
+					var blob = new Blob([ fileBufer ], { type: mime });
+					self.bundles.database[self.name+'/'+key] = URL.createObjectURL(blob);
+				}
 
 				// Decrement counter
 				setTimeout(load_callback, 1);
@@ -317,7 +324,7 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 
 						// Expose resources
 						self.resources[k] = objects[k];
-						self.bundles.resources[self.name+'/'+k] = objects[k];
+						self.bundles.database[self.name+'/'+k] = objects[k];
 
 					}
 					// Decrement counter
@@ -403,10 +410,9 @@ var BundlesLoader = function( profileLoader, baseURL ) {
 	this.bundles = {};
 
 	/**
-	 * Loaded resources and blobs of all bundles
+	 * Database of all loaded resources
 	 */
-	this.resources = {};
-	this.blobs = {};
+	this.database = {};
 
 	/**
 	 * Keep profile loader reference
@@ -489,9 +495,8 @@ BundlesLoader.prototype.load = function( callback ) {
  * Load file contents
  */
 BundlesLoader.prototype.__loadFileContents = function( url, asBlob, callback ) {
-	var isBrowser=new Function("try {return this===window;}catch(e){ return false;}"); // browser exclude
-	if (!isBrowser() /* browser exclude */) {
-		// Load file contents
+	if (!IS_BROWSER /* browser exclude */) {
+		// Node Code
 		var fs = require('fs');
 		if (asBlob) {
 			var buf = fs.readFileSync( url ),		// Load Buffer
@@ -505,24 +510,26 @@ BundlesLoader.prototype.__loadFileContents = function( url, asBlob, callback ) {
 		} else {
 			fs.readFile(url, {encoding: 'utf8'}, callback);
 		}
+		return;
+	}
+
+	// Broswer code
+	var req = new XMLHttpRequest(),
+		scope = this;
+
+	// Place request
+	req.open('GET', url);
+	if (asBlob) {
+		req.responseType = "arraybuffer";
 	} else {
-		var req = new XMLHttpRequest(),
-			scope = this;
+		req.responseType = "text";
+	}
+	req.send();
 
-		// Place request
-		req.open('GET', url);
-		if (asBlob) {
-			req.responseType = "arraybuffer";
-		} else {
-			req.responseType = "text";
-		}
-		req.send();
-
-		// Wait until the file is loaded
-		req.onreadystatechange = function () {
-			if (req.readyState !== 4) return;
-			callback(null, req.response);
-		}
+	// Wait until the file is loaded
+	req.onreadystatechange = function () {
+		if (req.readyState !== 4) return;
+		callback(null, req.response);
 	}
 };
 
