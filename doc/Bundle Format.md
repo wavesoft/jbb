@@ -104,6 +104,7 @@ The data in a bundle file are organised in _Primitives_, each one being one of t
 * __OBJECT__ - A Javascript object, further specialised as:
     - `PREDEFINED` - A predefined object from the object table
     - `PLAIN` - A plain object
+    - `PRIMITIVE` - A primitive javascript object, such as `Date`
 * __BUFFER__ - Buffered contents, further specialised as:
     - `STRING_LATIN` - A string in LATIN-1 (ISO-8859-1) encoding
     - `STRING_UTF8` - A string un UTF-8 encoding

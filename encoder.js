@@ -43,7 +43,7 @@ const SAFE = 1;
 /**
  * Fake DOM environment when from node
  */
-if (typeof(document) == "undefined") {
+if (typeof(document) === "undefined") {
 
 	// Prepare a fake browser
 	var MockBrowser = require('mock-browser').mocks.MockBrowser;
@@ -257,6 +257,25 @@ var PRIM_OP = {
 	SIMPLE: 	0xF8, 	// Simple
 	SIMPLE_EX:	0xFC,	// Extended simple primitive
 	IMPORT: 	0xFE, 	// External Import
+};
+
+/**
+ * Object Op-Codes
+ */
+var OBJ_OP = {
+	KNOWN_5:		0x00,	// Known object (5-bit)
+	KNOWN_12: 		0x20,	// Known object (12-bit)
+	PLAIN_LOOKUP:	0x30,	// A plain object from lookup table
+	PLAIN_NEW: 		0x3F,	// A new plain object that will define a lookup entry
+	PRIMITIVE: 		0x38, 	// Primitive object
+	PRIM_DATE: 		0x38
+};
+
+/**
+ * Primitive object op-codes
+ */
+var OBJ_PRIM = {
+	DATE: 			0x00, 	// A DATE primitive
 };
 
 /**
@@ -556,7 +575,7 @@ BinaryStream.prototype = {
 	'write': function( buffer ) {
 		if (this.logWrites) {
 			var bits = String(this.__alignSize*8);
-			if (bits.length == 1) bits=" "+bits;
+			if (bits.length === 1) bits=" "+bits;
 			console.log((bits+"b ").yellow+("@"+this.offset/this.__alignSize).bold.yellow+": "+util.inspect(buffer));
 		}
 		this.__writeChunks.push( buffer );
@@ -570,7 +589,7 @@ BinaryStream.prototype = {
 	'writeAt': function( offset, buffer ) {
 		if (this.logWrites) {
 			var bits = String(this.__alignSize*8);
-			if (bits.length == 1) bits=" "+bits;
+			if (bits.length === 1) bits=" "+bits;
 			console.log((bits+"b ").yellowBG+("@"+offset).bold.yellowBG+": "+util.inspect(buffer));
 		}
 
@@ -665,15 +684,15 @@ BinaryStream.prototype = {
  * @return {float} - Return the scale factor
  */
 function getFloatDeltaScale(t, scale) {
-	if (scale == DELTASCALE.S_1)
+	if (scale === DELTASCALE.S_1)
 		return 1.0;
-	else if (scale == DELTASCALE.S_001)
+	else if (scale === DELTASCALE.S_001)
 		return 0.01;
 	else {
 		var multiplier = 1.0;
-		if (scale == DELTASCALE.S_R00) multiplier = 100.0;
+		if (scale === DELTASCALE.S_R00) multiplier = 100.0;
 		// Check for INT8 target
-		if ( ((t >= 0) && (t <= 3)) || (t == 6) ) {
+		if ( ((t >= 0) && (t <= 3)) || (t === 6) ) {
 			return multiplier * 127;
 		} else {
 			return multiplier * 32768;
@@ -690,7 +709,7 @@ function isEmptyArray(v) {
 		(v instanceof Uint32Array) || (v instanceof Int32Array) ||
 		(v instanceof Float32Array) || (v instanceof Float64Array) ||
 		(v instanceof Array) ) {
-		return (v.length == 0);
+		return (v.length === 0);
 	}
 	return false;
 }
@@ -716,7 +735,7 @@ function isNumericSubclass( t, of_t ) {
 	switch (of_t) {
 		case NUMTYPE.UINT8:
 		case NUMTYPE.INT8:
-			return (of_t == t);
+			return (of_t === t);
 
 		case NUMTYPE.UINT16:
 			switch (t) {
@@ -887,8 +906,8 @@ function getNumType( v ) {
 function downscaleType( fromType, toType ) {
 	// Lookup conversion on the downscale table
 	for (var i=0; i<NUMTYPE_DOWNSCALE.FROM.length; i++) {
-		if ( (NUMTYPE_DOWNSCALE.FROM[i] == fromType) && 
-			 (NUMTYPE_DOWNSCALE.TO_DWS[i] == toType) )
+		if ( (NUMTYPE_DOWNSCALE.FROM[i] === fromType) && 
+			 (NUMTYPE_DOWNSCALE.TO_DWS[i] === toType) )
 			return i;
 	}
 	// Nothing found
@@ -901,8 +920,8 @@ function downscaleType( fromType, toType ) {
 function deltaEncType( fromType, toType ) {
 	// Lookup conversion on the downscale table
 	for (var i=0; i<NUMTYPE_DOWNSCALE.FROM.length; i++) {
-		if ( (NUMTYPE_DOWNSCALE.FROM[i] == fromType) && 
-			 (NUMTYPE_DOWNSCALE.TO_DELTA[i] == toType) )
+		if ( (NUMTYPE_DOWNSCALE.FROM[i] === fromType) && 
+			 (NUMTYPE_DOWNSCALE.TO_DELTA[i] === toType) )
 			return i;
 	}
 	// Nothing found
@@ -982,7 +1001,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		// Update delta
 		if (i>0) {
 			d = Math.abs(last_v - n);
-			if (i ==1) {
+			if (i === 1) {
 				min_delta = d;
 				max_delta = d;
 			} else {
@@ -994,7 +1013,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		// Same values
 		if (is_repeated && (n != rep_v)) is_repeated = false;
 		// Skip zeros from type detection
-		if (n == 0) continue;
+		if (n === 0) continue;
 		// Check for float
 		if (n % 1 === 0) {
 			// Mark integer fields
@@ -1051,7 +1070,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 	// Get original type (if typed array) of the array
 	var originalType = getTypedArrayType( array );
-	if (originalType == NUMTYPE.UNKNOWN) originalType = type;
+	if (originalType === NUMTYPE.UNKNOWN) originalType = type;
 
 	// If same value repeated, that's a repeated array
 	if (is_repeated) {
@@ -1074,7 +1093,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 		// Find a matching delta encoding type
 		var delta_type = deltaEncType( originalType, delta[1] );
-		if (delta_type == undefined) {
+		if (delta_type === undefined) {
 			console.warn("Consider protocol revision: No compact type match for delta from="+_NUMTYPE[originalType]+", to="+_NUMTYPE[delta[1]]);
 		} else {
 
@@ -1097,7 +1116,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 			// Find a matching downscale type
 			var dws_type = downscaleType( originalType, type );
-			if (dws_type == undefined) {
+			if (dws_type === undefined) {
 				console.warn("Consider protocol revision: No compact type match for downscaling from="+_NUMTYPE[originalType]+", to="+_NUMTYPE[type]);
 				type = originalType;
 			} else {
@@ -1162,14 +1181,14 @@ function deltaEncodeFloats( array, arrayClass, scale ) {
 function convertArray( array, numType ) {
 
 	// Skip matching cases
-	if ( ((array instanceof Uint8Array) && (numType == NUMTYPE.UINT8)) ||
-		 ((array instanceof Int8Array) && (numType == NUMTYPE.INT8)) ||
-		 ((array instanceof Uint16Array) && (numType == NUMTYPE.UINT16)) ||
-		 ((array instanceof Int16Array) && (numType == NUMTYPE.INT16)) ||
-		 ((array instanceof Uint32Array) && (numType == NUMTYPE.UINT32)) ||
-		 ((array instanceof Int32Array) && (numType == NUMTYPE.INT32)) ||
-		 ((array instanceof Float32Array) && (numType == NUMTYPE.FLOAT32)) ||
-		 ((array instanceof Float64Array) && (numType == NUMTYPE.FLOAT64)) ) {
+	if ( ((array instanceof Uint8Array) && (numType === NUMTYPE.UINT8)) ||
+		 ((array instanceof Int8Array) && (numType === NUMTYPE.INT8)) ||
+		 ((array instanceof Uint16Array) && (numType === NUMTYPE.UINT16)) ||
+		 ((array instanceof Int16Array) && (numType === NUMTYPE.INT16)) ||
+		 ((array instanceof Uint32Array) && (numType === NUMTYPE.UINT32)) ||
+		 ((array instanceof Int32Array) && (numType === NUMTYPE.INT32)) ||
+		 ((array instanceof Float32Array) && (numType === NUMTYPE.FLOAT32)) ||
+		 ((array instanceof Float64Array) && (numType === NUMTYPE.FLOAT64)) ) {
 
 		// Return as-is
 		return array;
@@ -1221,11 +1240,11 @@ var FOR_NUMTYPE = 0,
 function pickStream(encoder, t, encType) {
 
 	// If we have an encoded type, change type now
-	if (encType == FOR_DWS_TO) { // Downscale type
+	if (encType === FOR_DWS_TO) { // Downscale type
 		t = NUMTYPE_DOWNSCALE.TO_DWS[t];
-	} else if (encType == FOR_DELTA_TO) { // Delta type
+	} else if (encType === FOR_DELTA_TO) { // Delta type
 		t = NUMTYPE_DOWNSCALE.TO_DELTA[t];
-	} else if (encType == FOR_DELTA_FROM) { // From downscale
+	} else if (encType === FOR_DELTA_FROM) { // From downscale
 		t = NUMTYPE_DOWNSCALE.FROM[t];
 	}
 
@@ -1252,7 +1271,7 @@ function pickStream(encoder, t, encType) {
  */
 function encodeNumArrayHeader( encoder, array, op ) {
 	// Write header
-	if ((op & 0xF8) == ARR_OP.SHORT) { // 8-bit length prefix
+	if ((op & 0xF8) === ARR_OP.SHORT) { // 8-bit length prefix
 		encoder.stream8.write( pack1b( op ) );
 		encoder.stream8.write( pack1b( array.length, false ) );
 		encoder.counters.arr_hdr+=2;
@@ -1317,11 +1336,11 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 			// We are not breaking
 			break_candidate = false;
 			// Increment up to 255
-			if (++rep_val == 255) break;
+			if (++rep_val === 255) break;
 		}
 
 		// Check for same constructor
-		if (typeof v == "number") {
+		if (typeof v === "number") {
 
 			// Check for same type
 			var t = getNumType( v );
@@ -1340,7 +1359,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 				if (isNumericSubclass(t, last_t)) {
 					break_candidate = false;
 					// Increment up to 255
-					if (++rep_typ == 255) break;
+					if (++rep_typ === 255) break;
 				}
 			}
 
@@ -1379,19 +1398,19 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 	// console.log(("-- CFWA ofs="+start+", rep_typ="+rep_typ+", rep_val="+rep_val).red);
 
 	// Return appropriate chunk
-	if ((plain_rep > 1) && (rep_val == 0)) {
+	if ((plain_rep > 1) && (rep_val === 0)) {
 		// Multiple plain objects are bulked
 		return [ ARR_CHUNK.BULK_PLAIN, plain_rep+1, plain_keys ];
 
-	} else if ((rep_val == 0) && (rep_typ ==0)) {
+	} else if ((rep_val === 0) && (rep_typ === 0)) {
 		// Do not use chunks, rather use a single primitive for representing zero value
 		return [ ARR_CHUNK.PRIMITIVE, 1, last_t ];
 
-	} else if ((rep_val == 0) && (rep_typ > 0)) {
+	} else if ((rep_val === 0) && (rep_typ > 0)) {
 		// We have repeated type (numeric)
 		return [ ARR_CHUNK.NUMERIC, rep_typ+1, last_t ];
 
-	} else if ((rep_val > 0) && (rep_typ == 0)) {
+	} else if ((rep_val > 0) && (rep_typ === 0)) {
 		// We have repeated type
 		return [ ARR_CHUNK.REPEAT, rep_val+1, last_t ];
 
@@ -1409,7 +1428,7 @@ function encodeNumArray( encoder, data ) {
 
 	// Run analysis on the numbers and return false if not numbers
 	var numAnalysis = analyzeNumArray( data, /* optimisation flags -> */ false, true );
-	if (numAnalysis == undefined)
+	if (numAnalysis === undefined)
 		return false;
 
 	// Cache properties
@@ -1585,7 +1604,7 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 function encodeArray( encoder, data ) {
 
 	// Check for empty array
-	if (data.length == 0) {
+	if (data.length === 0) {
 		encoder.log(LOG.ARR, "empty");
 		encoder.stream8.write( pack1b( ARR_OP.EMPTY ) );
 		encoder.counters.op_prm+=1;
@@ -1729,7 +1748,7 @@ function encodeBuffer( encoder, buffer_type, mime_type, buffer ) {
 	}
 
 	// Write buffer
-	if (buffer_type == PRIM_BUFFER_TYPE.STRING_UTF8) {
+	if (buffer_type === PRIM_BUFFER_TYPE.STRING_UTF8) {
 
 		// NOTE: UTF-8 is a special case. For optimisation
 		// purposes it's better to use the 16-bit stream
@@ -1887,11 +1906,11 @@ function encodeObject( encoder, object ) {
 	encoder.log(LOG.OBJ,"eid="+eid+", properties="+propertyTable.length);
 	encoder.keepIRef( object, propertyTable, eid );
 
-	// Check if we should use 13-bit or 5-bit index
-	if (eid < 16) {
+	// Check if we should use 12-bit or 5-bit index
+	if (eid < 32) {
 
 		// Write entity opcode
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | eid ) );
+		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.KNOWN_5 | eid ) );
 		encoder.counters.op_prm+=1;
 
 	} else {
@@ -1901,7 +1920,7 @@ function encodeObject( encoder, object ) {
 			eid_lo = eid & 0xFF;
 
 		// Write entity
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | 0x10 | eid_hi ) );
+		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.KNOWN_12 | eid_hi ) );
 		encoder.stream8.write( pack1b( eid_lo ) );
 		encoder.counters.op_prm+=2;
 
@@ -1909,6 +1928,20 @@ function encodeObject( encoder, object ) {
 
 	// Write property table as an array
 	encodeArray( encoder, propertyTable );
+
+}
+
+/**
+ * Encode primitive date
+ */
+function encodePrimitiveDate( encoder, object ) {
+
+	// We have a date primitive
+	encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PRIMITIVE | OBJ_PRIM.DATE ) );
+
+	// Save date and timezone
+	encoder.stream64.write( pack8f( Number(object) ) );
+	encoder.stream16.write( pack1b( object.getTimezoneOffset() / 10, true ) );
 
 }
 
@@ -1934,7 +1967,7 @@ function encodePlainObject( encoder, object ) {
 		encoder.log(LOG.PLO, "plain(new), signature="+signature+", sid="+sid);
 
 		// Write entity opcode
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | 0x30 ) );
+		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PLAIN_NEW ) );
 		encoder.counters.op_prm+=1;
 
 		// Write length
@@ -1949,12 +1982,12 @@ function encodePlainObject( encoder, object ) {
 
 		encoder.log(LOG.PLO, "plain["+sid+"], signature="+signature+", sid="+sid);
 
-		// Split entity ID in a 12-bit number
-		var sid_hi = (sid & 0xF00) >> 8,
+		// Split entity ID in a 11-bit number
+		var sid_hi = (sid & 0x700) >> 8,
 			sid_lo =  sid & 0xFF;
 
-		// We have a known entity ID, re-use it				
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | 0x20 | sid_hi ) );
+		// We have a known entity ID, re-use it
+		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PLAIN_LOOKUP | sid_hi ) );
 		encoder.stream8.write( pack1b( sid_lo ) );
 		encoder.counters.op_prm+=2;
 
@@ -2006,7 +2039,7 @@ function encodePrimitive( encoder, data ) {
 	//  Number
 	// ===============================
 
-	} else if (typeof data == "number") {
+	} else if (typeof data === "number") {
 
 		if (isNaN(data)) {
 
@@ -2056,7 +2089,7 @@ function encodePrimitive( encoder, data ) {
 	//  Buffers
 	// ===============================
 
-	} else if (typeof data == "string") {
+	} else if (typeof data === "string") {
 
 		// Write a string buffer primitive
 		encoder.log(LOG.PRM, "buffer[string], len="+data.length);
@@ -2095,6 +2128,12 @@ function encodePrimitive( encoder, data ) {
 		// Encode plain object
 		encoder.log(LOG.PRM, "object[plain]");
 		encodePlainObject( encoder, data );
+
+	} else if (data instanceof Date) {
+
+		// Encode plain object
+		encoder.log(LOG.PRM, "object[date]");
+		encodePrimitiveDate( encoder, data );
 
 	} else {
 
@@ -2164,7 +2203,7 @@ var BinaryEncoder = function( filename, config ) {
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8
-	this.sparse = (config['sparse'] == undefined) ? false : config['sparse'];
+	this.sparse = (config['sparse'] === undefined) ? false : config['sparse'];
 	if (this.sparse) {
 
 		this.stream8.write( pack2b( 0x4233 ) ); // Magic header
@@ -2212,6 +2251,7 @@ var BinaryEncoder = function( filename, config ) {
 	// Plain object signatures lookup table
 	this.plainObjectSignatureID = 0;
 	this.plainObjectSignatureLookup = {};
+	this.plainObjectSignatureTable = [];
 
 }
 
@@ -2359,7 +2399,7 @@ BinaryEncoder.prototype = {
 	'stringID': function(string) {
 		var index = this.stringLookupQuick[string];
 		// If missing, allocate now
-		if (index == undefined) {
+		if (index === undefined) {
 			index = this.stringLookup.length;
 			this.stringLookup.push( string );
 			this.stringLookupQuick[string]= index;
@@ -2410,7 +2450,7 @@ BinaryEncoder.prototype = {
 	'keepIRef': function( object, propertyTable, eid ) {
 
 		// Create a new BST for this entity type if missing
-		if (this.indexVal[eid] == undefined)
+		if (this.indexVal[eid] === undefined)
 			this.indexVal[eid] = new BinarySearchTree({
 				compareKeys: objectBstComparison,
 				checkValueEquality: objectBstEquals,
@@ -2489,7 +2529,7 @@ BinaryEncoder.prototype = {
 
 		// Calculate relative path
 		var relPath = filename;
-		if (relPath.substr(0,this.baseDir.length) == this.baseDir)
+		if (relPath.substr(0,this.baseDir.length) === this.baseDir)
 			relPath = relPath.substr( this.baseDir.lengh );
 
 		// Write control operation
@@ -2541,7 +2581,7 @@ BinaryEncoder.prototype = {
 	'log': function(subsystem, text) {
 
 		// Don't log subsystems we don't track
-		if ((subsystem & this.logFlags) == 0) return;
+		if ((subsystem & this.logFlags) === 0) return;
 
 		// Log
 		console.log(

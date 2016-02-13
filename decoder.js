@@ -145,15 +145,15 @@ var PRIM_SIMPLE = [ undefined, null, false, true ],
  * @return {float} - Return the scale factor
  */
 function getFloatDeltaScale(t, scale) {
-	if (scale == DELTASCALE.S_1)
+	if (scale === DELTASCALE.S_1)
 		return 1.0;
-	else if (scale == DELTASCALE.S_001)
+	else if (scale === DELTASCALE.S_001)
 		return 0.01;
 	else {
 		var multiplier = 1.0;
-		if (scale == DELTASCALE.S_R00) multiplier = 100.0;
+		if (scale === DELTASCALE.S_R00) multiplier = 100.0;
 		// Check for INT8 target
-		if ( ((t >= 0) && (t <= 3)) || (t == 6) ) {
+		if ( ((t >= 0) && (t <= 3)) || (t === 6) ) {
 			return multiplier * 127;
 		} else {
 			return multiplier * 32768;
@@ -178,23 +178,23 @@ function decodeBuffer( bundle, len, buf_type ) {
 		length = bundle.readTypedNum[ lnType ]();
 
 	// Process buffer according to type
-	if (buf_type == 0) { // STRING_LATIN
+	if (buf_type === 0) { // STRING_LATIN
 		return String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT8 ]( length ) );
 
-	} else if (buf_type == 1) { // STRING_UTF8
+	} else if (buf_type === 1) { // STRING_UTF8
 		return String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT16 ]( length ) );
 
-	} else if (buf_type == 2) { // IMAGE
+	} else if (buf_type === 2) { // IMAGE
 		var img = document.createElement('img');
 		img.src = decodeBlobURL( bundle, length );
 		return img;
 
-	} else if (buf_type == 4) { // SCRIPT
+	} else if (buf_type === 4) { // SCRIPT
 		var img = document.createElement('script');
 		img.src = decodeBlobURL( bundle, length );
 		return img;
 
-	} else if (buf_type == 7) { // RESOURCE
+	} else if (buf_type === 7) { // RESOURCE
 		return decodeBlobURL( bundle, length );
 
 	} else {
@@ -210,14 +210,14 @@ function decodeBuffer( bundle, len, buf_type ) {
 /**
  * Read an object from the bundle
  */
-function decodeObject( bundle, database, ot, eid_hi ) {
-	if ((ot == 0) || (ot == 1)) { // Predefined objects
-		var eid = eid_hi;
-		if (ot == 1) eid = bundle.readTypedNum[ NUMTYPE.UINT8 ]() | (eid_hi << 8)
+function decodeObject( bundle, database, op ) {
+	if ( !(op & 0x20) || ((op & 0x30) === 0x20) ) { // Predefined objects
+		var eid = op;
+		if (op & 0x20) eid = bundle.readTypedNum[ NUMTYPE.UINT8 ]() | ((op & 0x0F) << 8);
 
 		// Fetch object class
 		var ENTITY = bundle.ot.ENTITIES[eid];
-		if (ENTITY == undefined) {
+		if (ENTITY === undefined) {
 			throw {
 				'name' 		: 'AssertError',
 				'message'	: 'Could not found known object entity #'+eid+'!',
@@ -237,10 +237,28 @@ function decodeObject( bundle, database, ot, eid_hi ) {
 		ENTITY[2]( instance, bundle.ot.PROPERTIES[eid], prop_table );
 		return instance;
 
-	} else if (ot == 2) { // Simple object with known signature
-		var eid = (eid_hi << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+	} else if ((op & 0x3C) === 0x38) { // Primitive object
+		var poid = (op & 0x03);
+		switch (poid) {
+			case 0:
+				var date = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
+					tzOffset = bundle.readTypedNum[ NUMTYPE.INT8 ]() * 10;
+
+				// Return date
+				return new Date( date );
+
+			default:
+				throw {
+					'name' 		: 'AssertError',
+					'message'	: 'Unknown primitive object with POID #'+poid+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				}
+		}
+
+	} else if ((op & 0x38) === 0x30) { // Simple object with known signature
+		var eid = ((op & 0x07) << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
 			factory = bundle.plain_factory_table[ eid ];
-		if (factory == undefined) {
+		if (factory === undefined) {
 			throw {
 				'name' 		: 'AssertError',
 				'message'	: 'Could not found simple object signature with id #'+eid+'!',
@@ -252,7 +270,7 @@ function decodeObject( bundle, database, ot, eid_hi ) {
 		var values = decodePrimitive( bundle, database );
 		return factory( values );
 
-	} else if (ot == 3) { // New simple object, keep signature
+	} else if (op === 0x3F) { // New simple object, keep signature
 
 		// Build factory funtion
 		var factoryFn = "return {", llen = bundle.readTypedNum[ NUMTYPE.UINT16 ]();
@@ -377,7 +395,7 @@ function decodePrimitiveArray( bundle, database, length ) {
 	while (size<length) {
 		// Peek on the operator
 		var op = bundle.u8[ bundle.i8 ];
-		if ((op & 0xFC) == 0x78) { // Primitive Flag
+		if ((op & 0xFC) === 0x78) { // Primitive Flag
 			// If the next opcode seems like a flag, pop it (otherwise
 			// that's an opcode that defines a primitive)
 			bundle.i8++;
@@ -411,7 +429,7 @@ function decodePrimitiveArray( bundle, database, length ) {
 			}
 		} else { // Primitive
 			var prim = decodePrimitive( bundle, database );
-			if (flag != 10) {
+			if (flag !== 10) {
 				// Apply flags to primitive
 				switch (flag) {
 					case 0: // REPEAT (Repeat primitive)
@@ -445,12 +463,12 @@ function decodePrimitiveArray( bundle, database, length ) {
  * Read an array from the bundle
  */
 function decodeArray( bundle, database, op ) {
-	var ln3 = (((op & 0x8) >> 3) == 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32, 
-		ln0 = ((op & 0x1) == 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32,
+	var ln3 = (((op & 0x8) >> 3) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32, 
+		ln0 = ((op & 0x1) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32,
 		scl = (op & 0x30) >> 4,
 		typ = (op & 0x7);
 
-	if ((op & 0x40) == 0x00) { // Delta-Encoded
+	if ((op & 0x40) === 0x00) { // Delta-Encoded
 		var l = bundle.readTypedNum[ ln3 ](),
 			v0 = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[typ] ](),
 			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[typ] ]( l - 1 );
@@ -470,13 +488,13 @@ function decodeArray( bundle, database, op ) {
 		}
 
 
-	} else if ((op & 0x70) == 0x40) { // Raw
+	} else if ((op & 0x70) === 0x40) { // Raw
 		var l = bundle.readTypedNum[ ln3 ]();
 
 		// Return raw array
 		return bundle.readTypedArray[ typ ]( l );
 
-	} else if ((op & 0x70) == 0x50) { // Repeated
+	} else if ((op & 0x70) === 0x50) { // Repeated
 		var l = bundle.readTypedNum[ ln3 ](),
 			v0 = bundle.readTypedNum[ typ ](),
 			arr = new NUMTYPE_CLASS[ typ ]( l );
@@ -485,7 +503,7 @@ function decodeArray( bundle, database, op ) {
 		for (var i=0; i<l; i++) arr[i]=v0;
 		return arr;
 
-	} else if ((op & 0x70) == 0x60) { // Downscaled
+	} else if ((op & 0x70) === 0x60) { // Downscaled
 		var l = bundle.readTypedNum[ ln3 ](),
 			v0 = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[typ] ](),
 			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DWS[typ] ]( l ),
@@ -494,14 +512,14 @@ function decodeArray( bundle, database, op ) {
 
 		return nArr;
 
-	} else if ((op & 0x78) == 0x70) { // Short
+	} else if ((op & 0x78) === 0x70) { // Short
 		var l = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
 			vArr = bundle.readTypedArray[ typ ]( l );
 
 		// Return short array
 		return vArr;
 
-	} else if ((op & 0x7C) == 0x78) { // Flag
+	} else if ((op & 0x7C) === 0x78) { // Flag
 		// This operator is used ONLY as indicator when parsing a primitive array
 		throw {
 			'name' 		: 'AssertError',
@@ -509,18 +527,18 @@ function decodeArray( bundle, database, op ) {
 			toString 	: function(){return this.name + ": " + this.message;}
 		}
 
-	} else if ((op & 0x7E) == 0x7C) { // Primitive
+	} else if ((op & 0x7E) === 0x7C) { // Primitive
 		var l = bundle.readTypedNum[ ln0 ]();
 
 		// Return decoded primitive array
 		return decodePrimitiveArray( bundle, database, l );
 
-	} else if ((op & 0x7F) == 0x7E) { // Empty
+	} else if ((op & 0x7F) === 0x7E) { // Empty
 
 		// Return empty array
 		return [];
 
-	} else if ((op & 0x7F) == 0x7F) { // Extended
+	} else if ((op & 0x7F) === 0x7F) { // Extended
 		// Currently unused
 	}
 }
@@ -530,43 +548,42 @@ function decodeArray( bundle, database, op ) {
  */
 function decodePrimitive( bundle, database ) {
 	var op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
-	if ((op & 0x80) == 0x00) { // Array
+	if ((op & 0x80) === 0x00) { // Array
 		return decodeArray(bundle, database,
 			(op & 0x7F) );
 
-	} else if ((op & 0xC0) == 0x80) { // Object
+	} else if ((op & 0xC0) === 0x80) { // Object
 		return decodeObject(bundle, database,
-			(op & 0x30) >> 4,
-			(op & 0x0F) );
+			(op & 0x3F) );
 
-	} else if ((op & 0xE0) == 0xC0) { // Buffer
+	} else if ((op & 0xE0) === 0xC0) { // Buffer
 		return decodeBuffer(bundle,
 			(op & 0x18) >> 3,
 			(op & 0x07) );
 
-	} else if ((op & 0xF0) == 0xE0) { // I-Ref
+	} else if ((op & 0xF0) === 0xE0) { // I-Ref
 		var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
 		return bundle.iref_table[id];
 
-	} else if ((op & 0xF8) == 0xF0) { // Number
+	} else if ((op & 0xF8) === 0xF0) { // Number
 		return bundle.readTypedNum[ op & 0x07 ]();
 
-	} else if ((op & 0xFC) == 0xF8) { // Simple
+	} else if ((op & 0xFC) === 0xF8) { // Simple
 		return PRIM_SIMPLE[ op & 0x03 ];
 
-	} else if ((op & 0xFE) == 0xFC) { // Simple_EX
+	} else if ((op & 0xFE) === 0xFC) { // Simple_EX
 		return PRIM_SIMPLE_EX[ op & 0x02 ];
 
-	} else if ((op & 0xFF) == 0xFE) { // Import
+	} else if ((op & 0xFF) === 0xFE) { // Import
 		var name = bundle.readStringLT();
-		if (database[name] == undefined) throw {
+		if (database[name] === undefined) throw {
 			'name' 		: 'ImportError',
 			'message'	: 'Cannot import undefined external reference '+name+'!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		};
 		return database[name];
 
-	} else if ((op & 0xFF) == 0xFF) { // Extended
+	} else if ((op & 0xFF) === 0xFF) { // Extended
 		// Currently unused
 	}
 }
@@ -602,7 +619,7 @@ function downloadArrayBuffers( urls, callback ) {
 	var pending = urls.length, buffers = Array(pending);
 	var continue_callback = function( response, index ) {
 		buffers[index] = response;
-		if (--pending == 0) callback( null, buffers );
+		if (--pending === 0) callback( null, buffers );
 	};
 
 	// Start loading each url in parallel
@@ -646,7 +663,7 @@ function downloadArrayBuffers( urls, callback ) {
 var BinaryLoader = function( objectTable, baseDir, database ) {
 
 	// Check for missing baseDir
-	if (typeof(baseDir) == "object") {
+	if (typeof(baseDir) === "object") {
 		database = baseDir;
 		baseDir = "";
 	}
@@ -689,7 +706,7 @@ BinaryLoader.prototype = {
 		// Check for sparse bundle
 		var parts = url.split("?"), suffix = "", reqURL = [];
 		if (parts.length > 1) suffix = "?"+parts[1];
-		if (parts[0].substr(parts[0].length - 5).toLowerCase() == ".jbbp") {
+		if (parts[0].substr(parts[0].length - 5).toLowerCase() === ".jbbp") {
 			var base = prefix + parts[0].substr(0, parts[0].length - 5);
 			reqURL = [
 				base + '.jbbp',
@@ -751,7 +768,7 @@ BinaryLoader.prototype = {
 		if (!callback) callback = function(){};
 
 		// If there are no queued requests, fire callback as-is
-		if (this.queuedRequests.length == 0) {
+		if (this.queuedRequests.length === 0) {
 			callback( null, this );
 			return;
 		}
@@ -759,7 +776,7 @@ BinaryLoader.prototype = {
 		// First make sure that there are no bundles pending loading
 		var pendingLoading = false;
 		for (var i=0; i<this.queuedRequests.length; i++) {
-			if (this.queuedRequests[i].status == PBUND_REQUESTED) {
+			if (this.queuedRequests[i].status === PBUND_REQUESTED) {
 				pendingLoading = true;
 				break;
 			}
@@ -777,7 +794,7 @@ BinaryLoader.prototype = {
 			var state = { 'counter': 0 }
 			var continue_callback = (function() {
 				// When reached 0, continue loading
-				if (--this.counter == 0)
+				if (--this.counter === 0)
 					self.__process( callback );
 			}).bind(state);
 
@@ -785,7 +802,7 @@ BinaryLoader.prototype = {
 			var triggeredError = false;
 			for (var i=0; i<this.queuedRequests.length; i++) {
 				var req = this.queuedRequests[i];
-				if (req.status == PBUND_REQUESTED) {
+				if (req.status === PBUND_REQUESTED) {
 
 					// Download bundle from URL(s)
 					state.counter++;
@@ -805,7 +822,7 @@ BinaryLoader.prototype = {
 
 								// Discard array if only 1 item
 								req.buffer = response;
-								if (response.length == 1) req.buffer = response[0];
+								if (response.length === 1) req.buffer = response[0];
 								// Keep buffer and mark as loaded
 								req.status = PBUND_LOADED;
 								// Continue
@@ -829,7 +846,7 @@ BinaryLoader.prototype = {
 
 		for (var i=0; i<this.queuedRequests.length; i++) {
 			var req = this.queuedRequests[i];
-			if (req.status == PBUND_LOADED) {
+			if (req.status === PBUND_LOADED) {
 				// try {
 
 				// Create & parse bundle
