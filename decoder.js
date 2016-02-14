@@ -257,7 +257,7 @@ function decodeObject( bundle, database, op ) {
 
 	} else if ((op & 0x38) === 0x30) { // Simple object with known signature
 		var eid = ((op & 0x07) << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-			factory = bundle.plain_factory_table[ eid ];
+			factory = bundle.factory_plain[ eid ];
 		if (factory === undefined) {
 			throw {
 				'name' 		: 'AssertError',
@@ -324,28 +324,40 @@ function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
  */
 function decodePlainBulkArray( bundle, database, len ) {
 
-	// Read plain object keys and create object
-	// factory class for faster parsing
-	var numKeys = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-		keys = [], factoryFn = "return {";
-	for (var i=0; i<numKeys; i++) {
-		var k = bundle.readStringLT(); keys.push( k );
-		factoryFn += "'"+k+"': props["+i+"][i],";
+	// // Read plain object keys and create object
+	// // factory class for faster parsing
+	// var numKeys = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+	// 	keys = [], factoryFn = "return {";
+	// for (var i=0; i<numKeys; i++) {
+	// 	var k = bundle.readStringLT(); keys.push( k );
+	// 	factoryFn += "'"+k+"': props["+i+"][i],";
+	// }
+	// factoryFn += "}";
+
+	// Get signature ID
+	var sid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
+		properties = bundle.signature_table[sid],
+		objectFactory = bundle.factory_plain_bulk[sid];
+	if (!properties) {
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Unknown plain object with signature #'+sid+'!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
 	}
-	factoryFn += "}";
 
 	// Read property arrays
 	var props = [];
-	for (var i=0; i<numKeys; i++)
+	for (var i=0, l=properties.length; i<l; i++)
 		props.push(decodePrimitive( bundle, database ));
 
-	// Create factory function
-	var makeObject = Function("props","i", factoryFn);
+	// // Create factory function
+	// var makeObject = Function("props","i", factoryFn);
 
 	// Create objects
 	var ans = [];
 	for (var i=0; i<len; i++)
-		ans.push( makeObject(props, i) );
+		ans.push( objectFactory(props, i) );
 	return ans;
 	
 }

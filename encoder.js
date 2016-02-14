@@ -41,6 +41,11 @@ Known Limitations
 const SAFE = 1;
 
 /**
+ * Protocol version
+ */
+const PROTO_VERSION = 1;
+
+/**
  * Fake DOM environment when from node
  */
 if (typeof(document) === "undefined") {
@@ -674,6 +679,14 @@ BinaryStream.prototype = {
 //////////////////////////////////////////////////////////////////
 // Analysis and Encoding helper functions
 //////////////////////////////////////////////////////////////////
+
+/**
+ * Get a new unique object ID
+ */
+var __objectID = 0;
+function __newObjectID() {
+	return '_'+(++__objectID);
+}
 
 /**
  * Get the scale factor for the specified float-based delta encoding
@@ -1574,13 +1587,15 @@ function encodePlainBulkArray_v1( encoder, entities, properties ) {
 function encodePlainBulkArray( encoder, entities, properties ) {
 
 	// Write down the keys
-	var pl = properties.length;
-	encoder.stream8.write( pack1b( pl , false ) );
-	for (var i=0; i<pl; i++)
-		encoder.stream16.write( pack2b( encoder.stringID(properties[i]) ) );
+	// var pl = properties.length;
+	// encoder.stream8.write( pack1b( pl , false ) );
+	// for (var i=0; i<pl; i++)
+	// 	encoder.stream16.write( pack2b( encoder.stringID(properties[i]) ) );
 
 	// Encode array
-	encoder.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.join("+") );
+	var eid = encoder.getSignatureID( properties );
+	encoder.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.toString()+", eid="+eid );
+	encoder.stream16.write( pack2b( eid, false ) );
 
 	// Write bulked properties
 	for (var i=0, pl=properties.length; i<pl; i++) {
@@ -1951,36 +1966,36 @@ function encodePrimitiveDate( encoder, object ) {
 function encodePlainObject( encoder, object ) {
 
 	// Extract plain object signature
-	var o_keys =Object.keys(object),
-		signature = o_keys.join("+"),
-		sid = encoder.getSignatureID( signature );
+	var o_keys =Object.keys(object);
+		// signature = o_keys.join("+"),
+	var sid = encoder.getSignatureID( o_keys );
 
 	// Prepare values
 	var values = [];
 	for (var i=0, len=o_keys.length; i<len; i++) values.push( object[o_keys[i]] );
 
-	// If not found, allocate new
-	if (sid === undefined) {
+	// // If not found, allocate new
+	// if (sid === undefined) {
 
-		// Register signature
-		sid = encoder.defineSignature( signature );
-		encoder.log(LOG.PLO, "plain(new), signature="+signature+", sid="+sid);
+	// 	// Register signature
+	// 	sid = encoder.defineSignature( signature );
+	// 	encoder.log(LOG.PLO, "plain(new), signature="+signature+", sid="+sid);
 
-		// Write entity opcode
-		encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PLAIN_NEW ) );
-		encoder.counters.op_prm+=1;
+	// 	// Write entity opcode
+	// 	encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PLAIN_NEW ) );
+	// 	encoder.counters.op_prm+=1;
 
-		// Write length
-		encoder.stream16.write( pack2b( o_keys.length, false ) );
+	// 	// Write length
+	// 	encoder.stream16.write( pack2b( o_keys.length, false ) );
 
-		// Write key IDs
-		for (var i=0, len=o_keys.length; i<len; i++)
-			encoder.stream16.write( pack2b( encoder.stringID(o_keys[i]) ) );
-		encoder.counters.ref_str += o_keys.length * 2;
+	// 	// Write key IDs
+	// 	for (var i=0, len=o_keys.length; i<len; i++)
+	// 		encoder.stream16.write( pack2b( encoder.stringID(o_keys[i]) ) );
+	// 	encoder.counters.ref_str += o_keys.length * 2;
 
-	} else {
+	// } else {
 
-		encoder.log(LOG.PLO, "plain["+sid+"], signature="+signature+", sid="+sid);
+		encoder.log(LOG.PLO, "plain["+sid+"], signature="+o_keys.toString()+", sid="+sid);
 
 		// Split entity ID in a 11-bit number
 		var sid_hi = (sid & 0x700) >> 8,
@@ -1991,9 +2006,49 @@ function encodePlainObject( encoder, object ) {
 		encoder.stream8.write( pack1b( sid_lo ) );
 		encoder.counters.op_prm+=2;
 
-	}
+	// }
 
 	// Keep iref and encode
+	encodeArray( encoder, values );
+
+}
+
+/**
+ * Encode plain object
+ */
+function encodePlainObject_v2( encoder, object ) {
+
+	// Get signature
+	var signature = encoder.getObjectSignature( object );
+
+	// Split entity ID in a 11-bit number
+	var sid = signature[0],
+		sid_hi = (sid & 0x700) >> 8,
+		sid_lo =  sid & 0xFF;
+
+	// Check for overflow
+	if (sid >= 2048)
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Exceeded the plain object signature table! Too many different plain objects!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		};
+
+	// We have a known entity ID, re-use it
+	encoder.log(LOG.PLO, "plain["+sid+"], sid="+sid);
+	encoder.stream8.write( pack1b( PRIM_OP.OBJECT | OBJ_OP.PLAIN_LOOKUP | sid_hi ) );
+	encoder.stream8.write( pack1b( sid_lo ) );
+	encoder.counters.op_prm+=2;
+
+	// Compile values array, sorted by object type
+	var values = [];
+	for (var i =0; i<signature[1].length; i++) values.push( signature[1][i] );
+	encodeArray( encoder, values );
+	values = [];
+	for (var i =0; i<signature[2].length; i++) values.push( signature[2][i] );
+	encodeArray( encoder, values );
+	values = [];
+	for (var i =0; i<signature[3].length; i++) values.push( signature[3][i] );
 	encodeArray( encoder, values );
 
 }
@@ -2206,15 +2261,17 @@ var BinaryEncoder = function( filename, config ) {
 	this.sparse = (config['sparse'] === undefined) ? false : config['sparse'];
 	if (this.sparse) {
 
-		this.stream8.write( pack2b( 0x4233 ) ); // Magic header
+		this.stream8.write( pack2b( 0x4231 ) ); 		// Magic header
+		this.stream8.write( pack2b( 0 ) ); 				// Object Table ID
+		this.stream8.write( pack2b( PROTO_VERSION ) ); 	// Protocol Version
+		this.stream8.write( pack2b( 0 ) ); 				// Reserved
 
-		// Start by writing an empty header (this will be re-built at close time)
-		this.stream8.write( pack2b( 0 ) ); // Object Table ID
 		this.stream8.write( pack4b( 0 ) ); // 64-bit buffer lenght
 		this.stream8.write( pack4b( 0 ) ); // 32-bit buffer lenght
 		this.stream8.write( pack4b( 0 ) ); // 16-bit buffer length
 		this.stream8.write( pack4b( 0 ) ); // 8-bit buffer length
-		this.stream8.write( pack4b( 0 ) ); // String lookup table length
+		this.stream8.write( pack4b( 0 ) ); // Length (in bytes) of string lookup table
+		this.stream8.write( pack4b( 0 ) ); // Length (in bytes) of plain object signature table
 
 	}
 
@@ -2267,33 +2324,39 @@ BinaryEncoder.prototype = {
 	 */
 	'close': function() {
 
+		// Header length
+		var header_length = 32;
+
+		// Write down null-terminated string lookup table in the end
+		var stream8offset = this.stream8.offset;
+		for (var i=0; i<this.stringLookup.length; i++) {
+			this.stream8.write( new Buffer( this.stringLookup[i] ) );
+			this.stream8.write( new Buffer( [0] ) );
+		}
+		// console.log("ST: len="+(this.stream8.offset - stream8offset)+", sl=", this.stringLookup );
+
+		// Encode the object signature table
+		var stream16offset = this.stream16.offset;
+		for (var i=0; i<this.plainObjectSignatureTable.length; i++)
+			this.stream16.write( this.plainObjectSignatureTable[i] );
+		// console.log("OT: len="+(this.stream16.offset - stream16offset)+", ot=", this.plainObjectSignatureTable );
+
 		// Finalize individual streams
 		this.stream64.finalize();
 		this.stream32.finalize();
 		this.stream16.finalize();
+		this.stream8.finalize();
 
 		// If sparse bundle update stream8
 		if (this.sparse) {
 
-			// Get the current offset of stream8 offset
-			var stream8offset = this.stream8.offset - 24;
-
-			// Write down null-terminated string lookup table in the end
-			for (var i=0; i<this.stringLookup.length; i++) {
-				this.stream8.write( new Buffer( this.stringLookup[i] ) );
-				this.stream8.write( new Buffer( [0] ) );
-			}
-
-			// Finalize stream8
-			this.stream8.finalize();
-
 			// Overwrite header
-			this.stream8.writeAt( 2,  pack2b( this.objectTable.ID ) );  // Object Table ID
-			this.stream8.writeAt( 4,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
-			this.stream8.writeAt( 8,  pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
-			this.stream8.writeAt( 12, pack4b( this.stream16.offset ) ); // 16-bit buffer length
-			this.stream8.writeAt( 16, pack4b( stream8offset ) );  // 8-bit buffer length (exclude header)
-			this.stream8.writeAt( 20, pack4b( this.stringLookup.length ) ); // String lookup table length
+			this.stream8.writeAt( 8,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
+			this.stream8.writeAt( 12, pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
+			this.stream8.writeAt( 16, pack4b( this.stream16.offset ) ); // 16-bit buffer length
+			this.stream8.writeAt( 20, pack4b( this.stream8.offset - header_length ) );  // 8-bit buffer length (exclude header)
+			this.stream8.writeAt( 24, pack4b( this.stream8.offset - stream8offset ) ); // Length of string table
+			this.stream8.writeAt( 28, pack4b( this.stream16.offset - stream16offset ) ); // Length of signature table
 
 			// Close streams
 			this.stream8.close();  this.stream16.close(); 
@@ -2321,28 +2384,22 @@ BinaryEncoder.prototype = {
 		// If not separating, merge everything
 		else {
 
-			// Finalize stream8
-			this.stream8.finalize();
-
 			// Open final stream
 			var finalStream = new BinaryStream( this.filename + '.jbb', 8 );
-			finalStream.write( pack2b( 0x4233 ) );  				 // Magic header
-			finalStream.write( pack2b( this.objectTable.ID ) ); 	 // Object Table ID
-			finalStream.write( pack4b( this.stream64.offset ) );     // 64-bit buffer lenght
-			finalStream.write( pack4b( this.stream32.offset ) );     // 32-bit buffer lenght
-			finalStream.write( pack4b( this.stream16.offset ) );     // 16-bit buffer length
-			finalStream.write( pack4b( this.stream8.offset ) );      // 8-bit buffer length
-			finalStream.write( pack4b( this.stringLookup.length ) ); // String lookup table length
+			finalStream.write( pack2b( 0x4231 ) );  			 // Magic header
+			finalStream.write( pack2b( this.objectTable.ID ) );  // Object Table ID
+			finalStream.write( pack2b( PROTO_VERSION ) );  		 // Version
+			finalStream.write( pack2b( 0 ) );  					 // Reserved
+			finalStream.write( pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
+			finalStream.write( pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
+			finalStream.write( pack4b( this.stream16.offset ) ); // 16-bit buffer length
+			finalStream.write( pack4b( this.stream8.offset ) );  // 8-bit buffer length
+			finalStream.write( pack4b( this.stream8.offset - stream8offset ) ); // Length of string table
+			finalStream.write( pack4b( this.stream16.offset - stream16offset ) ); // Length of signature table
 
 			// Merge individual streams
 			finalStream.merge( this.stream64 ); finalStream.merge( this.stream32 );
 			finalStream.merge( this.stream16 ); finalStream.merge( this.stream8 );
-
-			// Write down null-terminated string lookup table in the end
-			for (var i=0; i<this.stringLookup.length; i++) {
-				finalStream.write( new Buffer( this.stringLookup[i] ) );
-				finalStream.write( new Buffer( [0] ) );
-			}
 
 			// Close
 			finalStream.finalize();
@@ -2408,14 +2465,6 @@ BinaryEncoder.prototype = {
 	},
 
 	/**
-	 * Lookup if that object already exits in the i-ref table
-	 * and return it's ID.
-	 */
-	'lookupIRef': function( object ) {
-		return this.indexRef.indexOf( object );
-	},
-
-	/**
 	 * Lookup if that object already exits in the x-ref table
 	 * and return the ID of it's string on the string lookup table
 	 */
@@ -2445,11 +2494,27 @@ BinaryEncoder.prototype = {
 	},
 
 	/**
+	 * Lookup if that object already exits in the i-ref table
+	 * and return it's ID.
+	 */
+	'lookupIRef': function( object ) {
+		if (object.__iref__ === undefined) return -1;
+		return object.__iref__;
+		// return this.indexRefLookup[ object.__iref ];
+
+		// var idx = this.indexRefLookup[object];
+		// if (idx === undefined) return -1;
+		// return idx;
+
+		// return this.indexRef.indexOf( object );
+	},
+
+	/**
 	 * Keep the specified object in the lookup tables
 	 */
 	'keepIRef': function( object, propertyTable, eid ) {
 
-		// Create a new BST for this entity type if missing
+		// Create a new BST for this entity for by-value matching
 		if (this.indexVal[eid] === undefined)
 			this.indexVal[eid] = new BinarySearchTree({
 				compareKeys: objectBstComparison,
@@ -2461,13 +2526,123 @@ BinaryEncoder.prototype = {
 		this.indexVal[eid].insert( propertyTable, this.indexRef.length );
 		this.indexRef.push( object );
 
+		// Keep ID on the object itself so we have a faster lookup,
+		// and do it in a non-enumerable property so it doesn't pollute the objects.
+		Object.defineProperty(
+			object, "__iref__", {
+				enumerable: false,
+				value: this.indexRef.length,
+			}
+		);
+
+	},
+
+	/**
+	 * Calculate object signature without registering it
+	 */
+	'calcObjectSignature': function( object ) {
+		var keys = Object.keys(object), k, v,
+			lVals = [], lArrays = [], lObjects = [];
+
+		// Sort to values, arrays and objects
+		var lookupString = "";
+		for (var i=0; i<keys.length; i++) {
+			k = keys[i]; v = object[k];
+			if ((v instanceof Uint8Array) || (v instanceof Int8Array) ||
+				(v instanceof Uint16Array) || (v instanceof Int16Array) ||
+				(v instanceof Uint32Array) || (v instanceof Int32Array) ||
+				(v instanceof Float32Array) || (v instanceof Float64Array) ||
+				(v instanceof Array) ) {
+				lookupString += "@"+k;
+			} else if (v.constructor === ({}).constructor) {
+				lookupString += "%"+k;
+			} else {
+				lookupString += "$"+k;
+			}
+		}
+
+		// Return lookup string
+		return lookupString;
+	},
+
+	/**
+	 * Get object signature
+	 */
+	'getObjectSignature': function( object ) {
+		var keys = Object.keys(object), k, v, lookupString,
+			lVals = [], lArrays = [], lObjects = [];
+
+		// Sort to values, arrays and objects
+		lookupString = "";
+		for (var i=0; i<keys.length; i++) {
+			k = keys[i]; v = object[k];
+			if ((v instanceof Uint8Array) || (v instanceof Int8Array) ||
+				(v instanceof Uint16Array) || (v instanceof Int16Array) ||
+				(v instanceof Uint32Array) || (v instanceof Int32Array) ||
+				(v instanceof Float32Array) || (v instanceof Float64Array) ||
+				(v instanceof Array) ) {
+				lArrays.push(k);
+				lookupString += "@"+k;
+			} else if (v.constructor === ({}).constructor) {
+				lObjects.push(k);
+				lookupString += "%"+k;
+			} else {
+				lVals.push(k);
+				lookupString += "$"+k;
+			}
+		}
+
+		// Lookup or create signature
+		i = this.plainObjectSignatureLookup[lookupString];
+		if (i === undefined) {
+
+			// Compile signature
+			var sigbuf = [];
+			sigbuf.push( pack2b( lVals.length ) );
+			for (var i=0; i<lVals.length; i++) {
+				sigbuf.push( pack2b( this.stringID(lVals[i]) ) );
+			}
+			sigbuf.push( pack2b( lArrays.length ) );
+			for (var i=0; i<lArrays.length; i++) {
+				sigbuf.push( pack2b( this.stringID(lArrays[i]) ) );
+			}
+			sigbuf.push( pack2b( lObjects.length ) );
+			for (var i=0; i<lObjects.length; i++) {
+				sigbuf.push( pack2b( this.stringID(lObjects[i]) ) );
+			}
+
+			// Encode to the 16-bit stream
+			this.plainObjectSignatureTable.push( Buffer.concat( sigbuf ) );
+			this.plainObjectSignatureLookup[lookupString] 
+				= i = this.plainObjectSignatureTable.length - 1;
+		}
+
+		// Return index
+		return [i, lVals, lArrays, lObjects];
 	},
 
 	/**
 	 * Create and/or return the property signature with the given ID
 	 */
-	'getSignatureID': function( signature ) {
-		return this.plainObjectSignatureLookup[signature];			
+	'getSignatureID': function( keys ) {
+		var lookupString = keys.toString();
+		var id = this.plainObjectSignatureLookup[lookupString];			
+		if (id === undefined) {
+
+			// Create new signature buffer
+			var sigbuf = [];
+			sigbuf.push( pack2b( keys.length, false ) );
+			for (var i=0; i<keys.length; i++) {
+				sigbuf.push( pack2b( this.stringID(keys[i]), false ) );
+			}
+
+			// Keep on table
+			this.plainObjectSignatureTable.push( Buffer.concat( sigbuf ) );
+			this.plainObjectSignatureLookup[lookupString] 
+				= id = this.plainObjectSignatureTable.length - 1;
+
+		}
+		return id;
 	},
 
 	/**
