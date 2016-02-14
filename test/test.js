@@ -1,7 +1,8 @@
 
-var util   = require('util');
-var assert = require('assert');
-var common = require('./common');
+var util   			= require('util');
+var assert 			= require('assert');
+var common 			= require('./common');
+var BinaryBundle 	= require("../lib/BinaryBundle");
 
 // A coule of local objects, part of Object Table
 var ObjectA = function() {
@@ -50,7 +51,7 @@ var ObjectCInit = function( instance, properties, values ) {
 
 // Local object table for tests
 var ot 	   = {
-	'ID' 		: 0,
+	'ID' 		: 0x1E51,
 	'ENTITIES' 	: [
 		[ ObjectA, DefaultFactory, DefaultInit ],
 		[ ObjectB, UnconstructedFactory, DefaultInit ],
@@ -196,6 +197,80 @@ function it_should_return_array_rep( typeName, length, value ) {
 ////////////////////////////////////////////////////////////////
 
 describe('[Encoding/Decoding]', function() {
+
+	describe('Binary Protocol', function() {
+		var header_size = 32;
+
+		// Encode stream
+		var encode_stream = function( sparse ) {
+
+			// Encode object
+			var encoder = common.open_encoder( ot, sparse );
+			encoder.encode({
+				'plain'	: 152,
+				'32bit'	: 545406996,
+				'64bit' : 71468257902672,
+				'object': false
+			}, 'export_name');
+			encoder.close();
+
+			// Cleanup when this is done
+			after(function() {
+				common.cleanup_encoder( encoder );
+			});
+
+			// Open raw contents
+			return common.open_encoder_buffer( encoder );
+
+		}
+
+		// Run tests for sparse and not
+		var header_test = function( sparse ) {
+
+			// Get parts
+			var p = encode_stream( sparse );
+			var u16 = new Uint16Array(p[0], 0, header_size/2);
+			var u32 = new Uint32Array(p[0], 0, header_size/4);
+
+			// Header field
+			assert.equal( u16[0], 0x4231, 	'Magic number should be 0x4231');
+			assert.equal( u16[1], ot.ID, 	'Object table should be 0x'+ot.ID.toString(16));
+			assert.equal( u16[2], 1,		'Protocol version should be 1');
+			assert.equal( u16[3], 0,		'Reserved header field should be 0');
+
+			// Check table
+			assert.equal( u32[2], 8,		'64-bit table size');
+			assert.equal( u32[3], 8,		'32-bit table size');
+			assert.equal( u32[4], 14,		'16-bit table size');
+			assert.equal( u32[5], 51,		'8-bit table size');
+			assert.equal( u32[6], 42,		'String table size');
+			assert.equal( u32[7], 10,		'Plain Object Signature table size');
+
+		}
+
+		// Validate header
+		it('should validate the header of compact bundle', function() { header_test(false) });
+		it('should validate the header of sparse bundle', function() { header_test(true) });
+
+		// Run tests for sparse and not
+		var parse_test = function( sparse ) {
+
+			// Get parts
+			var p = encode_stream( sparse );
+			var bundle = new BinaryBundle( p, ot );
+
+			// Validate string table
+			assert.deepEqual( bundle.string_table, 
+				[ 'test/export_name', 'plain', '32bit', '64bit', 'object' ],'string table');
+			assert.deepEqual( bundle.signature_table, 
+				[ ['plain', '32bit', '64bit', 'object'] ],'plain object signature table');
+		}
+
+		// Validate signature table
+		it('should validate string & signature table of compact bundle', function() { parse_test(false) });
+		it('should validate string & signature table of sparse bundle', function() { parse_test(true) });
+
+	});
 
 	describe('Simple Primitives', function () {
 
