@@ -28,6 +28,10 @@ That's why the bundle is organised in four streams laid one after the other, as 
     </tr>
     <tr>
         <th>...</th>
+        <td>Object Signatures</td>
+    </tr>
+    <tr>
+        <th>...</th>
         <td>8-Bit Elements (<code>Int8</code>, <code>UInt8</code>)</td>
     </tr>
     <tr>
@@ -42,7 +46,9 @@ The entry point of the bundle is the beginning of the 8-bit elements, since all 
 
 ## Header
 
-The file header is organised as shown below. The `Magic` number is a 16-bit unsigned integer with value `0x4233`, so it's represented as `<33h,42h>` in machines with little-endian architecture or `<42h,33h>` in big-endian. It's therefore possible to detect incompatible endianess before loading the bundle. 
+_Revision Notice: The previous version of the protocol was using the 0x4233 magic number in the header._ 
+
+The file header is organised as shown below. The `Magic` number is a 16-bit unsigned integer with value `0x4231`, so it's represented as `<31h,42h>` in machines with little-endian architecture or `<42h,31h>` in big-endian. It's therefore possible to detect incompatible endianess before loading the bundle. 
 
 The `Object Table ID` is the ID of the Object Table used to compile this bundle. This table contains the information required to re-construct the objects in the bundle and should be provided by the loader arguments.
 
@@ -56,28 +62,37 @@ The `Object Table ID` is the ID of the Object Table used to compile this bundle.
     </tr>    
     <tr>
         <th>0x00</th>
-        <td colspan="2">Magic (0x4233)</td>
+        <td colspan="2">Magic (0x4231)</td>
         <td colspan="2">Object Table ID</td>
     </tr>
     <tr>
         <th>0x04</th>
-        <td colspan="4">64-Bit Table Size (Bytes)</td>
+        <td colspan="2">Protocol Version (1)</td>
+        <td colspan="2"><em>Reserved</em></td>
     </tr>
     <tr>
         <th>0x08</th>
-        <td colspan="4">32-Bit Table Size (Bytes)</td>
+        <td colspan="4">64-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x0C</th>
-        <td colspan="4">16-Bit Table Size (Bytes)</td>
+        <td colspan="4">32-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x10</th>
-        <td colspan="4">8-Bit Table Size (Bytes)</td>
+        <td colspan="4">16-Bit Table Size (Bytes)</td>
     </tr>
     <tr>
         <th>0x14</th>
-        <td colspan="4">String Table Size (Items)</td>
+        <td colspan="4">8-Bit Table Size (Bytes)</td>
+    </tr>
+    <tr>
+        <th>0x18</th>
+        <td colspan="4">String Table Size (Bytes)</td>
+    </tr>
+    <tr>
+        <th>0x1C</th>
+        <td colspan="4">Object Signature Table Size (Bytes)</td>
     </tr>
 </table>
 
