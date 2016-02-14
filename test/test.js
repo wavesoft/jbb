@@ -257,7 +257,7 @@ describe('[Encoding/Decoding]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( p, ot );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, ot );
 
 			// Validate string table
 			assert.deepEqual( bundle.string_table, 
@@ -269,6 +269,31 @@ describe('[Encoding/Decoding]', function() {
 		// Validate signature table
 		it('should validate string & signature table of compact bundle', function() { parse_test(false) });
 		it('should validate string & signature table of sparse bundle', function() { parse_test(true) });
+
+		// Run tests for sparse and not
+		var factory_tests = function( sparse ) {
+
+			// Get parts
+			var p = encode_stream( sparse );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, ot );
+
+			// Validate string table
+			var plain_values = [ 1, 2, 3, 4 ];
+			var weave_values = [ [1], [2], [3], [4] ];
+			var test_object = {
+				'plain': plain_values[0],
+				'32bit': plain_values[1],
+				'64bit': plain_values[2],
+				'object': plain_values[3],
+			};
+
+			assert.deepEqual( bundle.factory_plain[0]( plain_values ), test_object, 'plain object factory' );
+			assert.deepEqual( bundle.factory_plain_bulk[0]( weave_values, 0 ), test_object, 'bulk object factory' );
+		}
+
+		// Validate signature table
+		it('should properly create factory objects of compact bundle', function() { factory_tests(false) });
+		it('should properly create factory objects of sparse bundle', function() { factory_tests(true) });
 
 	});
 

@@ -25,6 +25,17 @@ var temp = require("temp").track();
 var fs   = require('fs');
 
 /**
+ * Read filename to buffer
+ */
+function readChunk( filename ) {
+	// Read into buffer
+	var file = fs.readFileSync(filename),
+		u8 = new Uint8Array(file);
+	// Return buffer
+	return u8.buffer;
+}
+
+/**
  * Create a binary encoder pointing to a random file
  */
 function open_encoder( ot, sparse ) {
@@ -65,13 +76,6 @@ function open_decoder( encoder, ot, db ) {
  * Create a binary decoder to read something created with open_encoder
  */
 function open_decoder_sparse( encoder, ot, db ) {
-	var readChunk = function(filename) {
-		// Read into buffer
-		var file = fs.readFileSync(filename),
-			u8 = new Uint8Array(file);
-		// Return buffer
-		return u8.buffer;
-	}
 
 	// Load chunk buffers
 	var chunks = [
@@ -103,6 +107,33 @@ function cleanup_encoder( encoder ) {
 		fs.unlink( encoder.filename.replace(".jbbp", "_b16.jbbp") ),
 		fs.unlink( encoder.filename.replace(".jbbp", "_b32.jbbp") ),
 		fs.unlink( encoder.filename.replace(".jbbp", "_b64.jbbp") )
+	}
+
+}
+
+/**
+ * Load the buffer from 
+ */
+function open_encoder_buffer( encoder ) {
+
+	// Check if this is sparse
+	if (encoder.filename.substr(encoder.filename.length-5) == ".jbbp") {
+
+		// Load chunk buffers
+		return [
+			readChunk( encoder.filename ),
+			readChunk( encoder.filename.replace(".jbbp", "_b16.jbbp") ),
+			readChunk( encoder.filename.replace(".jbbp", "_b32.jbbp") ),
+			readChunk( encoder.filename.replace(".jbbp", "_b64.jbbp") )
+		];
+
+	} else {
+
+		// Load entire bundle
+		return [
+			readChunk( encoder.filename )
+		];
+
 	}
 
 }
@@ -168,5 +199,6 @@ module.exports = {
 	'open_encoder': open_encoder,
 	'open_decoder': open_decoder,
 	'open_decoder_sparse': open_decoder_sparse,
+	'open_encoder_buffer': open_encoder_buffer,
 	'cleanup_encoder': cleanup_encoder,
 };

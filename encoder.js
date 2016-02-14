@@ -2348,9 +2348,11 @@ BinaryEncoder.prototype = {
 		this.stream8.finalize();
 
 		// If sparse bundle update stream8
+		var totalSize = 0;
 		if (this.sparse) {
 
 			// Overwrite header
+			this.stream8.writeAt( 2,  pack2b( this.objectTable.ID ) );  // Update object table ID
 			this.stream8.writeAt( 8,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
 			this.stream8.writeAt( 12, pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
 			this.stream8.writeAt( 16, pack4b( this.stream16.offset ) ); // 16-bit buffer length
@@ -2362,16 +2364,16 @@ BinaryEncoder.prototype = {
 			this.stream8.close();  this.stream16.close(); 
 			this.stream32.close(); this.stream64.close(); 
 
+			// Calculate total size
+			totalSize = this.stream8.offset +  this.stream16.offset + 
+						this.stream32.offset + this.stream64.offset;
+
 			// Update filename
 			this.filename += ".jbbp";
 
 			// Write summar header
 			if ((this.logFlags & LOG.SUMM)) {
-				var sumSize = this.stream8.offset +  this.stream16.offset + 
-							  this.stream32.offset + this.stream64.offset;
-
-				// Write summary footer
-				console.info("Encoding size =",sumSize,"bytes");
+				console.info("Encoding size =",totalSize,"bytes");
 				console.info("     8b chunk =",this.stream8.offset,"bytes");
 				console.info("    16b chunk =",this.stream16.offset,"bytes");
 				console.info("    32b chunk =",this.stream32.offset,"bytes");
@@ -2404,6 +2406,7 @@ BinaryEncoder.prototype = {
 			// Close
 			finalStream.finalize();
 			finalStream.close();
+			totalSize = finalStream.offset;
 
 			// Close and delete helper stream files
 			this.stream8.close();  fs.unlink( this.filename + '.jbbp' );
@@ -2429,7 +2432,7 @@ BinaryEncoder.prototype = {
 			console.info(" 64-bit Stream      : ", this.stream64.offset, "b");
 			console.info(" 32-bit Stream      : ", this.stream32.offset, "b");
 			console.info(" 16-bit Stream      : ", this.stream16.offset, "b");
-			console.info("  8-bit Stream      : ", this.stream8.offset, "b");
+			console.info("  8-bit Stream      : ", this.stream8.offset,  "b");
 			console.info("-----------------------------------");
 			console.info(" Control Op-Codes   : ", this.counters.op_ctr, "b");
 			console.info(" Primitive Op-Codes : ", this.counters.op_prm, "b");
@@ -2443,7 +2446,7 @@ BinaryEncoder.prototype = {
 					  this.counters.ref_str + this.counters.op_iref + this.counters.op_xref +
 					  this.counters.arr_hdr + this.counters.arr_chu + this.counters.dat_hdr;
 			console.info("-----------------------------------");
-			var perc = ((sum / finalStream.offset) * 100).toFixed(2);
+			var perc = ((sum / totalSize) * 100).toFixed(2);
 			console.info(" Total Overhead     : ",sum,"b ("+perc+" %)");
 		}
 
@@ -2469,13 +2472,18 @@ BinaryEncoder.prototype = {
 	 * and return the ID of it's string on the string lookup table
 	 */
 	'lookupXRef': function( object ) {
+		var key = object.__xref__;
+		if (key === undefined) return -1;
 
-		// Lookup object on xref table
-		var id = this.dbObjects.indexOf( object );
-		if (id < 0) return -1;
+		// Return stringID of the key
+		return this.stringID( key );		
 
-		// Get string ID of the db tag
-		return this.stringID( this.dbTags[id] );
+		// // Lookup object on xref table
+		// var id = this.dbObjects.indexOf( object );
+		// if (id < 0) return -1;
+
+		// // Get string ID of the db tag
+		// return this.stringID( this.dbTags[id] );
 
 	},
 
@@ -2632,7 +2640,7 @@ BinaryEncoder.prototype = {
 			// Create new signature buffer
 			var sigbuf = [];
 			sigbuf.push( pack2b( keys.length, false ) );
-			for (var i=0; i<keys.length; i++) {
+			for (var i=0, l=keys.length; i<l; i++) {
 				sigbuf.push( pack2b( this.stringID(keys[i]), false ) );
 			}
 
@@ -2663,12 +2671,22 @@ BinaryEncoder.prototype = {
 	'setDatabase': function( db, prefix ) {
 		if (!prefix) prefix="";
 		// Import into an easy-to-process format
-		var keys = Object.keys(db);
+		var keys = Object.keys(db), k, v;
 		for (var i=0; i<keys.length; i++) {
-			var k = keys[i];
+			k = keys[i]; v = db[k];
 			if (!db.hasOwnProperty(k)) continue;
+
 			this.dbTags.push( prefix+k );
 			this.dbObjects.push( db[k] );
+
+			// Define the XRef property for faster lookup of the key
+			Object.defineProperty(
+				v, "__xref__", {
+					enumerable: false,
+					value: k,
+				}
+			);
+
 		}
 		// Keep reference of database
 		this.database = db;
