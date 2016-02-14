@@ -426,48 +426,58 @@ describe('[Encoding/Decoding]', function() {
 
 	describe('External References (XRef)', function () {
 
-		// Create some objects
-		var obj1 = new ObjectA(),
-			obj2 = new ObjectB( 12345, "check" ),
-			obj3 = new ObjectC( obj1, "part-object-1" ),
-			obj4 = new ObjectC( obj2, "part-object-2" ),
-			obj5 = new ObjectB( obj2, "nested" ),
-			obj6 = new ObjectC( obj5, "part-object-3" );
-
-		// Create an encoder with 2 objects
-		var encoder1 = common.open_encoder( ot );
-		var db1 = {
-			'x/obj1': obj1,
-			'x/obj2': obj2
-		};
-		encoder1.setDatabase( db1 );
-		encoder1.encode( obj3, 'obj3' );
-		encoder1.encode( obj4, 'obj4' );
-		encoder1.close();
-
-		// Create an encoder with 2 objects with nested depencencies
-		var encoder2 = common.open_encoder( ot );
-		var db2 = {
-			'x/obj1': obj1,
-			'x/obj2': obj2,
-			'x/obj5': obj5
-		};
-		encoder2.setDatabase( db2 );
-		encoder2.encode( obj3, 'obj3' );
-		encoder2.encode( obj6, 'obj6' );
-		encoder2.close();
-
 		it('should except when oppening a bundle with xrefs, but with undefined db', function() {
+
+			// Create some objects
+			var obj1 = new ObjectA(),
+				obj2 = new ObjectB( 12345, "check" ),
+				obj3 = new ObjectC( obj1, "part-object-1" ),
+				obj4 = new ObjectC( obj2, "part-object-2" );
+
+			// Create an encoder with 2 objects
+			var encoder = common.open_encoder( ot );
+			var db = {
+				'x/obj1': obj1,
+				'x/obj2': obj2
+			};
+			encoder.setDatabase( db );
+			encoder.encode( obj3, 'obj3' );
+			encoder.encode( obj4, 'obj4' );
+			encoder.close();
+
+			// Try to load a bundle with xrefs
 			assert.throws(function() {
-				var openBundle = common.open_decoder( encoder1, ot );
+				var openBundle = common.open_decoder( encoder, ot );
 			}, function(err) {
 				return (err.name == 'ImportError');
 			}, 'bundle decoder did not thorw an ImportError while loading');
+
+			// Cleanup
+			common.cleanup_encoder( encoder );
+
 		});
 
 		it('should properly import the correct XRef dependencies', function() {
+
+			// Create some objects
+			var obj1 = new ObjectA(),
+				obj2 = new ObjectB( 12345, "check" ),
+				obj3 = new ObjectC( obj1, "part-object-1" ),
+				obj4 = new ObjectC( obj2, "part-object-2" );
+
+			// Create an encoder with 2 objects
+			var encoder = common.open_encoder( ot );
+			var db = {
+				'x/obj1': obj1,
+				'x/obj2': obj2
+			};
+			encoder.setDatabase( db );
+			encoder.encode( obj3, 'obj3' );
+			encoder.encode( obj4, 'obj4' );
+			encoder.close();
+
 			// Open bundle with xref table
-			var openBundle = common.open_decoder( encoder1, ot, {
+			var openBundle = common.open_decoder( encoder, ot, {
 				'x/obj1': "yes-imported-1",
 				"x/obj2": "yes-imported-2"
 			});
@@ -475,23 +485,46 @@ describe('[Encoding/Decoding]', function() {
 			// Make sure xrefs are correct
 			assert( openBundle.database['test/obj3'].propA == "yes-imported-1" );
 			assert( openBundle.database['test/obj4'].propA == "yes-imported-2" );
+
+			// Cleanup
+			common.cleanup_encoder( encoder );
+
 		});
 
 		it('should properly import the correct nested XRef dependencies', function() {
 
+			// Create some objects
+			var obj1 = new ObjectA(),
+				obj2 = new ObjectB( 12345, "check" ),
+				obj3 = new ObjectC( obj1, "part-object-1" ),
+				obj4 = new ObjectC( obj2, "part-object-2" ),
+				obj5 = new ObjectB( obj2, "nested" ),
+				obj6 = new ObjectC( obj5, "part-object-3" );
+
+			// Create an encoder with 2 objects with nested depencencies
+			var encoder = common.open_encoder( ot );
+			var db = {
+				'x/obj1': obj1,
+				'x/obj2': obj2,
+				'x/obj4': obj4,
+				'x/obj5': obj5
+			};
+			encoder.setDatabase( db );
+			encoder.encode( obj3, 'obj3' );
+			encoder.encode( obj6, 'obj6' );
+			encoder.close();
+
 			// Open bundle with xref table
-			delete db2['test/obj3']; delete db2['test/obj6'];
-			var openBundle = common.open_decoder( encoder2, ot, db2);
+			delete db['test/obj3']; delete db['test/obj6'];
+			var openBundle = common.open_decoder( encoder, ot, db);
 
 			// Make sure xrefs are correct
 			assert( openBundle.database['test/obj3'].propA.propA == obj1.propA );
 			assert( openBundle.database['test/obj6'].propA.propA.propA == obj2.propA );
-		});
 
-		// Cleanup at the end
-		after(function() {
-			common.cleanup_encoder( encoder1 );
-			common.cleanup_encoder( encoder2 );
+			// Cleanup
+			common.cleanup_encoder( encoder );
+
 		});
 
 	});
