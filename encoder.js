@@ -1598,12 +1598,14 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 	encoder.stream16.write( pack2b( eid, false ) );
 
 	// Write bulked properties
+	// var weaveArrays = [];
 	for (var i=0, pl=properties.length; i<pl; i++) {
 
 		// Read property of all entities
 		var prop = [], p = properties[i];
 		for (var j=0, el=entities.length; j<el; j++) {
 			prop.push( entities[j][p] );
+			// weaveArrays.push( entities[j][p] );
 		}
 
 		// Align values of same property for optimal encoding
@@ -1611,6 +1613,8 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 
 	}
 
+	// console.log(">>WEAVE>>", weaveArrays);
+	// encodeArray( encoder, weaveArrays );
 }
 
 /**

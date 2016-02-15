@@ -279,16 +279,28 @@ describe('[Encoding/Decoding]', function() {
 
 			// Validate string table
 			var plain_values = [ 1, 2, 3, 4 ];
-			var weave_values = [ [1], [2], [3], [4] ];
-			var test_object = {
+			var weave_values = [ [1, 10], 
+								 [2, 20], 
+								 [3, 30], 
+								 [4, 40] ];
+
+			// Two test objects
+			var test_object_1 = {
 				'plain': plain_values[0],
 				'32bit': plain_values[1],
 				'64bit': plain_values[2],
 				'object': plain_values[3],
 			};
+			var test_object_2 = {
+				'plain': weave_values[0][1],
+				'32bit': weave_values[1][1],
+				'64bit': weave_values[2][1],
+				'object': weave_values[3][1],
+			};
 
-			assert.deepEqual( bundle.factory_plain[0]( plain_values ), test_object, 'plain object factory' );
-			assert.deepEqual( bundle.factory_plain_bulk[0]( weave_values, 0 ), test_object, 'bulk object factory' );
+			assert.deepEqual( bundle.factory_plain[0]( plain_values ), test_object_1, 'plain object factory' );
+			assert.deepEqual( bundle.factory_plain_bulk[0]( weave_values, 0 ), test_object_1, 'bulk object factory (idx=0)' );
+			assert.deepEqual( bundle.factory_plain_bulk[0]( weave_values, 1 ), test_object_2, 'bulk object factory (idx=1)' );
 		}
 
 		// Validate signature table
@@ -481,6 +493,26 @@ describe('[Encoding/Decoding]', function() {
 			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
 		);
 		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]' );
+
+		// Check limits of repeated values
+		values = [].concat(
+			[ 'chunk_prefix' ],
+			gen_array_rep( 'Array', 255, 'same' ),
+			[ false ]
+		);
+		it_should_return( values, 'Repeated Chunk [ 255 x \'same\' ]' );
+		values = [].concat(
+			[ 'chunk_prefix' ],
+			gen_array_rep( 'Array', 32767, 'same' ),
+			[ false ]
+		);
+		it_should_return( values, 'Repeated Chunk [ 32,767 x \'same\' ]' );
+		// values = [].concat(
+		// 	[ 'chunk_prefix' ],
+		// 	gen_array_rep( 'Array', 65535, 'same' ),
+		// 	[ false ]
+		// );
+		// it_should_return( values, 'Repeated Chunk [ 65,535 x \'same\' ]' );
 
 		// Create bulk array
 		var bulkrep = [];

@@ -395,9 +395,13 @@ var JBBBinaryLoader =
 		}
 
 		// Read property arrays
-		var props = [];
+		var values = [];
 		for (var i=0, l=properties.length; i<l; i++)
-			props.push(decodePrimitive( bundle, database ));
+			values.push(decodePrimitive( bundle, database ));
+
+		// Read weaved property array
+		// var values = decodePrimitive( bundle, database );
+		// console.log("<<WAVE<<", values);
 
 		// // Create factory function
 		// var makeObject = Function("props","i", factoryFn);
@@ -405,7 +409,8 @@ var JBBBinaryLoader =
 		// Create objects
 		var ans = [];
 		for (var i=0; i<len; i++)
-			ans.push( objectFactory(props, i) );
+			ans.push( objectFactory(values, i) );
+			// ans.push( objectFactory(values, values.length / properties.length, i) );
 		return ans;
 		
 	}
@@ -454,21 +459,22 @@ var JBBBinaryLoader =
 		// Collect primitives
 		while (size<length) {
 			// Peek on the operator
-			var op = bundle.u8[ bundle.i8 ];
+			var op = bundle.u8[ bundle.i8 ] | 0;
 			if ((op & 0xFC) === 0x78) { // Primitive Flag
 				// If the next opcode seems like a flag, pop it (otherwise
 				// that's an opcode that defines a primitive)
 				bundle.i8++;
 				// Keep flag
-				flag = op & 0x03;
+				flag = (op & 0x03) | 0;
 				switch (flag) {
 					case 0: // REPEAT
-						flen = bundle.readTypedNum[ NUMTYPE.UINT8 ]() + 1;
+						flen = bundle.readTypedNum[ NUMTYPE.UINT8 ]()|0;
+						flen++;
 						break;
 					case 1: // NUMERIC
 						break;
 					case 2: // PLAIN_BULK
-						flen = bundle.readTypedNum[ NUMTYPE.UINT16 ](); 
+						flen = bundle.readTypedNum[ NUMTYPE.UINT16 ]()|0; 
 
 						// This is a special case. We have a bit more complex
 						// parsing mechanism. The next object is NOT primitive
@@ -502,7 +508,6 @@ var JBBBinaryLoader =
 							break;
 						case 2: // BULK (Multiple entities with weaved property arrays)
 							break;
-
 					}
 					// Reset flag
 					flag = 10;
@@ -516,7 +521,6 @@ var JBBBinaryLoader =
 
 		// Return array
 		return ans;
-
 	}
 
 	/**
@@ -588,7 +592,7 @@ var JBBBinaryLoader =
 			}
 
 		} else if ((op & 0x7E) === 0x7C) { // Primitive
-			var l = bundle.readTypedNum[ ln0 ]();
+			var l = bundle.readTypedNum[ ln0 ]() | 0;
 
 			// Return decoded primitive array
 			return decodePrimitiveArray( bundle, database, l );
@@ -677,40 +681,37 @@ var JBBBinaryLoader =
 
 		// Prepare the completion calbacks
 		var pending = urls.length, buffers = Array(pending);
-		var continue_callback = function( response, index ) {
-			buffers[index] = response;
-			if (--pending === 0) callback( null, buffers );
-		};
 
 		// Start loading each url in parallel
 		var triggeredError = false;
-		for (var i=0; i<urls.length; i++) {
-			(function(index) {
-				// Request binary bundle
-				var req = new XMLHttpRequest(),
-					scope = this;
+		urls.forEach(function(url, index) {
+			// Request binary bundle
+			var req = new XMLHttpRequest(),
+				scope = this;
 
-				// Place request
-				req.open('GET', urls[index]);
-				req.responseType = "arraybuffer";
-				req.send();
+			// Place request
+			req.open('GET', urls[index]);
+			req.responseType = "arraybuffer";
+			req.send();
 
-				// Wait until the bundle is loaded
-				req.onreadystatechange = function () {
-					if (req.readyState !== 4) return;
-					if (req.status === 200) {  
-						// Continue loading
-						continue_callback( req.response, index );
-					} else {
-						// Trigger callback only once
-						if (triggeredError) return;
-						callback( "Error loading "+urls[index]+": "+req.statusText, null );
-						triggeredError = true;
-					}
-				};
-			})(i);
-		}
+			// Wait until the bundle is loaded
+			req.addEventListener('readystatechange', function () {
+				if (req.readyState !== 4) return;
+				if (req.status === 200) {  
+					// Continue loading
+					buffers[index] = req.response;
+					if (--pending === 0) callback( null );
+				} else {
+					// Trigger callback only once
+					if (triggeredError) return;
+					callback( "Error loading "+urls[index]+": "+req.statusText );
+					triggeredError = true;
+				}
+			});
+		});
 
+		// Return pointer to buffers
+		return buffers;
 	}
 
 	//////////////////////////////////////////////////////////////////
@@ -739,6 +740,9 @@ var JBBBinaryLoader =
 
 		// Keep object table
 		this.objectTable = objectTable;
+
+		// References for delayed GC
+		this.__delayGC = [];
 
 	};
 
@@ -866,9 +870,9 @@ var JBBBinaryLoader =
 
 						// Download bundle from URL(s)
 						state.counter++;
-						downloadArrayBuffers(req.url, 
+						req.buffer = downloadArrayBuffers(req.url,
 							(function(req) {
-								return function( err, response ) {
+								return function( err ) {
 
 									// Handle errors
 									if (err) {
@@ -880,9 +884,6 @@ var JBBBinaryLoader =
 										return;
 									}
 
-									// Discard array if only 1 item
-									req.buffer = response;
-									if (response.length === 1) req.buffer = response[0];
 									// Keep buffer and mark as loaded
 									req.status = PBUND_LOADED;
 									// Continue
@@ -909,8 +910,15 @@ var JBBBinaryLoader =
 				if (req.status === PBUND_LOADED) {
 					// try {
 
-					// Create & parse bundle
-					var bundle = new BinaryBundle( req.buffer, self.objectTable );
+					// Create bundle from sparse or compact format
+					var bundle;
+					if (req.buffer.length === 1) {
+						bundle = new BinaryBundle( req.buffer[0], self.objectTable );
+					} else {
+						bundle = new BinaryBundle( req.buffer, self.objectTable );
+					}
+
+					// Parse bundle
 					parseBundle( bundle, self.database );
 
 					// Trigger bundle callback
@@ -934,6 +942,14 @@ var JBBBinaryLoader =
 			// We are ready
 			this.queuedRequests = [];
 			callback( null, this );
+
+			// GC After a delay
+			setTimeout((function() {
+
+				// Release delayed GC References
+				this.__delayGC = [];
+
+			}).bind(this), 500);
 
 		}
 
@@ -1154,14 +1170,14 @@ var JBBBinaryLoader =
 		// Create fast numerical read functions
 		var scope = this;
 		this.readTypedNum = [
-			function() { return scope.u8[scope.i8++]; },
-			function() { return scope.s8[scope.i8++]; },
-			function() { return scope.u16[scope.i16++]; },
-			function() { return scope.s16[scope.i16++]; },
-			function() { return scope.u32[scope.i32++]; },
-			function() { return scope.s32[scope.i32++]; },
-			function() { return scope.f32[scope.i32++]; },
-			function() { return scope.f64[scope.i64++]; },
+			function() { return scope.u8[scope.i8++]|0; },
+			function() { return scope.s8[scope.i8++]|0; },
+			function() { return scope.u16[scope.i16++]|0; },
+			function() { return scope.s16[scope.i16++]|0; },
+			function() { return scope.u32[scope.i32++]|0; },
+			function() { return scope.s32[scope.i32++]|0; },
+			function() { return +scope.f32[scope.i32++]; },
+			function() { return +scope.f64[scope.i64++]; },
 		];
 		// this.readTypedNum = [
 		// 	function() { var v = scope.u8[scope.i8++];   console.log("8U@",scope.i8-1 -scope.ofs8/1,"=",  v,"[0x"+v.toString(16)+"]");  return v; },
@@ -1210,6 +1226,7 @@ var JBBBinaryLoader =
 			for (var j=0; j<llen; j++) {
 				factoryPlain += "'"+props[j]+"': values["+j+"],";
 				factoryBulk +=  "'"+props[j]+"': values["+j+"][i],";
+				// factoryBulk +=  "'"+props[j]+"': values[("+j+"*len)+i],";
 			}
 			factoryPlain += "}";
 			factoryBulk += "}";
@@ -1217,6 +1234,7 @@ var JBBBinaryLoader =
 			// Compile factory function
 			this.factory_plain.push( new Function("values", factoryPlain) );
 			this.factory_plain_bulk.push( new Function("values", "i", factoryBulk) );
+			// this.factory_plain_bulk.push( new Function("values", "len", "i", factoryBulk) );
 
 		}
 
