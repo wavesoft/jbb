@@ -1,202 +1,43 @@
+/**
+ * THREE Bundles - Binary Encoder/Decoder Test Suite
+ * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * @author Ioannis Charalampidis / https://github.com/wavesoft
+ */
 
 var util   			= require('util');
 var assert 			= require('assert');
-var common 			= require('./common');
 var BinaryBundle 	= require("../lib/BinaryBundle");
 
-// A coule of local objects, part of Object Table
-var ObjectA = function() {
-	this.propA = 125;
-	this.propB = 65532;
-	this.propC = "A string";
-};
-var ObjectB = function( propA, propB ) {
-	this.propA = propA;
-	this.propB = propB;
-	this.propC = [ 1, 4, 120, 4123 ]
-};
-var ObjectC = function( propA, propB ) {
-	this.propA = propA;
-	this.propB = propB;
-	this.propC = { 'some': { 'sub': 'object' } };
-	this.propD = "I am ignored :(";
-};
-var ObjectD = function() {
-	this.propA = 0;
-	this.propB = 1;
-	this.propC = "Not part of ObjectTable";
-};
+// Static import of utility functions
+require('./utils/common').static(global);
+require('./utils/ot').static(global);
+require('./utils/tests').static(global);
 
-// Default & Unconstructed factories
-var DefaultFactory = function(ClassName) {
-	return new ClassName();
-}
-var UnconstructedFactory = function(ClassName) {
-	return Object.create(ClassName.prototype);
-}
-
-// Default init
-var DefaultInit = function( instance, properties, values ) {
-	for (var i=0; i<properties.length; i++) {
-		instance[properties[i]] = values[i];
-	}
-}
-var ObjectCInit = function( instance, properties, values ) {
-	DefaultInit( instance, properties, values );
-	instance.constructor.call(
-			instance, instance.propA,
-					  instance.propB
-		);
-}
-
-// Local object table for tests
-var ot 	   = {
-	'ID' 		: 0x1E51,
-	'ENTITIES' 	: [
-		[ ObjectA, DefaultFactory, DefaultInit ],
-		[ ObjectB, UnconstructedFactory, DefaultInit ],
-		[ ObjectC, UnconstructedFactory, ObjectCInit ]
-	],
-	'PROPERTIES': [
-		[ 'propA', 'propB', 'propC' ],
-		[ 'propA', 'propB', 'propC' ],
-		[ 'propA', 'propB', 'propC' ]
-	],
-};
+const FLOAT32_POS = 3.40282346e+38; // largest positive number in float32
+const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
+const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 
 ////////////////////////////////////////////////////////////////
-// Generator helpers
+// Test Entry Point
 ////////////////////////////////////////////////////////////////
 
-/**
- * Sequential array generator
- */
-function gen_array_seq( typeName, length, min, step ) {
-	var arr = new global[typeName](length);
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
-	for (var i=0, v=min; i<length; i++) {
-		rarr[0] = v;
-		arr[i] = rarr[0];
-		v+=step;
-	}
-	return arr;
-}
-
-/**
- * Random array generator
- */
-function gen_array_rand( typeName, length, min, max ) {
-	var arr = new global[typeName](length), range = max-min;
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
-	for (var i=0; i<length; i++) {
-		rarr[0] = Math.random() * range + min;
-		arr[i] = rarr[0];
-	}
-	return arr;
-}
-
-/**
- * Repeated array generator
- */
-function gen_array_rep( typeName, length, value ) {
-	var arr = new global[typeName](length);
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
-	rarr[0] = value;
-	for (var i=0; i<length; i++) {
-		arr[i] = rarr[0];
-	}
-	return arr;
-}
-
-////////////////////////////////////////////////////////////////
-// Test helpers
-////////////////////////////////////////////////////////////////
-
-/**
- * Accelerator function for comparing primitives checking
- */
-function it_should_match(a, b, repr) {
-	var text = repr || util.inspect(a,{'depth':0});
-	it('should match `'+text+'`, as encoded', function () {
-		assert.deepEqual( a, b );
-	});
-}
-
-/**
- * Accelerator function for checking exceptions
- */
-function it_should_throw(primitive, repr, isCorrectException) {
-	var text = repr || util.inspect(primitive,{'depth':0});
-	it('should except when encoding `'+text+'`', function () {
-		assert.throws(function() {
-			var ans = common.encode_decode( primitive, ot );
-			assert(isNaN(ans) || (ans == undefined), 'encoder return an error after exception');
-		}, isCorrectException)
-	});
-}
-
-/**
- * Accelerator function for primitive checking
- */
-function it_should_return(primitive, repr) {
-	var text = repr || util.inspect(primitive,{'depth':0});
-	it('should return `'+text+'`, as encoded', function () {
-		var ans = common.encode_decode( primitive, ot );
-		if (isNaN(ans) && isNaN(primitive)) return;
-		assert.deepEqual( primitive, ans );
-	});
-}
-
-/**
- * Accelerator function for sequential array checking
- */
-function it_should_return_array_seq( typeName, length, min, step ) {
-	var array = gen_array_seq(typeName, length, min, step);
-	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[1]+'/'+step+']`, as encoded', function () {
-		var ans = common.encode_decode( array, ot );
-		// Perform strong type checks on typed arrays
-		if (typeName != 'Array')
-			assert.equal( array.constructor, ans.constructor );
-		// Otherwise just check values
-		assert.deepEqual( array, ans );
-	});
-}
-
-/**
- * Accelerator function for random array checking
- */
-function it_should_return_array_rand( typeName, length, min, max ) {
-	var array = gen_array_rand(typeName, length, min, max);
-	it('should return `'+typeName+'('+length+') = [rand('+min+'..'+max+')]`, as encoded', function () {
-		var ans = common.encode_decode( array, ot );
-		// Perform strong type checks on typed arrays
-		if (typeName != 'Array')
-			assert.equal( array.constructor, ans.constructor );
-		// Otherwise just check values
-		assert.deepEqual( array, ans );
-	});
-}
-
-/**
- * Accelerator function for repeared array checking
- */
-function it_should_return_array_rep( typeName, length, value ) {
-	var array = gen_array_rep(typeName, length, value);
-	it('should return `'+typeName+'('+length+') = [... ('+util.inspect(value,{'depth':1})+' x '+length+') ...]`, as encoded', function () {
-		var ans = common.encode_decode( array, ot );
-		// Perform strong type checks on typed arrays
-		if (typeName != 'Array')
-			assert.equal( array.constructor, ans.constructor );
-		// Otherwise just check values
-		assert.deepEqual( array, ans );
-	});
-}
-
-////////////////////////////////////////////////////////////////
-// Test entry point
-////////////////////////////////////////////////////////////////
-
-describe('[Encoding/Decoding]', function() {
+// Basic encoding/decoding
+describe('[Core Tests]', function() {
 
 	describe('Binary Protocol', function() {
 		var header_size = 32;
@@ -205,7 +46,7 @@ describe('[Encoding/Decoding]', function() {
 		var encode_stream = function( sparse ) {
 
 			// Encode object
-			var encoder = common.open_encoder( ot, sparse );
+			var encoder = open_encoder( SimpleOT, sparse );
 			encoder.encode({
 				'plain'	: 152,
 				'32bit'	: 545406996,
@@ -216,11 +57,11 @@ describe('[Encoding/Decoding]', function() {
 
 			// Cleanup when this is done
 			after(function() {
-				common.cleanup_encoder( encoder );
+				cleanup_encoder( encoder );
 			});
 
 			// Open raw contents
-			return common.open_encoder_buffer( encoder );
+			return open_encoder_buffer( encoder );
 
 		}
 
@@ -233,18 +74,18 @@ describe('[Encoding/Decoding]', function() {
 			var u32 = new Uint32Array(p[0], 0, header_size/4);
 
 			// Header field
-			assert.equal( u16[0], 0x4231, 	'Magic number should be 0x4231');
-			assert.equal( u16[1], ot.ID, 	'Object table should be 0x'+ot.ID.toString(16));
-			assert.equal( u16[2], 1,		'Protocol version should be 1');
-			assert.equal( u16[3], 0,		'Reserved header field should be 0');
+			assert.equal( u16[0], 0x4231, 		'Magic number should be 0x4231');
+			assert.equal( u16[1], SimpleOT.ID, 	'Object table should be 0x'+SimpleOT.ID.toString(16));
+			assert.equal( u16[2], 1,			'Protocol version should be 1');
+			assert.equal( u16[3], 0,			'Reserved header field should be 0');
 
 			// Check table
-			assert.equal( u32[2], 8,		'64-bit table size');
-			assert.equal( u32[3], 8,		'32-bit table size');
-			assert.equal( u32[4], 14,		'16-bit table size');
-			assert.equal( u32[5], 51,		'8-bit table size');
-			assert.equal( u32[6], 42,		'String table size');
-			assert.equal( u32[7], 10,		'Plain Object Signature table size');
+			assert.equal( u32[2], 8,			'64-bit table size');
+			assert.equal( u32[3], 8,			'32-bit table size');
+			assert.equal( u32[4], 14,			'16-bit table size');
+			assert.equal( u32[5], 51,			'8-bit table size');
+			assert.equal( u32[6], 42,			'String table size');
+			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
 		}
 
@@ -257,7 +98,7 @@ describe('[Encoding/Decoding]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, ot );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, SimpleOT );
 
 			// Validate string table
 			assert.deepEqual( bundle.string_table, 
@@ -275,7 +116,7 @@ describe('[Encoding/Decoding]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, ot );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, SimpleOT );
 
 			// Validate string table
 			var plain_values = [ 1, 2, 3, 4 ];
@@ -317,6 +158,9 @@ describe('[Encoding/Decoding]', function() {
 		it_should_return(true);
 		it_should_return(false);
 		it_should_return(NaN);
+
+		// Simple objects
+		it_should_return(new Date());
 
 	});
 
@@ -462,6 +306,24 @@ describe('[Encoding/Decoding]', function() {
 
 	});
 
+	describe('Float Arrays', function () {	
+
+		// Float32 extremes
+		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_POS);	
+		it_should_return_array_rand('Float32Array',256,	FLOAT32_NEG, 0.0);	
+		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_SMALL);
+
+		// Float64 extremes
+		it_should_return_array_rand('Float64Array',256,	1.7E-108, 1.7E-107);	
+		it_should_return_array_rand('Float64Array',256,	1.7E+107, 1.7E+108);	
+
+		// Element detail on half-float decimals
+		it_should_return_array_rand('Float32Array',256,		1e-19,	1e-18);	
+		it_should_return_array_rand('Float32Array',1024,	1e-19,	1e-18);	
+		it_should_return_array_rand('Float32Array',65535,	1e-19,	1e-18);	
+
+	});
+
 	describe('Chunked Arrays', function () {
 		var values;
 
@@ -567,7 +429,7 @@ describe('[Encoding/Decoding]', function() {
 				obj4 = new ObjectC( obj2, "part-object-2" );
 
 			// Create an encoder with 2 objects
-			var encoder = common.open_encoder( ot );
+			var encoder = open_encoder( SimpleOT );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2
@@ -579,13 +441,13 @@ describe('[Encoding/Decoding]', function() {
 
 			// Try to load a bundle with xrefs
 			assert.throws(function() {
-				var openBundle = common.open_decoder( encoder, ot );
+				var openBundle = open_decoder( encoder, SimpleOT );
 			}, function(err) {
 				return (err.name == 'ImportError');
 			}, 'bundle decoder did not thorw an ImportError while loading');
 
 			// Cleanup
-			common.cleanup_encoder( encoder );
+			cleanup_encoder( encoder );
 
 		});
 
@@ -598,7 +460,7 @@ describe('[Encoding/Decoding]', function() {
 				obj4 = new ObjectC( obj2, "part-object-2" );
 
 			// Create an encoder with 2 objects
-			var encoder = common.open_encoder( ot );
+			var encoder = open_encoder( SimpleOT );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2
@@ -609,7 +471,7 @@ describe('[Encoding/Decoding]', function() {
 			encoder.close();
 
 			// Open bundle with xref table
-			var openBundle = common.open_decoder( encoder, ot, {
+			var openBundle = open_decoder( encoder, SimpleOT, {
 				'x/obj1': "yes-imported-1",
 				"x/obj2": "yes-imported-2"
 			});
@@ -619,7 +481,7 @@ describe('[Encoding/Decoding]', function() {
 			assert( openBundle.database['test/obj4'].propA == "yes-imported-2" );
 
 			// Cleanup
-			common.cleanup_encoder( encoder );
+			cleanup_encoder( encoder );
 
 		});
 
@@ -634,7 +496,7 @@ describe('[Encoding/Decoding]', function() {
 				obj6 = new ObjectC( obj5, "part-object-3" );
 
 			// Create an encoder with 2 objects with nested depencencies
-			var encoder = common.open_encoder( ot );
+			var encoder = open_encoder( SimpleOT );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2,
@@ -648,14 +510,14 @@ describe('[Encoding/Decoding]', function() {
 
 			// Open bundle with xref table
 			delete db['test/obj3']; delete db['test/obj6'];
-			var openBundle = common.open_decoder( encoder, ot, db);
+			var openBundle = open_decoder( encoder, SimpleOT, db);
 
 			// Make sure xrefs are correct
 			assert( openBundle.database['test/obj3'].propA.propA == obj1.propA );
 			assert( openBundle.database['test/obj6'].propA.propA.propA == obj2.propA );
 
 			// Cleanup
-			common.cleanup_encoder( encoder );
+			cleanup_encoder( encoder );
 
 		});
 
@@ -670,7 +532,7 @@ describe('[Encoding/Decoding]', function() {
 			obj4 = new ObjectC( 31247123, 0.6764000058174133 );
 
 		// Create a sparse encoder with few objects
-		var encoder1 = common.open_encoder( ot, true );
+		var encoder1 = open_encoder( SimpleOT, true );
 		encoder1.encode( obj1, 'obj1' );
 		encoder1.encode( obj2, 'obj2' );
 		encoder1.encode( obj3, 'obj3' );
@@ -678,7 +540,7 @@ describe('[Encoding/Decoding]', function() {
 		encoder1.close();
 
 		// Load the sparse file
-		var decoder1 = common.open_decoder_sparse( encoder1, ot );
+		var decoder1 = open_decoder_sparse( encoder1, SimpleOT );
 		it_should_match( obj1, decoder1.database['test/obj1'], '[ObjectA]' );
 		it_should_match( obj2, decoder1.database['test/obj2'], '[ObjectB( 128, "some-string" )]');
 		it_should_match( obj3, decoder1.database['test/obj3'], '[ObjectC( 1024, 4.212E+40 )]');
@@ -686,7 +548,7 @@ describe('[Encoding/Decoding]', function() {
 
 		// Cleanup at the end
 		after(function() {
-			common.cleanup_encoder( encoder1 );
+			cleanup_encoder( encoder1 );
 		});
 
 	});

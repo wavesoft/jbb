@@ -25,6 +25,10 @@ var MockBrowser = require("mock-browser");
 var colors 		= require("colors");
 var mime 		= require("mime");
 
+const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
+const FLOAT32_NEG = -3.40282347e+38; // largest negative number in float32
+const FLOAT32_SMALL = 1.175494351e-38; // smallest number in float32
+
 /*
 
 Known Limitations
@@ -392,23 +396,23 @@ var packBuffer = new ArrayBuffer(8),
 		if (SAFE) { if (signed) {
 			if (num < -128) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits!',
+				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 127) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits!',
+				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} else {
 			if (num < 0) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing negative number on unsigned 8-bit!',
+				'message'	: 'Packing negative number on unsigned 8-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 255) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits!',
+				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} }
@@ -422,23 +426,23 @@ var packBuffer = new ArrayBuffer(8),
 		if (SAFE) { if (signed) {
 			if (num < -32768) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits!',
+				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 32767) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits!',
+				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} else {
 			if (num < 0) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing negative integer on unsigned 16-bit!',
+				'message'	: 'Packing negative integer on unsigned 16-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 65535) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits!',
+				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} }
@@ -452,23 +456,23 @@ var packBuffer = new ArrayBuffer(8),
 		if (SAFE) { if (signed) {
 			if (num < -2147483648) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits!',
+				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 2147483647) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits!',
+				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} else {
 			if (num < 0) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing negative integer on unsigned 32-bit!',
+				'message'	: 'Packing negative integer on unsigned 32-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 			else if (num > 4294967295) throw {
 				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits!',
+				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		} }
@@ -480,14 +484,9 @@ var packBuffer = new ArrayBuffer(8),
 	pack4f = function( num ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (num == 0.0) { }
-		else if (Math.abs(num) < 3.4E-38) throw {
+		else if ((Math.abs(num) < FLOAT32_SMALL) || (num < FLOAT32_NEG) || (num > FLOAT32_POS)) throw {
 			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 32-bits!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
-		else if (Math.abs(num) > 3.4E+38) throw {
-			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 32-bits!',
+			'message'	: 'Packing float bigger than 32-bits ('+num+')!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		} };
 		packViewF32[0] = num;
@@ -499,12 +498,12 @@ var packBuffer = new ArrayBuffer(8),
 		if (SAFE) { if (num == 0.0) { }
 		else if (Math.abs(num) < 1.7E-108) throw {
 			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 32-bits!',
+			'message'	: 'Packing float bigger than 64-bits ('+num+')!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		};
 		else if (Math.abs(num) > 1.7E+108) throw {
 			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 32-bits!',
+			'message'	: 'Packing float bigger than 64-bits ('+num+')!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		} };
 		packViewF64[0] = num;
@@ -882,7 +881,7 @@ function getNumType( v ) {
 
 	if (v % 1 !== 0) {
 		// Check for Float32 or Float64
-		if (Math.abs(v) < 3.40282e+38) {
+		if ((Math.abs(v) < FLOAT32_SMALL) || (v < FLOAT32_NEG) || (v > FLOAT32_POS)) {
 			return NUMTYPE.FLOAT32;
 		} else {
 			return NUMTYPE.FLOAT64;
@@ -1050,7 +1049,9 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	var type = null;
 	if (is_float) {
 		// Check Float bounds
-		if (Math.max( Math.abs(max), Math.abs(min) ) >= 3.40282e+38) {
+		if ((Math.abs(min) < FLOAT32_SMALL) || (Math.abs(max) < FLOAT32_SMALL) || 
+			(min < FLOAT32_NEG) || (max > FLOAT32_POS)) {
+			console.log("Upscale caused by min=",min,"max=",max);
 			type = NUMTYPE.FLOAT64;
 		} else {
 			type = NUMTYPE.FLOAT32;
@@ -1141,7 +1142,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 			// Assert - We are upscaling?!!! Something's wrong!
 			throw {
 				'name' 		: 'AssertError',
-				'message'	: 'A type was upscaled instead of downscaled! This should never happen!',
+				'message'	: 'A type was upscaled instead of downscaled (from='+_NUMTYPE[originalType]+', to='+_NUMTYPE[type]+')! This should never happen!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 		}

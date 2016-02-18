@@ -1176,8 +1176,8 @@ var JBBBinaryLoader =
 			function() { return scope.s16[scope.i16++]; },
 			function() { return scope.u32[scope.i32++]; },
 			function() { return scope.s32[scope.i32++]; },
-			function() { return +scope.f32[scope.i32++]; },
-			function() { return +scope.f64[scope.i64++]; },
+			function() { return scope.f32[scope.i32++]; },
+			function() { return scope.f64[scope.i64++]; },
 		];
 		// this.readTypedNum = [
 		// 	function() { var v = scope.u8[scope.i8++];   console.log("8U@",scope.i8-1 -scope.ofs8/1,"=",  v,"[0x"+v.toString(16)+"]");  return v; },

@@ -23,7 +23,9 @@
   "homepage": "https://github.com/wavesoft/jbb#readme",
   "devDependencies": {
     "gulp-header": "^1.7.1",
+    "jbb-profile-three": "^0.4.0",
     "mocha": "^2.3.4",
+    "mute": "^2.0.6",
     "node-getopt": "^0.2.3",
     "webpack-stream": "^3.1.0"
   },

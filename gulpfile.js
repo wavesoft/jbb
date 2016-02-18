@@ -4,7 +4,7 @@ var webpack 	= require('webpack-stream');
 var PROD 		= JSON.parse(process.env.PROD_DEV || "0");
 
 //
-// Compile the sources 
+// Compile the binary loader 
 //
 gulp.task('dist/jbb', function() {
 	return gulp.src('decoder.js')
@@ -40,12 +40,12 @@ gulp.task('dist/jbb', function() {
 			    })
 		    ] : [])
 		}))
-		.pipe(header("/* JBB Binary Bundle Loader - https://github.com/wavesoft/jbb-profile-three */\n"))
+		.pipe(header("/* JBB Binary Bundle Loader - https://github.com/wavesoft/jbb */\n"))
 		.pipe(gulp.dest('dist'));
 });
 
 //
-// Compile the sources 
+// Compile the source loader
 //
 gulp.task('dist/jbb-loader', function() {
 	return gulp.src('loader.js')
@@ -78,7 +78,7 @@ gulp.task('dist/jbb-loader', function() {
 		    	new webpack.webpack.optimize.DedupePlugin(),
 		    ]
 		}))
-		.pipe(header("/* JBB Source Bundle Loader - https://github.com/wavesoft/jbb-profile-three */\n"))
+		.pipe(header("/* JBB Source Bundle Loader - https://github.com/wavesoft/jbb */\n"))
 		.pipe(gulp.dest('dist'));
 });
 

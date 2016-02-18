@@ -1,0 +1,17 @@
+{
+	"name": "md2",
+	"exports": {
+		"THREE.MD2CharacterLoader": {
+			"ratamahatta": {
+				"baseUrl": "${BUNDLE}/ratamahatta/",
+				"body": "ratamahatta.md2",
+				"skins": [ "ratamahatta.png", "ctf_b.png", "ctf_r.png", "dead.png", "gearwhore.png" ],
+				"weapons":  [  [ "weapon.md2", "weapon.png" ]
+						]
+			}
+		},
+		"THREE.TextureLoader": {
+			"images/ground": "grasslight-big.jpg"
+		}
+	}
+}

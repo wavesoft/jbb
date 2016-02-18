@@ -39,7 +39,7 @@ function compileFile( sourceBundle, bundleFile, config, callback ) {
 
 		// Update path if missing
 		if (!config['path'])
-			config['path'] = path.dirname( bundleFile );
+			config['path'] = path.dirname( sourceBundle );
 
 		// Compile
 		compile( JSON.parse(data), bundleFile, config, callback );

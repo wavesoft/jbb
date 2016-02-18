@@ -19,8 +19,8 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var BinaryEncoder = require("../encoder.js");
-var BinaryLoader = require("../decoder.js");
+var BinaryEncoder = require("../../encoder.js");
+var BinaryLoader = require("../../decoder.js");
 var temp = require("temp").track();
 var fs   = require('fs');
 
@@ -194,11 +194,17 @@ function encode_decode( structure, ot ) {
 }
 
 // Export functions
-module.exports = {
+var exports = module.exports = {
+	'readChunk': readChunk,
 	'encode_decode': encode_decode,
 	'open_encoder': open_encoder,
 	'open_decoder': open_decoder,
 	'open_decoder_sparse': open_decoder_sparse,
 	'open_encoder_buffer': open_encoder_buffer,
 	'cleanup_encoder': cleanup_encoder,
+};
+module.exports.static = function(scope) {
+	Object.keys(exports).forEach(function(key,index) {
+		scope[key] = exports[key];
+	});
 };
