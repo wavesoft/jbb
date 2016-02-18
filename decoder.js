@@ -18,8 +18,16 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
+/* Imports */
 var BinaryBundle = require("./lib/BinaryBundle");
 
+/* Production optimisations and debug metadata flags */
+if (typeof PROD === 'undefined') var PROD = false;
+if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
+
+/**
+ * Bundle loading states
+ */
 var PBUND_REQUESTED = 0,
 	PBUND_LOADED = 1,
 	PBUND_PARSED = 2,
@@ -133,6 +141,32 @@ var PRIM_SIMPLE = [ undefined, null, false, true ],
 	PRIM_SIMPLE_EX = [ NaN, /* Reserved */ ];
 
 //////////////////////////////////////////////////////////////////
+// Debug Helper Functions
+//////////////////////////////////////////////////////////////////
+
+/**
+ * Inject protocol metadata information in the object
+ */
+function __debugMeta( object, type, meta ) {
+	// Dont' re-define meta
+	if (object.__meta === undefined) {
+		if (typeof object == 'object')
+			Object.defineProperty(
+				object, "__meta", {
+					enumerable: false,
+					value: {
+						'type': type,
+						'meta': meta,
+					},
+				}
+			);
+	}
+
+	// Return object for return calls
+	return object;
+}
+
+//////////////////////////////////////////////////////////////////
 // Decoding Functions
 //////////////////////////////////////////////////////////////////
 
@@ -235,6 +269,9 @@ function decodeObject( bundle, database, op ) {
 
 		// Run initializer
 		ENTITY[2]( instance, bundle.ot.PROPERTIES[eid], prop_table );
+
+		// Append debug metadata
+		DEBUG && __debugMeta( instance, 'object.known', { 'eid': eid } );
 		return instance;
 
 	} else if ((op & 0x3C) === 0x38) { // Primitive object
@@ -245,7 +282,9 @@ function decodeObject( bundle, database, op ) {
 					tzOffset = bundle.readTypedNum[ NUMTYPE.INT8 ]() * 10;
 
 				// Return date
-				return new Date( date );
+				return DEBUG 
+						? __debugMeta( new Date( date ), 'object.date', {} )
+						: new Date( date );
 
 			default:
 				throw {
@@ -268,25 +307,16 @@ function decodeObject( bundle, database, op ) {
 
 		// Create object
 		var values = decodePrimitive( bundle, database );
-		return factory( values );
+		return DEBUG
+			? __debugMeta( factory( values ), 'object.plain.factory', { 'eid': eid } )
+			: factory( values );
 
-	} else if (op === 0x3F) { // New simple object, keep signature
-
-		// Build factory funtion
-		var factoryFn = "return {", llen = bundle.readTypedNum[ NUMTYPE.UINT16 ]();
-		for (var i=0; i<llen; i++) {
-			factoryFn += "'"+bundle.readStringLT()+"': values["+i+"],";
+	} else {
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Unexpected object opcode #'+op+'!',
+			toString 	: function(){return this.name + ": " + this.message;}
 		}
-		factoryFn += "}";
-
-		// Compile factory function
-		var factory = Function("values", factoryFn);
-		bundle.plain_factory_table.push( factory );
-
-		// Create object
-		var values = decodePrimitive( bundle, database );
-		return factory( values );
-
 	}
 
 }
@@ -302,7 +332,9 @@ function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
 		v += values[i] / scale;
 		ans[i+1] = v;
 	}
-	return ans;
+	return DEBUG
+		? __debugMeta( ans, 'array.delta[float]', {} )
+		: ans;
 }
 
 /**
@@ -316,7 +348,9 @@ function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
 		v += values[i];
 		ans[i+1] = v;
 	}
-	return ans;
+	return DEBUG
+		? __debugMeta( ans, 'array.delta[int]', {} )
+		: ans;
 }
 
 /**
@@ -363,7 +397,10 @@ function decodePlainBulkArray( bundle, database, len ) {
 	for (var i=0; i<len; i++)
 		ans.push( objectFactory(values, i) );
 		// ans.push( objectFactory(values, values.length / properties.length, i) );
-	return ans;
+
+	return DEBUG
+		? __debugMeta( ans, 'array.plainbulk', { 'sid': sid } )
+		: ans;
 	
 }
 
@@ -398,7 +435,9 @@ function decodeBulkArray( bundle, database, len ) {
 
 	// Free proprty tables and return objects
 	prop_tables = [];
-	return ans;
+	return DEBUG
+		? __debugMeta( ans, 'array.bulk', { 'eid': eid } )
+		: ans;
 
 }
 
@@ -406,7 +445,7 @@ function decodeBulkArray( bundle, database, len ) {
  * Decode primitive array
  */
 function decodePrimitiveArray( bundle, database, length ) {
-	var i=0, ans = [], size=0, flag=10, flen=0;
+	var i=0, ans = [], size=0, flag=10, flen=0, chunks_meta = [];
 
 	// Collect primitives
 	while (size<length) {
@@ -433,6 +472,7 @@ function decodePrimitiveArray( bundle, database, length ) {
 					// TODO: Perhaps MAKE it primtive?
 					ans = ans.concat( decodePlainBulkArray( bundle, database, flen ) );
 					size += flen;
+					DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk' });
 
 					// Reset flag
 					flag = 10;
@@ -453,10 +493,12 @@ function decodePrimitiveArray( bundle, database, length ) {
 					case 0: // REPEAT (Repeat primitive)
 						for (var i=0; i<flen; i++) ans.push(prim);
 						size += flen;
+						DEBUG && chunks_meta.push({ 'len':flen, 'type':'repeat', 'value':prim });
 						break;
 					case 1: // NUMERIC (Merge numeric values from primitive)
 						ans = ans.concat( Array.prototype.slice.call(prim) );
 						size += prim.length;
+						DEBUG && chunks_meta.push({ 'len':flen, 'type':'numeric', 'value':prim });
 						break;
 					case 2: // BULK (Multiple entities with weaved property arrays)
 						break;
@@ -466,13 +508,16 @@ function decodePrimitiveArray( bundle, database, length ) {
 			} else {
 				// Keep primitive
 				ans.push(prim);
+				DEBUG && chunks_meta.push({ 'len':1, 'type':'primitive' });
 				size += 1;
 			}
 		}
 	}
 
 	// Return array
-	return ans;
+	return DEBUG
+		? __debugMeta( ans, 'array.chunked', { 'chunks': chunks_meta } )
+		: ans;
 }
 
 /**
@@ -508,7 +553,9 @@ function decodeArray( bundle, database, op ) {
 		var l = bundle.readTypedNum[ ln3 ]();
 
 		// Return raw array
-		return bundle.readTypedArray[ typ ]( l );
+		return DEBUG
+			? __debugMeta( bundle.readTypedArray[ typ ]( l ), 'array.raw', { } )
+			: bundle.readTypedArray[ typ ]( l );
 
 	} else if ((op & 0x70) === 0x50) { // Repeated
 		var l = bundle.readTypedNum[ ln3 ](),
@@ -517,7 +564,9 @@ function decodeArray( bundle, database, op ) {
 
 		// Repeat value
 		for (var i=0; i<l; i++) arr[i]=v0;
-		return arr;
+		return DEBUG
+			? __debugMeta( arr, 'array.repeated', { 'value':v0 } )
+			: arr;
 
 	} else if ((op & 0x70) === 0x60) { // Downscaled
 		var l = bundle.readTypedNum[ ln3 ](),
@@ -526,14 +575,18 @@ function decodeArray( bundle, database, op ) {
 			// Type-cast constructor
 			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ]( vArr );
 
-		return nArr;
+		return DEBUG
+			? __debugMeta( nArr, 'array.downscaled', { 'typ': typ } )
+			: nArr;
 
 	} else if ((op & 0x78) === 0x70) { // Short
 		var l = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
 			vArr = bundle.readTypedArray[ typ ]( l );
 
 		// Return short array
-		return vArr;
+		return DEBUG
+			? __debugMeta( vArr, 'array.short', { } )
+			: vArr;
 
 	} else if ((op & 0x7C) === 0x78) { // Flag
 		// This operator is used ONLY as indicator when parsing a primitive array
@@ -552,10 +605,17 @@ function decodeArray( bundle, database, op ) {
 	} else if ((op & 0x7F) === 0x7E) { // Empty
 
 		// Return empty array
-		return [];
+		return DEBUG
+			? __debugMeta( [], 'array.empty', {} )
+			: [];
 
 	} else if ((op & 0x7F) === 0x7F) { // Extended
-		// Currently unused
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Encountered RESERVED array operator!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+
 	}
 }
 
@@ -579,7 +639,9 @@ function decodePrimitive( bundle, database ) {
 
 	} else if ((op & 0xF0) === 0xE0) { // I-Ref
 		var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
-		return bundle.iref_table[id];
+		return DEBUG
+			? __debugMeta( bundle.iref_table[id], 'object.iref', { 'id': id } )
+			: bundle.iref_table[id];
 
 	} else if ((op & 0xF8) === 0xF0) { // Number
 		return bundle.readTypedNum[ op & 0x07 ]();
@@ -597,10 +659,17 @@ function decodePrimitive( bundle, database ) {
 			'message'	: 'Cannot import undefined external reference '+name+'!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		};
-		return database[name];
+		return DEBUG
+			? __debugMeta( database[name], 'object.string', { 'key': name } )
+			: database[name];
 
 	} else if ((op & 0xFF) === 0xFF) { // Extended
-		// Currently unused
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Encountered RESERVED primtive operator!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+
 	}
 }
 
