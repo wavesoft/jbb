@@ -991,16 +991,16 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
 	} else {
 
 		// We have integer delta, so check 
-		if (max_delta < 127) {
+		if (max_delta < -INT8_MIN) {
 			// A value between 0 and INT8 bounds
 			return [ DELTASCALE.S_1, NUMTYPE.INT8 ];
-		} else if ((max_delta < 12700) && !precisionOverSize) {
+		} else if ((max_delta < -INT8_MIN*100) && !precisionOverSize) {
 			// A value between 0 and INT8 bounds scaled down by factor 100  (loosing in precision)
 			return [ DELTASCALE.S_001, NUMTYPE.INT8 ];
-		} else if (max_delta < 32767) {
+		} else if (max_delta < -INT16_MIN) {
 			// A value between 0 and INT16 bounds
 			return [ DELTASCALE.S_1, NUMTYPE.INT16 ];
-		} else if ((max_delta < 3276700) && !precisionOverSize) {
+		} else if ((max_delta < -INT16_MIN*100) && !precisionOverSize) {
 			// A value between 0 and INT16 bounds scaled down by factor 100  (loosing in precision)
 			return [ DELTASCALE.S_001, NUMTYPE.INT16 ];
 		}
@@ -1134,18 +1134,9 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		return [ ARR_OP.SHORT, originalType ]; 
 	}
 
-	// Check for upscaling
-	if (type > originalType) {
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'A type was upscaled instead of downscaled (from='+_NUMTYPE[originalType]+', to='+_NUMTYPE[type]+')! This should never happen!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
-	}
-
 	// Check if we can apply delta encoding with better type than the current
 	var delta = analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize );
-	if ((delta !== undefined) && (delta[1] < type)) {
+	if ((delta !== undefined) && (delta[1] < Math.min(originalType, type))) {
 
 		// Find a matching delta encoding type
 		var delta_type = deltaEncType( originalType, delta[1] );
