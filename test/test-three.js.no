@@ -56,7 +56,7 @@ global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 // Fake Blob
 global.Blob = function(url) { };
-global.URL = { createObjectURL: function(blob) { } };
+global.URL = { createObjectURL: function(blob) { return ""; } };
 
 // Initialize environment for node.js
 JBBProfileThreeLoader.initialize();

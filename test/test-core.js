@@ -76,14 +76,14 @@ describe('[Core Tests]', function() {
 			// Header field
 			assert.equal( u16[0], 0x4231, 		'Magic number should be 0x4231');
 			assert.equal( u16[1], SimpleOT.ID, 	'Object table should be 0x'+SimpleOT.ID.toString(16));
-			assert.equal( u16[2], 1,			'Protocol version should be 1');
+			assert.equal( u16[2], 0x0102,		'Protocol version should be v1.2');
 			assert.equal( u16[3], 0,			'Reserved header field should be 0');
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
 			assert.equal( u32[3], 8,			'32-bit table size');
 			assert.equal( u32[4], 14,			'16-bit table size');
-			assert.equal( u32[5], 51,			'8-bit table size');
+			assert.equal( u32[5], 55,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -160,7 +160,7 @@ describe('[Core Tests]', function() {
 		it_should_return(NaN);
 
 		// Simple objects
-		it_should_return(new Date());
+		it_should_return(new Date(), null, [match_metaType('object.date')] );
 
 	});
 
@@ -192,47 +192,47 @@ describe('[Core Tests]', function() {
 		it_should_return([]);
 
 		// Test all possible typed array data for the maximum possible size of the short array
-		it_should_return_array_rand('Uint8Array',	255, 0,				255);
-		it_should_return_array_rand('Int8Array', 	255, -127,			127);
-		it_should_return_array_rand('Uint16Array',	255, 0,				65535);
-		it_should_return_array_rand('Int16Array', 	255, -32768,		32767);
-		it_should_return_array_rand('Uint32Array',	255, 0,				4294967296);
-		it_should_return_array_rand('Int32Array',	255, -2147483648,	2147483648);
-		it_should_return_array_rand('Float32Array',	255, 0,				2147483648);
-		it_should_return_array_rand('Float64Array',	255, 0,				17179869184);
+		it_should_return_array_rand('Uint8Array',	255, 0,				255, 		[match_metaType('array.short')]);
+		it_should_return_array_rand('Int8Array', 	255, -127,			127, 		[match_metaType('array.short')]);
+		it_should_return_array_rand('Uint16Array',	255, 0,				65535, 		[match_metaType('array.short')]);
+		it_should_return_array_rand('Int16Array', 	255, -32768,		32767, 		[match_metaType('array.short')]);
+		it_should_return_array_rand('Uint32Array',	255, 0,				4294967296, [match_metaType('array.short')]);
+		it_should_return_array_rand('Int32Array',	255, -2147483648,	2147483648, [match_metaType('array.short')]);
+		it_should_return_array_rand('Float32Array',	255, 0,				2147483648, [match_metaType('array.short')]);
+		it_should_return_array_rand('Float64Array',	255, 0,				17179869184,[match_metaType('array.short')]);
 
 	});
 
 	describe('Repeated Arrays', function () {
 
 		// Test the preference of repeated arrays instead of (short) 
-		it_should_return_array_seq('Array',100,1,0);
+		it_should_return_array_seq('Array',100,1,0, [match_metaType('array.repeated')]);
 
 		// Possibly short-sized, but with repeated values
-		it_should_return_array_seq('Array',256,1,0); 					// < 8bit
-		it_should_return_array_seq('Array',256,255,0);					// = 8bit
-		it_should_return_array_seq('Array',256,65535,0);				// = 16bit
-		it_should_return_array_seq('Array',256,4294967295,0);			// = 32bit
-		it_should_return_array_seq('Array',256,9.22337203685478E18,0);	// close to 64-bit
+		it_should_return_array_seq('Array',256,1,0, [match_metaType('array.repeated')]); 					// < 8bit
+		it_should_return_array_seq('Array',256,255,0, [match_metaType('array.repeated')]);					// = 8bit
+		it_should_return_array_seq('Array',256,65535,0, [match_metaType('array.repeated')]);				// = 16bit
+		it_should_return_array_seq('Array',256,4294967295,0, [match_metaType('array.repeated')]);			// = 32bit
+		it_should_return_array_seq('Array',256,9.22337203685478E18,0, [match_metaType('array.repeated')]);	// close to 64-bit
 
 		// Long repeated possiblities
-		it_should_return_array_seq('Array',1024,1,0);					// <<16 bit
-		it_should_return_array_seq('Array',65535,1,0);					// >16 bit
+		it_should_return_array_seq('Array',1024,1,0, [match_metaType('array.repeated')]);					// <<16 bit
+		it_should_return_array_seq('Array',65535,1,0, [match_metaType('array.repeated')]);					// >16 bit
 
 		// Typed repeated possibilities
-		it_should_return_array_seq('Uint8Array',256,255,0);				// = 8bit
-		it_should_return_array_seq('Int8Array',256,255,0);				// = 8bit
-		it_should_return_array_seq('Uint16Array',256,255,0);			// = 8bit
-		it_should_return_array_seq('Int16Array',256,255,0);				// = 8bit
-		it_should_return_array_seq('Uint32Array',256,255,0);			// = 8bit
-		it_should_return_array_seq('Int32Array',256,255,0);				// = 8bit
-		it_should_return_array_seq('Float32Array',256,4123.123,0);		// = 8bit
-		it_should_return_array_seq('Float64Array',256,4123.123,0);		// = 8bit
+		it_should_return_array_seq('Uint8Array',256,255,0, [match_metaType('array.repeated')]);				// = 8bit
+		it_should_return_array_seq('Int8Array',256,255,0, [match_metaType('array.repeated')]);				// = 8bit
+		it_should_return_array_seq('Uint16Array',256,255,0, [match_metaType('array.repeated')]);			// = 8bit
+		it_should_return_array_seq('Int16Array',256,255,0, [match_metaType('array.repeated')]);				// = 8bit
+		it_should_return_array_seq('Uint32Array',256,255,0, [match_metaType('array.repeated')]);			// = 8bit
+		it_should_return_array_seq('Int32Array',256,255,0, [match_metaType('array.repeated')]);				// = 8bit
+		it_should_return_array_seq('Float32Array',256,4123.123,0, [match_metaType('array.repeated')]);		// = 8bit
+		it_should_return_array_seq('Float64Array',256,4123.123,0, [match_metaType('array.repeated')]);		// = 8bit
 
 		// Repeated tricky and simple primitives
-		it_should_return_array_rep('Array', 255, undefined);
-		it_should_return_array_rep('Array', 255, false);
-		it_should_return_array_rep('Array', 255, {'simple':'object'});
+		it_should_return_array_rep('Array', 255, undefined, [match_chunkTypes(['repeat'])]);
+		it_should_return_array_rep('Array', 255, false, [match_chunkTypes(['repeat'])]);
+		it_should_return_array_rep('Array', 255, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
 
 	});
 
@@ -241,34 +241,34 @@ describe('[Core Tests]', function() {
 		//// Integer delta-encoding ////
 
 		// UINT16	-> INT8
-		it_should_return_array_seq('Uint16Array',256,	256,	1);
+		it_should_return_array_seq('Uint16Array',256,	256,	1,	 [match_metaType('array.delta.int')]);
 		// INT16	-> INT8
-		it_should_return_array_seq('Int16Array', 256,	-127,	1);
+		it_should_return_array_seq('Int16Array', 256,	-127,	1,	 [match_metaType('array.delta.int')]);
 		// UINT32	-> INT8
-		it_should_return_array_seq('Uint32Array',256,	65535,	1);	
+		it_should_return_array_seq('Uint32Array',256,	65535,	1,	 [match_metaType('array.delta.int')]);	
 		// INT32	-> INT8
-		it_should_return_array_seq('Int32Array', 256,	-32768,	1);
+		it_should_return_array_seq('Int32Array', 256,	-32768,	1,	 [match_metaType('array.delta.int')]);
 
 		// UINT32	-> INT16
-		it_should_return_array_seq('Uint32Array',256,	0,		256);
+		it_should_return_array_seq('Uint32Array',256,	0,		256, [match_metaType('array.delta.int')]);
 		// INT32	-> INT16
-		it_should_return_array_seq('Int32Array',256,	-1024,	256);
+		it_should_return_array_seq('Int32Array',256,	-1024,	256, [match_metaType('array.delta.int')]);
 
 		//// Float delta-encoding ////
 
 		// FLOAT32	-> INT8
-		it_should_return_array_seq('Float32Array',256,	0,	1);	
+		it_should_return_array_seq('Float32Array',256,	0,	1,	 [match_metaType('array.delta.float')]);	
 		// FLOAT32	-> INT16
-		it_should_return_array_seq('Float32Array',256,	0,	256);
+		it_should_return_array_seq('Float32Array',256,	0,	256, [match_metaType('array.delta.float')]);
 
 		//// Incomplete types ////
 
 		// FLOAT64	-> (Should opt out from Delta-Encoding without issues)
-		it_should_return_array_seq('Float64Array',256,	0,	256);
+		it_should_return_array_seq('Float64Array',256,	0,	256, [match_metaType('array.delta.float')]);
 
 		//// Test if the 32-bit index works ////
 
-		it_should_return_array_seq('Uint16Array',65536,	0, 		1);
+		it_should_return_array_seq('Uint16Array',65536,	0, 1, [match_metaType('array.delta.int')]);
 
 	});
 
@@ -277,32 +277,32 @@ describe('[Core Tests]', function() {
 		//// Integer downscaling ////
 
 		// UINT16	-> UINT8
-		it_should_return_array_rand('Uint16Array',1024,	0,	255);
+		it_should_return_array_rand('Uint16Array',1024,	0,	255,		[match_metaType('array.downscaled')]);
 		// INT16	-> INT8
-		it_should_return_array_rand('Int16Array', 1024,	-127, 127);
+		it_should_return_array_rand('Int16Array', 1024,	-127, 127,		[match_metaType('array.downscaled')]);
 
 		// INT16	-> UINT8 (Shout opt-out from downscaling)
-		it_should_return_array_rand('Int16Array', 1024,	0,	255);
+		it_should_return_array_rand('Int16Array', 1024,	0,	255,		[match_metaType('array.downscaled')]);
 
 		// UINT32	-> UINT8
-		it_should_return_array_rand('Uint32Array',1024,	0,	255);
+		it_should_return_array_rand('Uint32Array',1024,	0,	255,		[match_metaType('array.downscaled')]);
 		// INT32	-> INT8
-		it_should_return_array_rand('Int32Array', 1024,	-127, 127);
+		it_should_return_array_rand('Int32Array', 1024,	-127, 127,		[match_metaType('array.downscaled')]);
 
 		// INT32	-> UINT8 (Should opt-out from downscaling)
-		it_should_return_array_rand('Int32Array', 1024,	0,	255);
+		it_should_return_array_rand('Int32Array', 1024,	0,	255,		[match_metaType('array.downscaled')]);
 
 		// UINT32	-> UINT16
-		it_should_return_array_rand('Uint32Array',1024,	0,	65535);
+		it_should_return_array_rand('Uint32Array',1024,	0,	65535,		[match_metaType('array.downscaled')]);
 		// INT32	-> INT16
-		it_should_return_array_rand('Int32Array',1024,	-32768, 32768);
+		it_should_return_array_rand('Int32Array',1024,	-32768, 32768,	[match_metaType('array.downscaled')]);
 
 		//// Float downscaling ////
 
 		// FLOAT32	-> INT8
-		it_should_return_array_rand('Float32Array',1024,	0,	127);
+		it_should_return_array_rand('Float32Array',1024,	0,	127,	[match_metaType('array.downscaled')]);
 		// FLOAT32	-> INT16
-		it_should_return_array_rand('Float32Array',1024,	0,	32768);
+		it_should_return_array_rand('Float32Array',1024,	0,	32768,	[match_metaType('array.downscaled')]);
 
 	});
 
@@ -336,14 +336,14 @@ describe('[Core Tests]', function() {
 			gen_array_seq( 'Array', 100, 0, 1 ),
 			'Break'
 		);
-		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]' );
+		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', [match_metaType('array.chunked')] );
 
 		// Repeated composites (Ideally future-optimised)
 		values = [];
 		var rep = [true, false, undefined, 255, 65535, 4294967295, {'plain':'object'}];
 		for (var i=0; i<100; i++)
 			values = values.concat(rep);
-		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]' );
+		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]', [match_metaType('array.chunked')] );
 
 		// Create multi-chunked array
 		values = [].concat(
@@ -354,7 +354,7 @@ describe('[Core Tests]', function() {
 			gen_array_rep( 'Array', 255, {'limit_of_objects':255} ),
 			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
 		);
-		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]' );
+		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]', [match_metaType('array.chunked')] );
 
 		// Check limits of repeated values
 		values = [].concat(
@@ -362,13 +362,13 @@ describe('[Core Tests]', function() {
 			gen_array_rep( 'Array', 255, 'same' ),
 			[ false ]
 		);
-		it_should_return( values, 'Repeated Chunk [ 255 x \'same\' ]' );
+		it_should_return( values, 'Repeated Chunk [ 255 x \'same\' ]', [match_metaType('array.chunked')] );
 		values = [].concat(
 			[ 'chunk_prefix' ],
 			gen_array_rep( 'Array', 32767, 'same' ),
 			[ false ]
 		);
-		it_should_return( values, 'Repeated Chunk [ 32,767 x \'same\' ]' );
+		it_should_return( values, 'Repeated Chunk [ 32,767 x \'same\' ]', [match_metaType('array.chunked')] );
 		// values = [].concat(
 		// 	[ 'chunk_prefix' ],
 		// 	gen_array_rep( 'Array', 65535, 'same' ),
@@ -384,7 +384,7 @@ describe('[Core Tests]', function() {
 				'same': 4,
 				'string': 'This is a string'
 			});
-		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]' );
+		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]', [match_metaType('array.chunked')] );
 
 	});
 
@@ -397,10 +397,10 @@ describe('[Core Tests]', function() {
 			obj4 = { 'many': gen_array_rep('Array', 1000, obj3), 'length': 1000 };
 
 		// Try to encode simple object
-		it_should_return( obj1 );
-		it_should_return( obj2 );
-		it_should_return( obj3, "{ multi: [Object], object: [Object], with: [Object], iref: [Object] }" );
-		it_should_return( obj4 );
+		it_should_return( obj1, null, [match_metaType('object.plain')] );
+		it_should_return( obj2, null, [match_metaType('object.plain')] );
+		it_should_return( obj3, "{ multi: [Object], object: [Object], with: [Object], iref: [Object] }", [match_metaType('object.plain')] );
+		it_should_return( obj4 , null, [match_metaType('object.plain')] );
 
 		// Try to encode known object instances
 		var obj5 = new ObjectA(),
@@ -409,9 +409,9 @@ describe('[Core Tests]', function() {
 			obj8 = new ObjectD();
 
 		// Try to encode objects part of OT
-		it_should_return( obj5, '[ObjectA] (DefaultFactory, DefaultInit)' );
-		it_should_return( obj6, '[ObjectB] (UnconstructedFactory, DefaultInit)' );
-		it_should_return( obj7, '[ObjectC] (UnconstructedFactory, CustomInit)' );
+		it_should_return( obj5, '[ObjectA] (DefaultFactory, DefaultInit)', [match_metaType('object.known')] );
+		it_should_return( obj6, '[ObjectB] (UnconstructedFactory, DefaultInit)', [match_metaType('object.known')] );
+		it_should_return( obj7, '[ObjectC] (UnconstructedFactory, CustomInit)', [match_metaType('object.known')] );
 		it_should_throw ( obj8, '[ObjectD] (Not part of OT)', function(err) {
 			return (err.name == 'EncodingError');
 		});

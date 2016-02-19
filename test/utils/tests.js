@@ -34,10 +34,8 @@ require('./ot').static(global);
  */
 function gen_array_seq( typeName, length, min, step ) {
 	var arr = new global[typeName](length);
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
 	for (var i=0, v=min; i<length; i++) {
-		rarr[0] = v;
-		arr[i] = rarr[0];
+		arr[i] = v;
 		v+=step;
 	}
 	return arr;
@@ -47,15 +45,17 @@ function gen_array_seq( typeName, length, min, step ) {
  * Random array generator
  */
 function gen_array_rand( typeName, length, min, max ) {
-	var arr = new global[typeName](length), range = max-min;
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
+	var arr = new global[typeName](length), range = max-min, v;
 	var mid = (min + max) / 2;
-	var smallest = Math.min(Math.abs(min), Math.abs(max));
+	var smallest = Math.min(Math.abs(min), Math.abs(max)) % 1;
+	console.log(">> smallest ("+min+","+max+")=",smallest);
 	for (var i=0; i<length; i++) {
-		rarr[0] = (Math.random() * range) + min;
-		arr[i] = rarr[0];
-		if (Math.abs(arr[i]) < smallest)
-			arr[i] = ( arr[i] < mid ) ? min : max;
+		v = min + (Math.random() * range);
+		if (Math.abs(v % 1) < smallest) {
+			console.log("!!",v," < smallest");
+			v = ( v < mid ) ? min : max;
+		}
+		arr[i] = v;
 	}
 	return arr;
 }
@@ -65,12 +65,36 @@ function gen_array_rand( typeName, length, min, max ) {
  */
 function gen_array_rep( typeName, length, value ) {
 	var arr = new global[typeName](length);
-	var rarr = new global[typeName](1); // For type safety just in case we did something wrong here
-	rarr[0] = value;
 	for (var i=0; i<length; i++) {
-		arr[i] = rarr[0];
+		arr[i] = value;
 	}
 	return arr;
+}
+
+////////////////////////////////////////////////////////////////
+// Meta matchinf unction
+////////////////////////////////////////////////////////////////
+
+/**
+ * Match for type
+ */
+function match_metaType( matchType ) {
+	return function(meta) {
+		assert.equal( meta.type, matchType, 'expected types must match' );
+	}
+}
+
+/**
+ * Match for chunk type
+ */
+function match_chunkTypes( chunkTypes ) {
+	return function(meta) {
+		assert.equal( meta.type, 'array.chunked', 'array must be chunked' );
+		assert.equal( meta.meta.chunks.length, chunkTypes.length, 'expected chunk count differ' );
+		for (var i=0; i<meta.meta.chunks.length; i++) {
+			assert.equal( meta.meta.chunks[i].type, chunkTypes[i], 'mismatch chunk #'+i+' type' );
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////
@@ -103,19 +127,30 @@ function it_should_throw(primitive, repr, isCorrectException) {
 /**
  * Accelerator function for primitive checking
  */
-function it_should_return(primitive, repr) {
+function it_should_return(primitive, repr, metaMatchFn) {
 	var text = repr || util.inspect(primitive,{'depth':0});
 	it('should return `'+text+'`, as encoded', function () {
 		var ans = encode_decode( primitive, SimpleOT );
-		if (isNaN(ans) && isNaN(primitive)) return;
-		assert.deepEqual( primitive, ans );
+		if (typeof primitive == 'number') {
+			if (isNaN(ans) && isNaN(primitive)) return;
+			assert.equal( primitive, ans );
+		} else if (typeof primitive == 'object') {
+			assert.deepEqual( primitive, ans );
+			if (metaMatchFn) {
+				if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+				for (var i=0; i<metaMatchFn.length; i++)
+					metaMatchFn[i]( ans.__meta );
+			}
+		} else {
+			assert.equal( primitive, ans );
+		}
 	});
 }
 
 /**
  * Accelerator function for sequential array checking
  */
-function it_should_return_array_seq( typeName, length, min, step ) {
+function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) {
 	var array = gen_array_seq(typeName, length, min, step);
 	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[1]+'/'+step+']`, as encoded', function () {
 		var ans = encode_decode( array, SimpleOT );
@@ -124,13 +159,18 @@ function it_should_return_array_seq( typeName, length, min, step ) {
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
 		assert.deepEqual( array, ans );
+		if (metaMatchFn) {
+			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			for (var i=0; i<metaMatchFn.length; i++)
+				metaMatchFn[i]( ans.__meta );
+		}
 	});
 }
 
 /**
  * Accelerator function for random array checking
  */
-function it_should_return_array_rand( typeName, length, min, max ) {
+function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) {
 	var array = gen_array_rand(typeName, length, min, max);
 	it('should return `'+typeName+'('+length+') = [rand('+min+'..'+max+')]`, as encoded', function () {
 		var ans = encode_decode( array, SimpleOT );
@@ -139,13 +179,18 @@ function it_should_return_array_rand( typeName, length, min, max ) {
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
 		assert.deepEqual( array, ans );
+		if (metaMatchFn) {
+			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			for (var i=0; i<metaMatchFn.length; i++)
+				metaMatchFn[i]( ans.__meta );
+		}
 	});
 }
 
 /**
  * Accelerator function for repeared array checking
  */
-function it_should_return_array_rep( typeName, length, value ) {
+function it_should_return_array_rep( typeName, length, value, metaMatchFn ) {
 	var array = gen_array_rep(typeName, length, value);
 	it('should return `'+typeName+'('+length+') = [... ('+util.inspect(value,{'depth':1})+' x '+length+') ...]`, as encoded', function () {
 		var ans = encode_decode( array, SimpleOT );
@@ -154,11 +199,19 @@ function it_should_return_array_rep( typeName, length, value ) {
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
 		assert.deepEqual( array, ans );
+		if (metaMatchFn) {
+			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			for (var i=0; i<metaMatchFn.length; i++)
+				metaMatchFn[i]( ans.__meta );
+		}
+
 	});
 }
 
 // Export functions
 var exports = module.exports = {
+	'match_metaType': match_metaType,
+	'match_chunkTypes': match_chunkTypes,
 	'gen_array_seq': gen_array_seq,
 	'gen_array_rand': gen_array_rand,
 	'gen_array_rep': gen_array_rep,
