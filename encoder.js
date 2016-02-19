@@ -24,10 +24,28 @@ var util		= require("util");
 var MockBrowser = require("mock-browser");
 var colors 		= require("colors");
 var mime 		= require("mime");
+var deepEqual 	= require('deep-equal');
 
-const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
-const FLOAT32_NEG = -3.40282347e+38; // largest negative number in float32
+const FLOAT32_POS 	= 3.40282347e+38; // largest positive number in float32
+const FLOAT32_NEG 	= -3.40282347e+38; // largest negative number in float32
 const FLOAT32_SMALL = 1.175494351e-38; // smallest number in float32
+
+/* Note that all these values are exclusive (ex v < UING8_MAX) */
+
+const UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
+const UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
+const UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
+
+const INT8_MIN 		= -129; // largest negative signed integer on 8-bit
+const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+const INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
+const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+const INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
+const INT32_MAX 	= 2147483648; // largest positive signed integer on 16-bit
+
+/* Version of binary bundle */
+
+const VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
 
 /*
 
@@ -43,11 +61,6 @@ Known Limitations
  * which might increase the build time.
  */
 const SAFE = 1;
-
-/**
- * Protocol version
- */
-const PROTO_VERSION = 1;
 
 /**
  * Fake DOM environment when from node
@@ -103,6 +116,20 @@ var NUMTYPE = {
 	FLOAT32: 6, FLOAT64: 7,
 	// For internal use
 	UNKNOWN: 8, NAN: 9
+};
+
+/**
+ * Numerical length types
+ */
+var NUMTYPE_LN = {
+	UINT16: 0,
+	UINT32 : 1
+};
+var NUMTYPE_LEN = {
+	UINT8: 	 0,
+	UINT16:  1,
+	UINT32:  2,
+	FLOAT64: 3
 };
 
 /**
@@ -305,14 +332,20 @@ var ARR_OP = {
  * Array chunk types
  */
 var ARR_CHUNK = {
-	// For protocol use
-	REPEAT: 	0, 	// Repeat the next primitive 1-254 times
-	NUMERIC: 	1, 	// There are 1-254 consecutive numerical items
-	BULK_PLAIN:	2,	// A bulk of many objects of same type
-	// For internal use
-	PRIMITIVE: 	4, 	// No chunking available, encode individual primitive
-	PRIM_IREF:  5, 	// Internal reference primitive (speed optimisation)
-	PRIM_XREF:  6, 	// Internal reference primitive (speed optimisation)
+	REPEAT: 	 0x10, 	// Repeated of the same primitive
+	PRIMITIVES:  0x20,	// One or more consequtive primitives
+	NUMERIC: 	 0x30, 	// A numeric TypedArray
+	BULK_PLAIN:  0x40, 	// A bulk of many plain objects
+	BULK_OBJECT: 0x50, 	// A bulk of many objects
+
+	// // For protocol use
+	// REPEAT: 	0, 	// Repeat the next primitive 1-254 times
+	// NUMERIC: 	1, 	// There are 1-254 consecutive numerical items
+	// BULK_PLAIN:	2,	// A bulk of many objects of same type
+	// PRIMITIVE: 	4, 	// No chunking available, encode individual primitive
+	// // For internal use
+	// PRIM_IREF:  5, 	// Internal reference primitive (speed optimisation)
+	// PRIM_XREF:  6, 	// Internal reference primitive (speed optimisation)
 };
 
 /**
@@ -394,12 +427,12 @@ var packBuffer = new ArrayBuffer(8),
 	pack1b = function( num, signed ) {
 		var n = new Buffer(1);
 		if (SAFE) { if (signed) {
-			if (num < -128) throw {
+			if (num < INT8_MIN) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 127) throw {
+			else if (num > INT8_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -410,7 +443,7 @@ var packBuffer = new ArrayBuffer(8),
 				'message'	: 'Packing negative number on unsigned 8-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 255) throw {
+			else if (num > UINT8_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -424,12 +457,12 @@ var packBuffer = new ArrayBuffer(8),
 	pack2b = function( num, signed ) {
 		var n = new Buffer(2);
 		if (SAFE) { if (signed) {
-			if (num < -32768) throw {
+			if (num < INT16_MIN) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 32767) throw {
+			else if (num > INT16_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -440,7 +473,7 @@ var packBuffer = new ArrayBuffer(8),
 				'message'	: 'Packing negative integer on unsigned 16-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 65535) throw {
+			else if (num > UINT16_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -454,12 +487,12 @@ var packBuffer = new ArrayBuffer(8),
 	pack4b = function( num, signed ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (signed) {
-			if (num < -2147483648) throw {
+			if (num < INT32_MIN) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 2147483647) throw {
+			else if (num > INT32_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -470,7 +503,7 @@ var packBuffer = new ArrayBuffer(8),
 				'message'	: 'Packing negative integer on unsigned 32-bit ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
-			else if (num > 4294967295) throw {
+			else if (num > UINT32_MAX) throw {
 				'name' 		: 'PackError',
 				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
 				toString 	: function(){return this.name + ": " + this.message;}
@@ -705,9 +738,9 @@ function getFloatDeltaScale(t, scale) {
 		if (scale === DELTASCALE.S_R00) multiplier = 100.0;
 		// Check for INT8 target
 		if ( ((t >= 0) && (t <= 3)) || (t === 6) ) {
-			return multiplier * 127;
+			return multiplier * INT8_MAX;
 		} else {
-			return multiplier * 32768;
+			return multiplier * INT16_MAX;
 		}
 	}
 }
@@ -889,21 +922,21 @@ function getNumType( v ) {
 	} else {
 		// Check for signed or unsigned
 		if (v < 0) {
-			if (v >= -128) {
+			if (v > INT8_MIN) {
 				return NUMTYPE.INT8;
-			} else if (v >= -32768) {
+			} else if (v > INT16_MIN) {
 				return NUMTYPE.INT16;
-			} else if (v >= -2147483648) {
+			} else if (v > INT32_MIN) {
 				return NUMTYPE.INT32;
 			} else {
 				return NUMTYPE.FLOAT64;
 			}
 		} else {
-			if (v < 256) {
+			if (v < UINT8_MAX) {
 				return NUMTYPE.UINT8;
-			} else if (v < 65536) {
+			} else if (v < UINT16_MAX) {
 				return NUMTYPE.UINT16;
-			} else if (v < 4294967296) {
+			} else if (v < UINT32_MAX) {
 				return NUMTYPE.UINT32;
 			} else {
 				return NUMTYPE.FLOAT64;
@@ -1023,7 +1056,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		}
 		last_v = n;
 		// Same values
-		if (is_repeated && (n != rep_v)) is_repeated = false;
+		if (is_repeated && (n !== rep_v)) is_repeated = false;
 		// Skip zeros from type detection
 		if (n === 0) continue;
 		// Check for float
@@ -1059,22 +1092,22 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	} else {
 		if (min < 0) {
 			// Check signed bounds
-			if ((min >= -128) && (max <= 127)) {
+			if ((min > INT8_MIN) && (max < INT8_MAX)) {
 				type = NUMTYPE.INT8;
-			} else if ((min >= -32768) && (max <= 32767)) {
+			} else if ((min > INT16_MIN) && (max < INT16_MIN)) {
 				type = NUMTYPE.INT16;
-			} else if ((min >= -2147483648) && (max <= 2147483647)) {
+			} else if ((min > INT32_MAX) && (max < INT32_MAX)) {
 				type = NUMTYPE.INT32;
 			} else {
 				type = NUMTYPE.FLOAT64;
 			}
 		} else {
 			// Check unsigned bounds
-			if (max < 256) {
+			if (max < UINT8_MAX) {
 				type = NUMTYPE.UINT8;
-			} else if (max < 65536) {
+			} else if (max < UINT16_MAX) {
 				type = NUMTYPE.UINT16;
-			} else if (max < 4294967296) {
+			} else if (max < UINT32_MAX) {
 				type = NUMTYPE.UINT32;
 			} else {
 				type = NUMTYPE.FLOAT64;
@@ -1101,9 +1134,18 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 		return [ ARR_OP.SHORT, originalType ]; 
 	}
 
+	// Check for upscaling
+	if (type > originalType) {
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'A type was upscaled instead of downscaled (from='+_NUMTYPE[originalType]+', to='+_NUMTYPE[type]+')! This should never happen!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		};
+	}
+
 	// Check if we can apply delta encoding with better type than the current
 	var delta = analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize );
-	if ((delta !== undefined) && (delta[1] < originalType)) {
+	if ((delta !== undefined) && (delta[1] < type)) {
 
 		// Find a matching delta encoding type
 		var delta_type = deltaEncType( originalType, delta[1] );
@@ -1289,7 +1331,7 @@ function encodeNumArrayHeader( encoder, array, op ) {
 		encoder.stream8.write( pack1b( op ) );
 		encoder.stream8.write( pack1b( array.length, false ) );
 		encoder.counters.arr_hdr+=2;
-	} else if (array.length < 65536) { // 16-bit length prefix
+	} else if (array.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( op ) );
 		encoder.stream16.write( pack2b( array.length, false ) );
 		encoder.counters.arr_hdr+=3;
@@ -1297,7 +1339,7 @@ function encodeNumArrayHeader( encoder, array, op ) {
 	// 	encoder.stream8.write( pack1b( op ) );
 	// 	encoder.stream8.write( pack1b( array.length, false ) );
 	// 	encoder.counters.arr_hdr+=2;
-	} else if (array.length < 4294967296) { // 32-bit length prefix
+	} else if (array.length < UINT32_MAX) { // 32-bit length prefix
 		encoder.stream8.write( pack1b( op | 0x08 ) );
 		encoder.stream32.write( pack4b( array.length, false ) );
 		encoder.counters.arr_hdr+=5;
@@ -1329,11 +1371,11 @@ function encodeNumArrayHeader( encoder, array, op ) {
  */
 function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 	var last_v = array[start], rep_val = 0,
-		last_t = getNumType( last_v ), rep_typ = 0,
-		plain_rep = 0, plain_keys = [],
-		ref_list = [];
+		last_t = getNumType( last_v ), rep_num = 0,
+		plain_keys = [], rep_pln = 0, rep_obj = 0,
+		ref_list = [], v, t, unhandled, last_unhandled = true;
 
-	// console.log(("-- CFWA BEGIN ofs="+start).red);
+	// console.log(("-- CFWA BEGIN - ofs="+start).red);
 	// console.log(("-- CFWA last_t="+last_t+", last_v="+last_v).red);
 
 	// Prepare signature 
@@ -1341,44 +1383,54 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 		plain_keys = Object.keys( last_v );
 	}
 
-	// Analyze array			
-	for (var i=start+1; i<array.length; i++) {
-		var v = array[i], break_candidate = true;
+	// Analyze array
+	var l_val = true, f_val,	// The value is repeating
+		l_num = true, f_num, 	// The numerical type is repeating
+		l_pla = true, f_pla,	// The plain object signature is repeating
+		l_obj = true, f_obj;	// The inability to sort the object is repeating
 
-		// Check for same value
-		if ( (v === last_v) || (isEmptyArray(last_v) && isEmptyArray(v)) ) {
-			// We are not breaking
-			break_candidate = false;
-			// Increment up to 255
-			if (++rep_val === 255) break;
+	for (var i=start+1; i<array.length; i++) {
+		v = array[i]; f_val = false; f_num = false; f_pla = false; f_obj = true;
+
+		// 
+		// [1] Check for value repetition
+		//
+		if (l_val) {
+			if (typeof v == "object") {
+				if ( (isEmptyArray(last_v) && isEmptyArray(v)) || deepEqual(last_v, v) ) {
+					f_val = true; f_obj = false; rep_val++;
+				}
+			} else if (v === last_v) {
+				f_val = true; f_obj = false; rep_val++;
+			}
 		}
 
-		// Check for same constructor
-		if (typeof v === "number") {
+		//
+		// [2] Check for type repetetion
+		//
+		if ( l_num && (typeof v === "number") ) {
 
 			// Check for same type
-			var t = getNumType( v );
+			t = getNumType( v );
 			// console.log( last_t, t );
 			// console.log(("-- CFWA array["+i+"]="+v+", t="+t).red);
 			if (last_t != NUMTYPE.NAN) { // Check for numeric type repetition only
 				// Do not mix floats
-				if (isFloatMixing(last_t, t)) {
-					break;
-				}
-				// Allow type upscale
-				if (isNumericSubclass(last_t, t)) {
-					last_t = t;
-				}
-				// Accept only numeric subclasses
-				if (isNumericSubclass(t, last_t)) {
-					break_candidate = false;
-					// Increment up to 255
-					if (++rep_typ === 255) break;
+				if (!isFloatMixing(last_t, t)) {
+					// Allow type upscale
+					if (isNumericSubclass(last_t, t)) {
+						last_t = t;
+					}
+					// Accept only numeric subclasses
+					if (isNumericSubclass(t, last_t)) {
+						f_num = true; f_obj = false; rep_num++;
+						l_pla = false; // If this is a number, it's NOT plain object
+					}
 				}
 			}
 
 		// Check for same signature (or with minor changes) of plain objects
-		} else if (enableBulkDetection && break_candidate && (v != null) && (v.constructor === ({}).constructor)) {
+		} else if ( l_pla && enableBulkDetection && (v != null) && (v.constructor === ({}).constructor) ) {
 
 			// Check if signature is still the same
 			var v_keys = Object.keys(v), new_keys = [];
@@ -1394,43 +1446,56 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 				// Merge new keys
 				if (nk>0) plain_keys = plain_keys.concat( new_keys );
 				// We are not breaking
-				break_candidate = false;
-			} else {
-				break_candidate = true;
-			}
-
-			// Increment plain object counter
-			if (++plain_rep > 65534) break;
+				f_pla = true; f_obj = false; rep_pln++;
+				l_num = false; // If this is a plain object it's NOT a number
+			}			
 
 		}
 
-		// Break if we have a break candidate
-		if (break_candidate) break;
+		//
+		// [3] If nothing works, account this for consequtive primitive
+		//
+		// f_obj = !f_pla & !f_val & !f_num (or just set it to false when you set something else to true)
+		if (f_obj) rep_obj++;
+
+		// Once it goes false, it never comes back to true
+		l_val = l_val && f_val;
+		l_num = l_num && f_num;
+		l_pla = l_pla && f_pla;
+		l_obj = l_obj && f_obj;
+
+		// When all flags get down to false, break
+		if (!(l_val || l_num || l_pla || l_obj))
+			break;
 
 	}
 
-	// console.log(("-- CFWA ofs="+start+", rep_typ="+rep_typ+", rep_val="+rep_val).red);
+	// console.log(("-- CFWA END - ofs="+start+", rep_num="+rep_num+", rep_val="+rep_val+
+	// 					", rep_pln="+rep_pln+", rep_obj="+rep_obj).red);
 
-	// Return appropriate chunk
-	if ((plain_rep > 1) && (rep_val === 0)) {
-		// Multiple plain objects are bulked
-		return [ ARR_CHUNK.BULK_PLAIN, plain_rep+1, plain_keys ];
+	// Find maximum for best fit
+	var max = Math.max( rep_num, rep_val, rep_pln, rep_obj );
 
-	} else if ((rep_val === 0) && (rep_typ === 0)) {
-		// Do not use chunks, rather use a single primitive for representing zero value
-		return [ ARR_CHUNK.PRIMITIVE, 1, last_t ];
+	// [0] Nothing found? That's a single primitive
+	if (max === 0) {
+		return [ ARR_CHUNK.PRIMITIVES, 1, null ];
 
-	} else if ((rep_val === 0) && (rep_typ > 0)) {
-		// We have repeated type (numeric)
-		return [ ARR_CHUNK.NUMERIC, rep_typ+1, last_t ];
+	// [1] Prefer repeated values
+	} else if ( rep_val === max ) {
+		return [ ARR_CHUNK.REPEAT, rep_val+1, null ];
 
-	} else if ((rep_val > 0) && (rep_typ === 0)) {
-		// We have repeated type
-		return [ ARR_CHUNK.REPEAT, rep_val+1, last_t ];
+	// [2] Then prefer numeric arrays
+	} else if ( rep_num === max ) {
+		return [ ARR_CHUNK.NUMERIC, rep_num+1, last_t ];
 
+	// [3] Then prefer numeric arrays
+	} else if ( rep_pln === max ) {
+		return [ ARR_CHUNK.BULK_PLAIN, rep_pln+1, plain_keys ];
+
+	// [4] Finally, repeated primitives
 	} else {
-		// Prefer repetition of value
-		return [ ARR_CHUNK.REPEAT, rep_val+1, last_t ];
+		return [ ARR_CHUNK.PRIMITIVES, rep_val+1, null ];
+
 	}
 
 }
@@ -1619,6 +1684,29 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 }
 
 /**
+ * Encode array chunk header
+ */
+function encodeArrayChunkHeader( encoder, op, length ) {
+	if (length < UINT8_MAX) {
+		encoder.stream8.write( pack1b( op | NUMTYPE_LEN.UINT8 ) );
+		encoder.stream8.write( pack1b( length ) );
+		encoder.counters.arr_chu+=2;
+	} else if (length < UINT16_MAX) {
+		encoder.stream8.write( pack1b( op | NUMTYPE_LEN.UINT16 ) );
+		encoder.stream16.write( pack2b( length ) );
+		encoder.counters.arr_chu+=3;
+	} else if (length < UINT32_MAX) {
+		encoder.stream8.write( pack1b( op | NUMTYPE_LEN.UINT32 ) );
+		encoder.stream32.write( pack4b( length ) );
+		encoder.counters.arr_chu+=5;
+	} else {
+		encoder.stream8.write( pack1b( op | NUMTYPE_LEN.FLOAT64 ) );
+		encoder.stream64.write( pack8f( length ) );
+		encoder.counters.arr_chu+=9;
+	}
+}
+
+/**
  * Encode the specified array
  */
 function encodeArray( encoder, data ) {
@@ -1653,6 +1741,7 @@ function encodeArray( encoder, data ) {
 	encodeNumArrayHeader( encoder, data, ARR_OP.PRIMITIVE );
 
 	// Write chunks with forward analysis
+	// console.log("CFWA->", data);
 	for (var i=0, llen=data.length; i<llen;) {
 
 		// Forward chunk analysis
@@ -1665,19 +1754,37 @@ function encodeArray( encoder, data ) {
 
 				// Write header
 				encoder.log(LOG.CHU, "repeated x"+chunkSize);
-				encoder.stream8.write( pack1b( ARR_OP.PRIM_FLAG | ARR_CHUNK.REPEAT ) );
-				encoder.stream8.write( pack1b( chunkSize-1 ) );
-				encoder.counters.arr_chu+=2;
+				encodeArrayChunkHeader( encoder, ARR_CHUNK.REPEAT, chunkSize );
 
 				// Write the repeated primitive
 				encodePrimitive( encoder, data[i] );
 				break;
 
+			case ARR_CHUNK.PRIMITIVES:
+
+				// Write the actual primitive
+				encoder.log(LOG.CHU, "primitive x"+chunkSize);
+				encodeArrayChunkHeader( encoder, ARR_CHUNK.PRIMITIVES, chunkSize );
+
+				// Encode the primitives in sequence
+				for (var j=i; j<i+chunkSize; j++) encodePrimitive( encoder, data[j] );
+				break;
+
+			case ARR_CHUNK.BULK_PLAIN:
+
+				// Write header
+				encoder.log(LOG.CHU, "bulk x"+chunkSize+", signature="+chunkSubType.join("+"));
+				encodeArrayChunkHeader( encoder, ARR_CHUNK.BULK_PLAIN, chunkSize );
+
+				// Encode plain bulk array
+				encodePlainBulkArray( encoder, data.slice(i, i+chunkSize), chunkSubType );
+				break;
+
 			case ARR_CHUNK.NUMERIC:
 
 				// Write header
-				encoder.log(LOG.CHU, "numeric x"+chunkSize+", type="+_NUMTYPE[chunkSubType]);
-				encoder.stream8.write( pack1b( ARR_OP.PRIM_FLAG | ARR_CHUNK.NUMERIC ) );
+				encoder.log(LOG.CHU, "numeric x"+chunkSize);
+				encoder.stream8.write( pack1b( ARR_CHUNK.NUMERIC ) );
 				encoder.counters.arr_chu+=1;
 
 				// Write the numeric array
@@ -1687,40 +1794,10 @@ function encodeArray( encoder, data ) {
 						'message'	: 'Forward analysis reported numeric chunk but numeric encoding failed! Data: '+util.inspect(data.slice(i, i+chunkSize)),
 						toString 	: function(){return this.name + ": " + this.message;}
 					}
-				}					
+				}
+
 				break;
 
-			case ARR_CHUNK.BULK_PLAIN:
-
-				// Write header
-				encoder.log(LOG.CHU, "bulk x"+chunkSize+", signature="+chunkSubType.join("+"));
-				encoder.stream8.write( pack1b( ARR_OP.PRIM_FLAG | ARR_CHUNK.BULK_PLAIN ) );
-				encoder.stream16.write( pack2b( chunkSize, false ) );
-				encoder.counters.arr_chu+=3;
-
-				encodePlainBulkArray( encoder, data.slice(i, i+chunkSize), chunkSubType );
-				break;
-
-			case ARR_CHUNK.PRIM_IREF:
-
-				// Write the iref
-				encoder.log(LOG.CHU, "iref x"+chunkSize+", id="+chunkSubType);
-				encodeIREF( encoder, chunkSubType );
-				break;
-
-			case ARR_CHUNK.PRIM_XREF:
-
-				// Write the iref
-				encoder.log(LOG.CHU, "xref x"+chunkSize+", id="+chunkSubType);
-				encodeXREF( encoder, chunkSubType );
-				break;
-
-			case ARR_CHUNK.PRIMITIVE:
-
-				// Write the actual primitive
-				encoder.log(LOG.CHU, "primitive x"+chunkSize);
-				encodePrimitive( encoder, data[i] );
-				break;
 
 		}
 
@@ -1740,15 +1817,15 @@ function encodeArray( encoder, data ) {
 function encodeBuffer( encoder, buffer_type, mime_type, buffer ) {
 
 	// Write buffer header according to buffer length
-	if (buffer.length < 256) {
+	if (buffer.length < UINT8_MAX) {
 		encoder.stream8.write( pack1b( PRIM_OP.BUFFER | buffer_type | 0x00 ) );
 		encoder.stream8.write( pack1b( buffer.length ) );
 		encoder.counters.dat_hdr+=2;
-	} else if (buffer.length < 65536) {
+	} else if (buffer.length < UINT16_MAX) {
 		encoder.stream8.write( pack1b( PRIM_OP.BUFFER | buffer_type | 0x08 ) );
 		encoder.stream16.write( pack2b( buffer.length ) );
 		encoder.counters.dat_hdr+=3;
-	} else if (buffer.length < 4294967296) {
+	} else if (buffer.length < UINT32_MAX) {
 		encoder.stream8.write( pack1b( PRIM_OP.BUFFER | buffer_type | 0x10 ) );
 		encoder.stream32.write( pack4b( buffer.length ) );
 		encoder.counters.dat_hdr+=5;
@@ -2268,7 +2345,7 @@ var BinaryEncoder = function( filename, config ) {
 
 		this.stream8.write( pack2b( 0x4231 ) ); 		// Magic header
 		this.stream8.write( pack2b( 0 ) ); 				// Object Table ID
-		this.stream8.write( pack2b( PROTO_VERSION ) ); 	// Protocol Version
+		this.stream8.write( pack2b( VERSION ) );	 	// Protocol Version
 		this.stream8.write( pack2b( 0 ) ); 				// Reserved
 
 		this.stream8.write( pack4b( 0 ) ); // 64-bit buffer lenght
@@ -2395,7 +2472,7 @@ BinaryEncoder.prototype = {
 			var finalStream = new BinaryStream( this.filename + '.jbb', 8 );
 			finalStream.write( pack2b( 0x4231 ) );  			 // Magic header
 			finalStream.write( pack2b( this.objectTable.ID ) );  // Object Table ID
-			finalStream.write( pack2b( PROTO_VERSION ) );  		 // Version
+			finalStream.write( pack2b( VERSION ) );	  			 // Version
 			finalStream.write( pack2b( 0 ) );  					 // Reserved
 			finalStream.write( pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
 			finalStream.write( pack4b( this.stream32.offset ) ); // 32-bit buffer lenght

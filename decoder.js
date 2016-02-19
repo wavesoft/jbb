@@ -125,6 +125,24 @@ var NUMTYPE_DOWNSCALE_DELTA_CLASS = [
 ];
 
 /**
+ * Lookup table of numerical type for NL (1-but) length fields
+ */
+var LN_NUMTYPE = [
+	NUMTYPE.UINT16,
+	NUMTYPE.UINT32
+];
+
+/**
+ * Lookup table of numerical type for LEN (2-but) length fields
+ */
+var LEN_NUMTYPE = [
+	NUMTYPE.UINT8,
+	NUMTYPE.UINT16,
+	NUMTYPE.UINT32,
+	NUMTYPE.FLOAT64,
+];
+
+/**
  * Delta encoding scale factor
  */
 var DELTASCALE = {
@@ -201,7 +219,9 @@ function getFloatDeltaScale(t, scale) {
 function decodeBlobURL( bundle, length ) {
 	var mimeType = bundle.readStringLT(),
 		blob = new Blob([ bundle.readTypedArray[NUMTYPE.UINT8]( length ) ], { type: mimeType });
-	return URL.createObjectURL(blob);
+	return DEBUG
+		? __debugMeta( URL.createObjectURL(blob), 'buffer', { 'mime': mimeType, 'size': length } )
+		: URL.createObjectURL(blob);
 }
 
 /**
@@ -209,14 +229,20 @@ function decodeBlobURL( bundle, length ) {
  */
 function decodeBuffer( bundle, len, buf_type ) {
 	var lnType = [ NUMTYPE.UINT8, NUMTYPE.UINT16, NUMTYPE.UINT32, NUMTYPE.FLOAT64 ][ len ],
-		length = bundle.readTypedNum[ lnType ]();
+		length = bundle.readTypedNum[ lnType ](), ans;
 
 	// Process buffer according to type
 	if (buf_type === 0) { // STRING_LATIN
-		return String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT8 ]( length ) );
+		ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT8 ]( length ) );
+		return DEBUG
+			? __debugMeta( ans, 'string.latin', {} )
+			: ans;
 
 	} else if (buf_type === 1) { // STRING_UTF8
-		return String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT16 ]( length ) );
+		ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT16 ]( length ) );
+		return DEBUG
+			? __debugMeta( ans, 'string.utf8', {} )
+			: ans;
 
 	} else if (buf_type === 2) { // IMAGE
 		var img = document.createElement('img');
@@ -308,7 +334,7 @@ function decodeObject( bundle, database, op ) {
 		// Create object
 		var values = decodePrimitive( bundle, database );
 		return DEBUG
-			? __debugMeta( factory( values ), 'object.plain.factory', { 'eid': eid } )
+			? __debugMeta( factory( values ), 'object.plain', { 'eid': eid } )
 			: factory( values );
 
 	} else {
@@ -333,7 +359,7 @@ function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
 		ans[i+1] = v;
 	}
 	return DEBUG
-		? __debugMeta( ans, 'array.delta[float]', {} )
+		? __debugMeta( ans, 'array.delta.float', {} )
 		: ans;
 }
 
@@ -349,7 +375,7 @@ function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
 		ans[i+1] = v;
 	}
 	return DEBUG
-		? __debugMeta( ans, 'array.delta[int]', {} )
+		? __debugMeta( ans, 'array.delta.int', {} )
 		: ans;
 }
 
@@ -442,75 +468,93 @@ function decodeBulkArray( bundle, database, len ) {
 }
 
 /**
- * Decode primitive array
+ * Decode chunked array
  */
-function decodePrimitiveArray( bundle, database, length ) {
-	var i=0, ans = [], size=0, flag=10, flen=0, chunks_meta = [];
+function decodeChunkedArray( bundle, database, length ) {
+	var i=0, ans = [], size=0, flag=10, flen=0, prim=null,
+		chunks_meta = [], op, op_sz;
 
-	// Collect primitives
+	// Collect chunks
 	while (size<length) {
-		// Peek on the operator
-		var op = bundle.u8[ bundle.i8 ] | 0;
-		if ((op & 0xFC) === 0x78) { // Primitive Flag
-			// If the next opcode seems like a flag, pop it (otherwise
-			// that's an opcode that defines a primitive)
-			bundle.i8++;
-			// Keep flag
-			flag = (op & 0x03) | 0;
-			switch (flag) {
-				case 0: // REPEAT
-					flen = bundle.readTypedNum[ NUMTYPE.UINT8 ]()|0;
-					flen++;
-					break;
-				case 1: // NUMERIC
-					break;
-				case 2: // PLAIN_BULK
-					flen = bundle.readTypedNum[ NUMTYPE.UINT16 ]()|0; 
+		// Get the chunk operator
+		op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		op_sz = op & 0x03;
+		switch (op & 0xFC) {
+			case 0x10: // REPEAT
 
-					// This is a special case. We have a bit more complex
-					// parsing mechanism. The next object is NOT primitive
-					// TODO: Perhaps MAKE it primtive?
-					ans = ans.concat( decodePlainBulkArray( bundle, database, flen ) );
-					size += flen;
-					DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk' });
+				// Get size and primitive
+				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
+				prim = decodePrimitive( bundle, database );
+				// console.log("<< CHU[repeat] x"+flen+" @", bundle.i8);
 
-					// Reset flag
-					flag = 10;
+				// Update debug
+				DEBUG && chunks_meta.push({ 'len':flen, 'type':'repeat', 'value': prim });
 
-					break;
-				default:
-					throw {
-						'name' 		: 'AssertError',
-						'message'	: 'Unknown primitive array flag #'+flag+'!',
-						toString 	: function(){return this.name + ": " + this.message;}
-					}
-			}
-		} else { // Primitive
-			var prim = decodePrimitive( bundle, database );
-			if (flag !== 10) {
-				// Apply flags to primitive
-				switch (flag) {
-					case 0: // REPEAT (Repeat primitive)
-						for (var i=0; i<flen; i++) ans.push(prim);
-						size += flen;
-						DEBUG && chunks_meta.push({ 'len':flen, 'type':'repeat', 'value':prim });
-						break;
-					case 1: // NUMERIC (Merge numeric values from primitive)
-						ans = ans.concat( Array.prototype.slice.call(prim) );
-						size += prim.length;
-						DEBUG && chunks_meta.push({ 'len':flen, 'type':'numeric', 'value':prim });
-						break;
-					case 2: // BULK (Multiple entities with weaved property arrays)
-						break;
+				// Repeat and update size
+				for (var i=0; i<flen; i++) ans.push(prim);
+				size += flen;
+				break;
+
+			case 0x20: // PRIMITIVES
+
+				// Read primitives
+				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
+				for (var i=0; i<flen; i++)
+					ans.push( decodePrimitive( bundle, database ) );
+				// console.log("<< CHU[primitives] x"+flen+" @", bundle.i8);
+
+				// Update debug
+				DEBUG && chunks_meta.push({ 'len':flen, 'type':'primtives' });
+
+				// Update size
+				size += flen;
+				break;
+
+			case 0x30: // NUMERIC
+
+				// Decode numeric array and merge
+				prim = decodePrimitive( bundle, database );
+				ans = ans.concat( Array.prototype.slice.call(prim) );
+				// console.log("<< CHU[numeric] x"+prim.length+" @", bundle.i8);
+				size += prim.length;
+
+				// Update debug
+				DEBUG && chunks_meta.push({ 'len':prim.length, 'type':'numeric' });
+				break;
+
+			case 0x40: // BULK_PLAIN
+
+				// Decode plain bulk array
+				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
+				// console.log("<< CHU[bulk.plain] x"+flen+" @", bundle.i8);
+				prim = decodePlainBulkArray( bundle, database, flen );
+				ans = ans.concat( prim );
+				size += prim.length;
+
+				// Update debug
+				DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk.plain' });
+				break;
+
+			case 0x50: // BULK_OBJECT
+
+				// Decode plain bulk array
+				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
+				// console.log("<< CHU[bulk.object] x"+flen+" @", bundle.i8);
+				prim = decodeBulkArray( bundle, database, flen );
+				ans = ans.concat( prim );
+				size += prim.length;
+
+				// Update debug
+				DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk.known' });
+				break;
+
+			default:
+				throw {
+					'name' 		: 'AssertError',
+					'message'	: 'Unknown chunk operator #'+op+' at offset='+bundle.i8+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
 				}
-				// Reset flag
-				flag = 10;
-			} else {
-				// Keep primitive
-				ans.push(prim);
-				DEBUG && chunks_meta.push({ 'len':1, 'type':'primitive' });
-				size += 1;
-			}
+
 		}
 	}
 
@@ -596,11 +640,11 @@ function decodeArray( bundle, database, op ) {
 			toString 	: function(){return this.name + ": " + this.message;}
 		}
 
-	} else if ((op & 0x7E) === 0x7C) { // Primitive
+	} else if ((op & 0x7E) === 0x7C) { // Chunked
 		var l = bundle.readTypedNum[ ln0 ]() | 0;
 
-		// Return decoded primitive array
-		return decodePrimitiveArray( bundle, database, l );
+		// Return decoded chunked array
+		return decodeChunkedArray( bundle, database, l );
 
 	} else if ((op & 0x7F) === 0x7E) { // Empty
 
