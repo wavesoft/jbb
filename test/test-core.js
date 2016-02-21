@@ -32,6 +32,17 @@ const FLOAT32_POS = 3.40282346e+38; // largest positive number in float32
 const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
 const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 
+/**
+ * Numerical types
+ */
+var NUMTYPE = {
+	// For protocol use
+	UINT8: 	 0, INT8:    1,
+	UINT16:  2, INT16:   3,
+	UINT32:  4, INT32:   5,
+	FLOAT32: 6, FLOAT64: 7
+};
+
 ////////////////////////////////////////////////////////////////
 // Test Entry Point
 ////////////////////////////////////////////////////////////////
@@ -83,7 +94,7 @@ describe('[Core Tests]', function() {
 			assert.equal( u32[2], 8,			'64-bit table size');
 			assert.equal( u32[3], 8,			'32-bit table size');
 			assert.equal( u32[4], 14,			'16-bit table size');
-			assert.equal( u32[5], 55,			'8-bit table size');
+			assert.equal( u32[5], 53,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -234,11 +245,18 @@ describe('[Core Tests]', function() {
 		it_should_return_array_rep('Array', 255, false, [match_chunkTypes(['repeat'])]);
 		it_should_return_array_rep('Array', 255, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
 
+		// Test bigger indices in a single chunk
+		it_should_return_array_rep('Array', 1024, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
+		it_should_return_array_rep('Array', 65536, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
+
 	});
 
 	describe('Delta-Encoded Arrays', function () {
 
 		//// Integer delta-encoding ////
+
+		// UINT8	-> No delta-encoding
+		it_should_return_array_seq('Uint8Array', 256,	256,	1,	 [match_metaType('array.raw')]);
 
 		// UINT16	-> INT8
 		it_should_return_array_seq('Uint16Array',256,	256,	1,	 [match_metaType('array.delta.int')]);
@@ -250,16 +268,16 @@ describe('[Core Tests]', function() {
 		it_should_return_array_seq('Int32Array', 256,	-32768,	1,	 [match_metaType('array.delta.int')]);
 
 		// UINT32	-> INT16
-		it_should_return_array_seq('Uint32Array',256,	0,		256, [match_metaType('array.delta.int')]);
+		it_should_return_array_seq('Uint32Array',2048,	0,		256, [match_metaType('array.delta.int')]);
 		// INT32	-> INT16
 		it_should_return_array_seq('Int32Array',256,	-1024,	256, [match_metaType('array.delta.int')]);
 
 		//// Float delta-encoding ////
 
 		// FLOAT32	-> INT8
-		it_should_return_array_seq('Float32Array',256,	0,	1,	 [match_metaType('array.delta.float')]);	
+		it_should_return_array_seq('Float32Array',256,	0,	0.5, 	 [match_metaType('array.delta.float')]);	
 		// FLOAT32	-> INT16
-		it_should_return_array_seq('Float32Array',256,	0,	256, [match_metaType('array.delta.float')]);
+		it_should_return_array_seq('Float32Array',256,	0,	32.125,  [match_metaType('array.delta.float')]);
 
 		//// Incomplete types ////
 
@@ -309,23 +327,23 @@ describe('[Core Tests]', function() {
 	describe('Float Arrays', function () {	
 
 		// Float32 extremes
-		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_POS);	
-		it_should_return_array_rand('Float32Array',256,	FLOAT32_NEG, 0.0);	
-		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_SMALL);
+		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_POS, 	[match_rawArrayType( NUMTYPE.FLOAT32 )]);	
+		it_should_return_array_rand('Float32Array',256,	FLOAT32_NEG, 0.0, 	[match_rawArrayType( NUMTYPE.FLOAT32 )]);	
+		it_should_return_array_rand('Float32Array',256,	0.0, FLOAT32_SMALL, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
 
 		// Float64 extremes
-		it_should_return_array_rand('Float64Array',256,	1.7E-108, 1.7E-107);	
-		it_should_return_array_rand('Float64Array',256,	1.7E+107, 1.7E+108);	
+		it_should_return_array_rand('Float64Array',256,	1.7E-108, 1.7E-107,	[match_rawArrayType( NUMTYPE.FLOAT64 )]);
+		it_should_return_array_rand('Float64Array',256,	1.7E+107, 1.7E+108, [match_rawArrayType( NUMTYPE.FLOAT64 )]);
 
 		// Element detail on half-float decimals
-		it_should_return_array_rand('Float32Array',256,		1e-19,	1e-18);	
-		it_should_return_array_rand('Float32Array',1024,	1e-19,	1e-18);	
-		it_should_return_array_rand('Float32Array',65535,	1e-19,	1e-18);	
+		it_should_return_array_rand('Float32Array',256,		-1e+18,	1e-18, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
+		it_should_return_array_rand('Float32Array',1024,	-1e+18,	1e-18, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
+		it_should_return_array_rand('Float32Array',65535,	-1e+18,	1e-18, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
 
 	});
 
 	describe('Chunked Arrays', function () {
-		var values;
+		var values, matchTypes;
 
 		// Simple composite case
 		values = [].concat(
@@ -336,36 +354,54 @@ describe('[Core Tests]', function() {
 			gen_array_seq( 'Array', 100, 0, 1 ),
 			'Break'
 		);
-		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', [match_metaType('array.chunked')] );
+		// console.log(values);
+		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', 
+			[function(meta) { console.log(meta.meta.chunks); }, match_chunkTypes([
+				'numeric',		// 100 numeric items
+				'primitives',	// 'Break'
+				'numeric',		// 100 numeric items
+				'primitives',	// 'Break'
+				'numeric',		// 100 numeric items
+				'primitives'	// 'Break'
+			])] );
 
 		// Repeated composites (Ideally future-optimised)
-		values = [];
-		var rep = [true, false, undefined, 255, 65535, 4294967295, {'plain':'object'}];
-		for (var i=0; i<100; i++)
+		values = []; matchTypes = [];
+		var rep = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
+		var repTypes = [
+			'primitives',	// true, false, undefined
+			'numeric',		// 255, 128, 67, 65535, 32535, 4294967295
+			'primitives',	// {'plain':'object'}
+		];
+		for (var i=0; i<100; i++) {
 			values = values.concat(rep);
-		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]', [match_metaType('array.chunked')] );
+			matchTypes = matchTypes.concat(repTypes);
+		}
+		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]', 
+			[function(meta) { console.log(meta.meta.chunks); }, match_chunkTypes(matchTypes)] );
 
 		// Create multi-chunked array
 		values = [].concat(
-			gen_array_rep( 'Array', 100, false ),
-			gen_array_rep( 'Array', 50, true ),
-			gen_array_rep( 'Array', 5, undefined ),
-			gen_array_rep( 'Array', 128, {'object':'with_a_simple','structure':4} ),
-			gen_array_rep( 'Array', 255, {'limit_of_objects':255} ),
-			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
+			gen_array_rep( 'Array', 5/*100*/, false ),
+			gen_array_rep( 'Array', 5/*50*/, true ),
+			gen_array_rep( 'Array', 5/*5*/, undefined ),
+			gen_array_rep( 'Array', 5/*128*/, {'object':'with_a_simple','structure':4} ),
+			gen_array_rep( 'Array', 5/*255*/, {'limit_of_objects':255} ),
+			gen_array_rep( 'Array', 5/*1024*/, {'too_many':123,'objects':4123} )
 		);
-		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]', [match_metaType('array.chunked')] );
+		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]',
+			[ match_metaType('array.chunked') ] );
 
 		// Check limits of repeated values
 		values = [].concat(
 			[ 'chunk_prefix' ],
-			gen_array_rep( 'Array', 255, 'same' ),
+			gen_array_rep( 'Array', 10/*255*/, 'same' ),
 			[ false ]
 		);
 		it_should_return( values, 'Repeated Chunk [ 255 x \'same\' ]', [match_metaType('array.chunked')] );
 		values = [].concat(
 			[ 'chunk_prefix' ],
-			gen_array_rep( 'Array', 32767, 'same' ),
+			gen_array_rep( 'Array', 10/*32767*/, 'same' ),
 			[ false ]
 		);
 		it_should_return( values, 'Repeated Chunk [ 32,767 x \'same\' ]', [match_metaType('array.chunked')] );
@@ -378,7 +414,7 @@ describe('[Core Tests]', function() {
 
 		// Create bulk array
 		var bulkrep = [];
-		for (var i=0; i<65535; i++)
+		for (var i=0; i<10/*65535*/; i++)
 			bulkrep.push({
 				'value': Math.floor(Math.random() * 255),
 				'same': 4,

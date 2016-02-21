@@ -48,11 +48,11 @@ function gen_array_rand( typeName, length, min, max ) {
 	var arr = new global[typeName](length), range = max-min, v;
 	var mid = (min + max) / 2;
 	var smallest = Math.min(Math.abs(min), Math.abs(max)) % 1;
-	console.log(">> smallest ("+min+","+max+")=",smallest);
+	// console.log(">> smallest ("+min+","+max+")=",smallest);
 	for (var i=0; i<length; i++) {
 		v = min + (Math.random() * range);
 		if (Math.abs(v % 1) < smallest) {
-			console.log("!!",v," < smallest");
+			// console.log("!!",v," < smallest");
 			v = ( v < mid ) ? min : max;
 		}
 		arr[i] = v;
@@ -94,6 +94,16 @@ function match_chunkTypes( chunkTypes ) {
 		for (var i=0; i<meta.meta.chunks.length; i++) {
 			assert.equal( meta.meta.chunks[i].type, chunkTypes[i], 'mismatch chunk #'+i+' type' );
 		}
+	}
+}
+
+/**
+ * Match for chunk type
+ */
+function match_rawArrayType( matchType ) {
+	return function(meta) {
+		assert.equal( meta.type, 'array.raw', 'array must be raw' );
+		assert.equal( meta.meta.type, matchType, 'array types do not match' );
 	}
 }
 
@@ -152,7 +162,7 @@ function it_should_return(primitive, repr, metaMatchFn) {
  */
 function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) {
 	var array = gen_array_seq(typeName, length, min, step);
-	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[1]+'/'+step+']`, as encoded', function () {
+	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[array.length-1]+'/'+step+']`, as encoded', function () {
 		var ans = encode_decode( array, SimpleOT );
 		// Perform strong type checks on typed arrays
 		if (typeName != 'Array')
@@ -212,6 +222,7 @@ function it_should_return_array_rep( typeName, length, value, metaMatchFn ) {
 var exports = module.exports = {
 	'match_metaType': match_metaType,
 	'match_chunkTypes': match_chunkTypes,
+	'match_rawArrayType': match_rawArrayType,
 	'gen_array_seq': gen_array_seq,
 	'gen_array_rand': gen_array_rand,
 	'gen_array_rep': gen_array_rep,
