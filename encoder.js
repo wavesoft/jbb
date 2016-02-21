@@ -775,27 +775,49 @@ function isFloatType(t) {
 /**
  * Check if the specified number is a subclass of an other
  */
-function isNumericSubclass( t, of_t ) {
-	if (t > of_t) return false;
-	switch (of_t) {
+function isNumericSubclass( t, t_min, t_max, of_t ) {
+	if ((t === NUMTYPE.NAN) || (of_t === NUMTYPE.NAN)) return false;
+	switch (of_t) { // Parent
 		case NUMTYPE.UINT8:
+			switch (t) {
+				case NUMTYPE.UINT8:
+					return true;
+				case NUMTYPE.INT8:
+					return (t_min > 0);
+				default:
+					return false;
+			}
+
 		case NUMTYPE.INT8:
-			return (of_t === t);
+			switch (t) {
+				case NUMTYPE.UINT8:
+					return (t_max < INT8_MAX);
+				case NUMTYPE.INT8:
+					return true;
+				default:
+					return false;
+			}
 
 		case NUMTYPE.UINT16:
 			switch (t) {
 				case NUMTYPE.UINT8:
 				case NUMTYPE.UINT16:
 					return true;
+				case NUMTYPE.INT8:
+				case NUMTYPE.INT16:
+					return (t_min > 0);
 				default:
 					return false;
 			}
+
 		case NUMTYPE.INT16:
 			switch (t) {
 				case NUMTYPE.UINT8:
 				case NUMTYPE.INT8:
 				case NUMTYPE.INT16:
 					return true;
+				case NUMTYPE.UINT16:
+					return (t_max < INT16_MAX);
 				default:
 					return false;
 			}
@@ -806,9 +828,14 @@ function isNumericSubclass( t, of_t ) {
 				case NUMTYPE.UINT16:
 				case NUMTYPE.UINT32:
 					return true;
+				case NUMTYPE.INT8:
+				case NUMTYPE.INT16:
+				case NUMTYPE.INT32:
+					return (t_min > 0);
 				default:
 					return false;
 			}
+
 		case NUMTYPE.INT32:
 			switch (t) {
 				case NUMTYPE.UINT8:
@@ -817,6 +844,8 @@ function isNumericSubclass( t, of_t ) {
 				case NUMTYPE.INT16:
 				case NUMTYPE.INT32:
 					return true;
+				case NUMTYPE.UINT32:
+					return (t_max < INT32_MAX);
 				default:
 					return false;
 			}
@@ -827,15 +856,18 @@ function isNumericSubclass( t, of_t ) {
 				case NUMTYPE.INT8:
 				case NUMTYPE.UINT16:
 				case NUMTYPE.INT16:
-				case NUMTYPE.INT32:
 				case NUMTYPE.FLOAT32:
 					return true;
+				case NUMTYPE.UINT32:
+				case NUMTYPE.INT32:
+					return (t_min > FLOAT32_NEG) && (t_max < FLOAT32_POS);
 				default:
 					return false;
 			}
 
 		case NUMTYPE.FLOAT64:
 			return true;
+
 	}
 	return false;
 }
@@ -914,10 +946,11 @@ function getNumType( v ) {
 
 	if (v % 1 !== 0) {
 		// Check for Float32 or Float64
-		if ((Math.abs(v) < FLOAT32_SMALL) || (v < FLOAT32_NEG) || (v > FLOAT32_POS)) {
-			return NUMTYPE.FLOAT32;
-		} else {
+		if (((v !== 0) && (Math.abs(v % 1) < FLOAT32_SMALL)) || 
+			 (v < FLOAT32_NEG) || (v > FLOAT32_POS)) {
 			return NUMTYPE.FLOAT64;
+		} else {
+			return NUMTYPE.FLOAT32;
 		}
 	} else {
 		// Check for signed or unsigned
@@ -932,10 +965,16 @@ function getNumType( v ) {
 				return NUMTYPE.FLOAT64;
 			}
 		} else {
-			if (v < UINT8_MAX) {
+			if (v < INT8_MAX) {
+				return NUMTYPE.INT8;
+			} else if (v < UINT8_MAX) {
 				return NUMTYPE.UINT8;
+			} else if (v < INT16_MAX) {
+				return NUMTYPE.INT16;
 			} else if (v < UINT16_MAX) {
 				return NUMTYPE.UINT16;
+			} else if (v < INT32_MAX) {
+				return NUMTYPE.INT32;
 			} else if (v < UINT32_MAX) {
 				return NUMTYPE.UINT32;
 			} else {
@@ -981,12 +1020,17 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
 	if (is_float) {
 
 		if (max_delta < 0.01) { // 0.0 - 0.01 Scale
+			// console.log("-- delta="+max_delta+": S_R00");
 			return [ DELTASCALE.S_R00, precisionOverSize ? NUMTYPE.INT16 : NUMTYPE.INT8 ];
 		} else if (max_delta <= 1.0) { // 0.0 - 1.0 scale
+			// console.log("-- delta="+max_delta+": S_R");
 			return [ DELTASCALE.S_R, precisionOverSize ? NUMTYPE.INT16 : NUMTYPE.INT8 ];
 		} else if ((min_delta >= 100.0) && (max_delta <= 32767.0)) { // 100.0 - 32767.0
+			// console.log("-- delta="+max_delta+": S_001");
 			return [ DELTASCALE.S_001, NUMTYPE.INT16 ];
 		}
+
+		console.log("-- delta="+max_delta+": ???");
 
 	} else {
 
@@ -1027,7 +1071,7 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
  * @param {boolean} precisionOverSize - Prefer precision over size
  */
 function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
-	var min = array[0], max = array[0], // Bounds
+	var min = array[0], max = array[0], amin, amax, // Bounds
 		is_integer = false,	is_float = false, // Types
 		is_repeated = true, rep_v = array[0], // Same values
 		last_v = array[0], min_delta = null, max_delta = null; // Deltas
@@ -1082,9 +1126,21 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	var type = null;
 	if (is_float) {
 		// Check Float bounds
-		if ((Math.abs(min) < FLOAT32_SMALL) || (Math.abs(max) < FLOAT32_SMALL) || 
+		amin = Math.abs(min % 1); amax = Math.abs(max % 1);
+		if (((amin !== 0) && (amin < FLOAT32_SMALL)) || 
+			((amax !== 0) && (amax < FLOAT32_SMALL)) || 
 			(min < FLOAT32_NEG) || (max > FLOAT32_POS)) {
-			console.log("Upscale caused by min=",min,"max=",max);
+
+			if ((amin !== 0) && (amin < FLOAT32_SMALL)) {
+				console.log(("!!! amin < FLOAT32_SMALL, amin="+amin+", min="+min).cyan);
+			} else if ((amax !== 0) && (amax < FLOAT32_SMALL)) {
+				console.log(("!!! amax < FLOAT32_SMALL, amax="+amax+", max="+max).cyan);
+			} else if (min < FLOAT32_NEG) {
+				console.log("!!! min < FLOAT32_NEG".cyan);
+			} else if (max > FLOAT32_POS) {
+				console.log("!!! max < FLOAT32_NEG".cyan);
+			}
+
 			type = NUMTYPE.FLOAT64;
 		} else {
 			type = NUMTYPE.FLOAT32;
@@ -1094,19 +1150,25 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 			// Check signed bounds
 			if ((min > INT8_MIN) && (max < INT8_MAX)) {
 				type = NUMTYPE.INT8;
-			} else if ((min > INT16_MIN) && (max < INT16_MIN)) {
+			} else if ((min > INT16_MIN) && (max < INT16_MAX)) {
 				type = NUMTYPE.INT16;
-			} else if ((min > INT32_MAX) && (max < INT32_MAX)) {
+			} else if ((min > INT32_MIN) && (max < INT32_MAX)) {
 				type = NUMTYPE.INT32;
 			} else {
 				type = NUMTYPE.FLOAT64;
 			}
 		} else {
 			// Check unsigned bounds
-			if (max < UINT8_MAX) {
+			if (max < INT8_MAX) {
+				type = NUMTYPE.INT8;
+			} else if (max < UINT8_MAX) {
 				type = NUMTYPE.UINT8;
+			} else if (max < INT16_MAX) {
+				type = NUMTYPE.INT16;
 			} else if (max < UINT16_MAX) {
 				type = NUMTYPE.UINT16;
+			} else if (max < INT32_MAX) {
+				type = NUMTYPE.INT32;
 			} else if (max < UINT32_MAX) {
 				type = NUMTYPE.UINT32;
 			} else {
@@ -1136,7 +1198,9 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 	// Check if we can apply delta encoding with better type than the current
 	var delta = analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize );
-	if ((delta !== undefined) && (delta[1] < Math.min(originalType, type))) {
+	console.log( "-- delta=["+min_delta+"~"+max_delta+"], values=["+min+"~"+max+"], is_float="+is_float+
+				 ", delta=", delta, ", originalType=", originalType, ", type=", type );
+	if ((delta !== undefined) && ( sizeOfType(delta[1]) < sizeOfType(Math.min(originalType, type)) )) {
 
 		// Find a matching delta encoding type
 		var delta_type = deltaEncType( originalType, delta[1] );
@@ -1361,131 +1425,229 @@ function encodeNumArrayHeader( encoder, array, op ) {
  *
  */
 function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
-	var last_v = array[start], rep_val = 0,
-		last_t = getNumType( last_v ), rep_num = 0,
-		plain_keys = [], rep_pln = 0, rep_obj = 0,
-		ref_list = [], v, t, unhandled, last_unhandled = true;
 
-	// console.log(("-- CFWA BEGIN - ofs="+start).red);
-	// console.log(("-- CFWA last_t="+last_t+", last_v="+last_v).red);
+	const TEST_NUMBER = 0,
+		  TEST_PLAIN = 1,
+		  TEST_PRIMITIVE = 2;
 
-	// Prepare signature 
-	if (enableBulkDetection && (last_v != null) && (last_v.constructor === ({}).constructor)) {
-		plain_keys = Object.keys( last_v );
+	var v, v_type, numtype, test_mode, break_candidate,	// Temporary variables
+		keys, is_positive, new_keys, old_keys, is_numeric,
+		have_optimised_items = false,					// Counter of overall optimised items
+		c_same = 0, c_numeric = 0, c_plain = 0,			// Counters of individually optimisied items
+		c_unoptimised = 0,
+		last_test_mode, last_value, last_numtype,		// Last state variables
+		last_keys = [], all_positive = false, type_oscilating = false,
+		min_num, max_num;
+
+	// Get test mode of first value
+	v = array[start];
+	v_type = typeof v;
+	last_numtype = NUMTYPE.NAN;
+	if (v_type === 'number') {
+		last_test_mode = TEST_NUMBER;
+		last_numtype = getNumType( v );
+		all_positive = (v>0);
+		min_num = max_num = v;
+	} else if (v_type === 'string' ) {
+		last_test_mode = TEST_PRIMITIVE;
+	} else if (v_type === 'boolean' ) {
+		last_test_mode = TEST_PRIMITIVE;
+	} else if (v_type === 'undefined' ) {
+		last_test_mode = TEST_PRIMITIVE;
+	} else if (v === null) {
+		last_test_mode = TEST_PRIMITIVE;
+	} else if (v.constructor === ({}).constructor) {
+		last_test_mode = TEST_PLAIN;
+		last_keys = Object.keys( v ).sort();
+	} else { /* Other objects */
+		last_test_mode = TEST_PRIMITIVE;
 	}
+	last_value = v;
 
-	// Analyze array
-	var l_val = true, f_val,	// The value is repeating
-		l_num = true, f_num, 	// The numerical type is repeating
-		l_pla = true, f_pla,	// The plain object signature is repeating
-		l_obj = true, f_obj;	// The inability to sort the object is repeating
+	// Scan items
+	for (var i=start+1, il=array.length; i<il; i++) {
 
-	for (var i=start+1; i<array.length; i++) {
-		v = array[i]; f_val = false; f_num = false; f_pla = false; f_obj = true;
+		// Get test mode of the current value
+		v = array[i];
+		v_type = typeof v;
+		numtype = NUMTYPE.NAN;
+		is_positive = false;
+		is_numeric = false;
+		if (v_type === 'number') {
+			test_mode = TEST_NUMBER;
+			numtype = getNumType( v );
+			is_positive = (v>0);
+			is_numeric = true;
+		} else if (v_type === 'string' ) {
+			test_mode = TEST_PRIMITIVE;
+		} else if (v_type === 'boolean' ) {
+			test_mode = TEST_PRIMITIVE;
+		} else if (v_type === 'undefined' ) {
+			test_mode = TEST_PRIMITIVE;
+		} else if (v === null) {
+			test_mode = TEST_PRIMITIVE;
+		} else if (v.constructor === ({}).constructor) {
+			test_mode = TEST_PLAIN;
+		} else { /* Other objects */
+			test_mode = TEST_PRIMITIVE;
+		}
 
-		// 
-		// [1] Check for value repetition
-		//
-		if (l_val) {
-			if (typeof v == "object") {
-				if ( (isEmptyArray(last_v) && isEmptyArray(v)) || deepEqual(last_v, v) ) {
-					f_val = true; f_obj = false; rep_val++;
-				}
-			} else if (v === last_v) {
-				f_val = true; f_obj = false; rep_val++;
+		// If test mode is the same, check if values remain the same
+		if (test_mode === last_test_mode) {
+			break_candidate = true;
+
+			// If we have been oscilating on types that cannot be optimised
+			// but now we have at least 2 consecutive optimisable items,
+			// just break and let next call do the optimisation.
+			if (type_oscilating) {
+				console.log(">> "+("Breaking due to type oscilating").yellow);
+				break;
+			}
+
+			// Check optimisations
+			switch (test_mode) {
+				case TEST_NUMBER:
+					if (last_value === v) {
+						c_same++;
+						have_optimised_items = true;
+						break_candidate = false;
+					} else {
+
+						// Check for numeric subclass
+						if (!isFloatMixing(last_numtype, numtype)) {
+							// Allow type upscale
+							if (isNumericSubclass(last_numtype, min_num, max_num, numtype)) {
+								console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
+								last_numtype = numtype;
+							}
+							// Accept only numeric subclasses
+							if (isNumericSubclass(numtype, v, v, last_numtype)) {
+								c_numeric++;
+								have_optimised_items = true;
+								break_candidate = false;
+							} else {
+								console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
+							}
+						} else {
+							console.log(">> " + "Mixing floats".red);
+						}
+
+					}
+					break;
+
+				case TEST_PLAIN:
+					// if (deepEqual( v, last_value )) {
+					if ( v === last_value ) {
+						c_same++;
+						have_optimised_items = true;
+						break_candidate = false;
+					} else {
+
+						// Calculate key differences
+						keys = Object.keys( v ).sort();
+						new_keys = 0; 
+						old_keys = last_keys.length;
+						for (var ja=0, jb=0, jl=last_keys.length; (ja<jl) && (jb<jl) ;) {
+							if (keys[ja] < last_keys[jb]) {
+								jb++;
+								new_keys++;
+								last_keys.push( keys[ja] )
+							} else if (keys[ja] > last_keys[jb]) {
+								ja++;
+							} else {
+								ja++;
+								jb++;
+							}
+						}
+
+						// Allow up to 25% extension of the key set
+						if ((new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
+							c_plain++;
+							have_optimised_items = true;
+							break_candidate = false;
+						}
+
+					}
+					break;
+
+				case TEST_PRIMITIVE:
+					if (last_value === v) {
+						c_same++;
+						have_optimised_items = true;
+						break_candidate = false;
+					} else {
+
+						// This is a break candidate only if there were no
+						// optimised items collected so far.
+						if (!have_optimised_items) {
+							c_unoptimised++;
+							break_candidate = false;
+						}
+
+					}
+					break;
+			}
+
+			// If we couldn't optimise anything, break
+			if (break_candidate) {
+				console.log(">> "+("Breaking due to a break candidate").yellow);
+				break;
+			}
+
+		} else {
+
+			// If we didn't have any optimised item and we are
+			// oscilating between types, count them as primitive
+			// objects in order to chunk them together.
+			if (!have_optimised_items) {
+				c_unoptimised++;
+				type_oscilating = true;
+			} else {
+				// Otherwise break
+				console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
+				break;
 			}
 		}
 
-		//
-		// [2] Check for type repetetion
-		//
-		if ( l_num && (typeof v === "number") ) {
+		// Keep current state as last
+		all_positive = all_positive && is_positive;
+		last_test_mode = test_mode;
+		last_numtype = numtype;
+		last_value = v;
 
-			// Check for same type
-			t = getNumType( v );
-			// console.log( last_t, t );
-			// console.log(("-- CFWA array["+i+"]="+v+", t="+t).red);
-			if (last_t != NUMTYPE.NAN) { // Check for numeric type repetition only
-				// Do not mix floats
-				if (!isFloatMixing(last_t, t)) {
-					// Allow type upscale
-					if (isNumericSubclass(last_t, t)) {
-						last_t = t;
-					}
-					// Accept only numeric subclasses
-					if (isNumericSubclass(t, last_t)) {
-						f_num = true; f_obj = false; rep_num++;
-						l_pla = false; // If this is a number, it's NOT plain object
-					}
-				}
-			}
-
-		// Check for same signature (or with minor changes) of plain objects
-		} else if ( l_pla && enableBulkDetection && (v != null) && (v.constructor === ({}).constructor) ) {
-
-			// Check if signature is still the same
-			var v_keys = Object.keys(v), new_keys = [];
-			for (var j=0, llen=v_keys.length; j<llen; j++) {
-				// Inject new keys (and count them)
-				if (plain_keys.indexOf(v_keys[j]) < 0)
-					new_keys.push( v_keys[j] );
-			}
-
-			// Break if we have added more than 25% keys of the original
-			var nk = new_keys.length;
-			if (nk < plain_keys.length * 0.25) {
-				// Merge new keys
-				if (nk>0) plain_keys = plain_keys.concat( new_keys );
-				// We are not breaking
-				f_pla = true; f_obj = false; rep_pln++;
-				l_num = false; // If this is a plain object it's NOT a number
-			}			
-
+		// Update min/max on numeric values
+		if (is_numeric) {
+			if (v < min_num)
+				min_num = v;
+			if (v > max_num)
+				max_num = v;
 		}
 
-		//
-		// [3] If nothing works, account this for consequtive primitive
-		//
-		// f_obj = !f_pla & !f_val & !f_num (or just set it to false when you set something else to true)
-		if (f_obj) rep_obj++;
-
-		// Once it goes false, it never comes back to true
-		l_val = l_val && f_val;
-		l_num = l_num && f_num;
-		l_pla = l_pla && f_pla;
-		l_obj = l_obj && f_obj;
-
-		// When all flags get down to false, break
-		if (!(l_val || l_num || l_pla || l_obj))
-			break;
-
 	}
-
-	// console.log(("-- CFWA END - ofs="+start+", rep_num="+rep_num+", rep_val="+rep_val+
-	// 					", rep_pln="+rep_pln+", rep_obj="+rep_obj).red);
 
 	// Find maximum for best fit
-	var max = Math.max( rep_num, rep_val, rep_pln, rep_obj );
+	console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
+	var max = Math.max( c_same, c_numeric, c_plain, c_unoptimised );
 
 	// [0] Nothing found? That's a single primitive
 	if (max === 0) {
 		return [ ARR_CHUNK.PRIMITIVES, 1, null ];
 
 	// [1] Prefer repeated values
-	} else if ( rep_val === max ) {
-		return [ ARR_CHUNK.REPEAT, rep_val+1, null ];
+	} else if ( c_same === max ) {
+		return [ ARR_CHUNK.REPEAT, c_same+1, null ];
 
 	// [2] Then prefer numeric arrays
-	} else if ( rep_num === max ) {
-		return [ ARR_CHUNK.NUMERIC, rep_num+1, last_t ];
+	} else if ( c_numeric === max ) {
+		return [ ARR_CHUNK.NUMERIC, c_numeric+1, last_numtype ];
 
 	// [3] Then prefer numeric arrays
-	} else if ( rep_pln === max ) {
-		return [ ARR_CHUNK.BULK_PLAIN, rep_pln+1, plain_keys ];
+	} else if ( c_plain === max ) {
+		return [ ARR_CHUNK.BULK_PLAIN, c_plain+1, last_keys ];
 
-	// [4] Finally, repeated primitives
+	// [4] Finally, bulked, unoptimised primitives
 	} else {
-		return [ ARR_CHUNK.PRIMITIVES, rep_val+1, null ];
+		return [ ARR_CHUNK.PRIMITIVES, c_unoptimised, null ];
 
 	}
 
@@ -1740,6 +1902,8 @@ function encodeArray( encoder, data ) {
 			chunkType = chunk[0], chunkSize = chunk[1], chunkSubType = chunk[2];
 
 		// Handle chunk data
+		console.log(">> ofs="+i+", len="+chunkSize+", type="+chunkType+"]");
+		console.log(">", data.slice(i, i+chunkSize));
 		switch (chunkType) {
 			case ARR_CHUNK.REPEAT:
 
