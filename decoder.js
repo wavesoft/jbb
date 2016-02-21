@@ -504,7 +504,7 @@ function decodeChunkedArray( bundle, database, length ) {
 				// console.log("<< CHU[primitives] x"+flen+" @", bundle.i8);
 
 				// Update debug
-				DEBUG && chunks_meta.push({ 'len':flen, 'type':'primtives' });
+				DEBUG && chunks_meta.push({ 'len':flen, 'type':'primitives' });
 
 				// Update size
 				size += flen;
@@ -598,7 +598,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Return raw array
 		return DEBUG
-			? __debugMeta( bundle.readTypedArray[ typ ]( l ), 'array.raw', { } )
+			? __debugMeta( bundle.readTypedArray[ typ ]( l ), 'array.raw', { 'type': typ } )
 			: bundle.readTypedArray[ typ ]( l );
 
 	} else if ((op & 0x70) === 0x50) { // Repeated
@@ -710,7 +710,7 @@ function decodePrimitive( bundle, database ) {
 	} else if ((op & 0xFF) === 0xFF) { // Extended
 		throw {
 			'name' 		: 'AssertError',
-			'message'	: 'Encountered RESERVED primtive operator!',
+			'message'	: 'Encountered RESERVED primitive operator!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		}
 
