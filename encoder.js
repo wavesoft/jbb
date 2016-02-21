@@ -1030,7 +1030,7 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
 			return [ DELTASCALE.S_001, NUMTYPE.INT16 ];
 		}
 
-		console.log("-- delta="+max_delta+": ???");
+		// console.log("-- delta="+max_delta+": ???");
 
 	} else {
 
@@ -1198,8 +1198,8 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 	// Check if we can apply delta encoding with better type than the current
 	var delta = analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize );
-	console.log( "-- delta=["+min_delta+"~"+max_delta+"], values=["+min+"~"+max+"], is_float="+is_float+
-				 ", delta=", delta, ", originalType=", originalType, ", type=", type );
+	// console.log( "-- delta=["+min_delta+"~"+max_delta+"], values=["+min+"~"+max+"], is_float="+is_float+
+				 // ", delta=", delta, ", originalType=", originalType, ", type=", type );
 	if ((delta !== undefined) && ( sizeOfType(delta[1]) < sizeOfType(Math.min(originalType, type)) )) {
 
 		// Find a matching delta encoding type
@@ -1431,8 +1431,8 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 		  TEST_PRIMITIVE = 2;
 
 	var v, v_type, numtype, test_mode, break_candidate,	// Temporary variables
-		keys, is_positive, new_keys, old_keys, is_numeric,
-		have_optimised_items = false,					// Counter of overall optimised items
+		keys, is_positive, new_keys, old_keys, is_numeric, some_overlap,
+		have_optimised_items = false,
 		c_same = 0, c_numeric = 0, c_plain = 0,			// Counters of individually optimisied items
 		c_unoptimised = 0,
 		last_test_mode, last_value, last_numtype,		// Last state variables
@@ -1500,7 +1500,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 			// but now we have at least 2 consecutive optimisable items,
 			// just break and let next call do the optimisation.
 			if (type_oscilating) {
-				console.log(">> "+("Breaking due to type oscilating").yellow);
+				// console.log(">> "+("Breaking due to type oscilating").yellow);
 				break;
 			}
 
@@ -1517,7 +1517,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 						if (!isFloatMixing(last_numtype, numtype)) {
 							// Allow type upscale
 							if (isNumericSubclass(last_numtype, min_num, max_num, numtype)) {
-								console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
+								// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
 								last_numtype = numtype;
 							}
 							// Accept only numeric subclasses
@@ -1525,11 +1525,11 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 								c_numeric++;
 								have_optimised_items = true;
 								break_candidate = false;
-							} else {
-								console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
+							// } else {
+								// console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
 							}
-						} else {
-							console.log(">> " + "Mixing floats".red);
+						// } else {
+							// console.log(">> " + "Mixing floats".red);
 						}
 
 					}
@@ -1545,7 +1545,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 
 						// Calculate key differences
 						keys = Object.keys( v ).sort();
-						new_keys = 0; 
+						new_keys = 0; some_overlap = false;
 						old_keys = last_keys.length;
 						for (var ja=0, jb=0, jl=last_keys.length; (ja<jl) && (jb<jl) ;) {
 							if (keys[ja] < last_keys[jb]) {
@@ -1557,11 +1557,12 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 							} else {
 								ja++;
 								jb++;
+								some_overlap = true;
 							}
 						}
 
 						// Allow up to 25% extension of the key set
-						if ((new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
+						if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
 							c_plain++;
 							have_optimised_items = true;
 							break_candidate = false;
@@ -1572,13 +1573,23 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 
 				case TEST_PRIMITIVE:
 					if (last_value === v) {
-						c_same++;
-						have_optimised_items = true;
-						break_candidate = false;
+
+						// If we have oscillating primitive values but sudently we have
+						// a stable, continuous stream, roll back the last optimised value
+						// and exit
+						if (c_unoptimised) {
+							c_unoptimised--;
+						} else {
+							c_same++;
+							have_optimised_items = true;
+							break_candidate = false;
+						}
+
 					} else {
 
 						// This is a break candidate only if there were no
 						// optimised items collected so far.
+						// console.log(">",last_value,"!=",v);
 						if (!have_optimised_items) {
 							c_unoptimised++;
 							break_candidate = false;
@@ -1590,7 +1601,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 
 			// If we couldn't optimise anything, break
 			if (break_candidate) {
-				console.log(">> "+("Breaking due to a break candidate").yellow);
+				// console.log(">> "+("Breaking due to a break candidate").yellow);
 				break;
 			}
 
@@ -1604,7 +1615,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 				type_oscilating = true;
 			} else {
 				// Otherwise break
-				console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
+				// console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
 				break;
 			}
 		}
@@ -1626,7 +1637,7 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 	}
 
 	// Find maximum for best fit
-	console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
+	// console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
 	var max = Math.max( c_same, c_numeric, c_plain, c_unoptimised );
 
 	// [0] Nothing found? That's a single primitive
@@ -1813,7 +1824,7 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 
 	// Encode array
 	var eid = encoder.getSignatureID( properties );
-	encoder.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.toString()+", eid="+eid );
+	console.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.toString()+", eid="+eid );
 	encoder.stream16.write( pack2b( eid, false ) );
 
 	// Write bulked properties
@@ -1902,8 +1913,8 @@ function encodeArray( encoder, data ) {
 			chunkType = chunk[0], chunkSize = chunk[1], chunkSubType = chunk[2];
 
 		// Handle chunk data
-		console.log(">> ofs="+i+", len="+chunkSize+", type="+chunkType+"]");
-		console.log(">", data.slice(i, i+chunkSize));
+		// console.log(">> ofs="+i+", len="+chunkSize+", type="+chunkType+"]");
+		// console.log(">", data.slice(i, i+chunkSize));
 		switch (chunkType) {
 			case ARR_CHUNK.REPEAT:
 

@@ -94,7 +94,7 @@ describe('[Core Tests]', function() {
 			assert.equal( u32[2], 8,			'64-bit table size');
 			assert.equal( u32[3], 8,			'32-bit table size');
 			assert.equal( u32[4], 14,			'16-bit table size');
-			assert.equal( u32[5], 53,			'8-bit table size');
+			assert.equal( u32[5], 55,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -356,7 +356,7 @@ describe('[Core Tests]', function() {
 		);
 		// console.log(values);
 		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', 
-			[function(meta) { console.log(meta.meta.chunks); }, match_chunkTypes([
+			[/*function(meta) { console.log(meta.meta.chunks); },*/ match_chunkTypes([
 				'numeric',		// 100 numeric items
 				'primitives',	// 'Break'
 				'numeric',		// 100 numeric items
@@ -378,16 +378,16 @@ describe('[Core Tests]', function() {
 			matchTypes = matchTypes.concat(repTypes);
 		}
 		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]', 
-			[function(meta) { console.log(meta.meta.chunks); }, match_chunkTypes(matchTypes)] );
+			[/*function(meta) { console.log(meta.meta.chunks); },*/ match_chunkTypes(matchTypes)] );
 
 		// Create multi-chunked array
 		values = [].concat(
-			gen_array_rep( 'Array', 5/*100*/, false ),
-			gen_array_rep( 'Array', 5/*50*/, true ),
-			gen_array_rep( 'Array', 5/*5*/, undefined ),
-			gen_array_rep( 'Array', 5/*128*/, {'object':'with_a_simple','structure':4} ),
-			gen_array_rep( 'Array', 5/*255*/, {'limit_of_objects':255} ),
-			gen_array_rep( 'Array', 5/*1024*/, {'too_many':123,'objects':4123} )
+			gen_array_rep( 'Array', 100, false ),
+			gen_array_rep( 'Array', 50, true ),
+			gen_array_rep( 'Array', 5, undefined ),
+			gen_array_rep( 'Array', 128, {'object':'with_a_simple','structure':4} ),
+			gen_array_rep( 'Array', 255, {'limit_of_objects':255} ),
+			gen_array_rep( 'Array', 1024, {'too_many':123,'objects':4123} )
 		);
 		it_should_return( values, '[ 100 x false, 50 x true, 5 x undefined, 128 x [Object#1], 255 x [Object#2], 1024 x [Object#3] ]',
 			[ match_metaType('array.chunked') ] );
@@ -395,16 +395,16 @@ describe('[Core Tests]', function() {
 		// Check limits of repeated values
 		values = [].concat(
 			[ 'chunk_prefix' ],
-			gen_array_rep( 'Array', 10/*255*/, 'same' ),
+			gen_array_rep( 'Array', 255, 'same' ),
 			[ false ]
 		);
-		it_should_return( values, 'Repeated Chunk [ 255 x \'same\' ]', [match_metaType('array.chunked')] );
+		it_should_return( values, 'Repeated Chunk [ \'chunk_prefix\', 255 x \'same\', false ]', [match_metaType('array.chunked')] );
 		values = [].concat(
 			[ 'chunk_prefix' ],
-			gen_array_rep( 'Array', 10/*32767*/, 'same' ),
+			gen_array_rep( 'Array', 32767, 'same' ),
 			[ false ]
 		);
-		it_should_return( values, 'Repeated Chunk [ 32,767 x \'same\' ]', [match_metaType('array.chunked')] );
+		it_should_return( values, 'Repeated Chunk [ \'chunk_prefix\', 32,767 x \'same\', false ]', [match_metaType('array.chunked')] );
 		// values = [].concat(
 		// 	[ 'chunk_prefix' ],
 		// 	gen_array_rep( 'Array', 65535, 'same' ),
@@ -414,7 +414,7 @@ describe('[Core Tests]', function() {
 
 		// Create bulk array
 		var bulkrep = [];
-		for (var i=0; i<10/*65535*/; i++)
+		for (var i=0; i<65535; i++)
 			bulkrep.push({
 				'value': Math.floor(Math.random() * 255),
 				'same': 4,

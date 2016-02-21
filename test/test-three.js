@@ -162,7 +162,7 @@ describe('[THREE.js Profile Tests]', function() {
 		var config = {
 			ignoreKeys: [ 'uuid' ],
 			ignoreClasses: [ ],
-			numericTollerance: 0.00001
+			numericTollerance: 0.0001
 		};
 
 		// Explicit deep equal comparison
@@ -178,9 +178,20 @@ describe('[THREE.js Profile Tests]', function() {
 
 	}));
 
-	// describe('md2.jbbsrc', describe_clojure( 'md2', function( original, encoded ) {
-	// 	// console.log( Object.keys(original) );
-	// 	// assert.deepEqual( original['animated/flamingo'], encoded['animated/flamingo'] )
-	// }));
+	describe('md2.jbbsrc', describe_clojure( 'md2', function( original, encoded ) {
+
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: [ 'uuid', 'parent' ],
+			ignoreClasses: [ ],
+			numericTollerance: 0.0001
+		};
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['md2/ratamahatta'], 
+								   encoded['md2/ratamahatta'], 
+								   'in md2/ratamahatta', config );
+
+	}));
 
 });

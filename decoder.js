@@ -167,7 +167,7 @@ var PRIM_SIMPLE = [ undefined, null, false, true ],
  */
 function __debugMeta( object, type, meta ) {
 	// Dont' re-define meta
-	if (object.__meta === undefined) {
+	if ((object !== undefined) && (object.__meta === undefined)) {
 		if (typeof object == 'object')
 			Object.defineProperty(
 				object, "__meta", {
