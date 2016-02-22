@@ -1,0 +1,8 @@
+{
+	"name": "vrml",
+	"exports": {
+		"THREE.VRMLLoader": {
+			"house": "house.wrl"
+		}
+	}
+}
