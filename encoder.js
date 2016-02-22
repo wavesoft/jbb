@@ -1223,7 +1223,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 
 	// Check for downscaling
 	if (originalType != type) {
-		if (type < originalType) {
+		if (isNumericSubclass(type, min, max, originalType)) {
 
 			// Find a matching downscale type
 			var dws_type = downscaleType( originalType, type );
@@ -1536,8 +1536,10 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 					break;
 
 				case TEST_PLAIN:
-					// if (deepEqual( v, last_value )) {
-					if ( v === last_value ) {
+					if ( encoder.optimize.cfwa_object_byval 
+							? deepEqual( v, last_value )
+							: (v === last_value) 
+						) {
 						c_same++;
 						have_optimised_items = true;
 						break_candidate = false;
@@ -1824,7 +1826,7 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 
 	// Encode array
 	var eid = encoder.getSignatureID( properties );
-	console.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.toString()+", eid="+eid );
+	encoder.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.toString()+", eid="+eid );
 	encoder.stream16.write( pack2b( eid, false ) );
 
 	// Write bulked properties
@@ -2503,6 +2505,11 @@ var BinaryEncoder = function( filename, config ) {
 		op_prm:  0, dat_hdr: 0,
 		ref_str: 0, op_iref: 0,
 		arr_hdr: 0, op_xref: 0,
+	};
+
+	// Optimisation flags
+	this.optimize = {
+		cfwa_object_byval: true,	// By-value de-duplication of objects
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8
