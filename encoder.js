@@ -115,7 +115,7 @@ var NUMTYPE = {
 	UINT32:  4, INT32:   5,
 	FLOAT32: 6, FLOAT64: 7,
 	// For internal use
-	UNKNOWN: 8, NAN: 9
+	NUMERIC: 8, UNKNOWN: 9, NAN: 10
 };
 
 /**
@@ -318,14 +318,18 @@ var OBJ_PRIM = {
  * Array Op-Codes
  */
 var ARR_OP = {
-	DELTA:		0x00,	// Delta-Encoded TypedArray
-	RAW:		0x40,	// RAW Typed Array
-	REPEATED:	0x50,	// Repeated TypedArray
-	DOWNSCALED:	0x60,	// Downscaled TypedArray
-	SHORT:		0x70,	// Short TypedArray (0-255)
-	PRIM_FLAG:	0x78,	// A flag when processing a primitive array
-	PRIMITIVE:	0x7C,	// Primitive Array
-	EMPTY:		0x7E,	// Empty Array
+	NUM_DWS:		 0x00, // Downscaled numerical TypedArray
+	NUM_DELTA_INT:	 0x20, // Delta-Encoded Integer TypedArray
+	NUM_REPEATED:	 0x40, // Repeated TypedArray
+	NUM_DELTA_FLOAT: 0x60, // Delta-Encoded Float TypedArray
+	NUM_RAW:		 0x50, // Daw TypedArray
+	NUM_SHORT:		 0x70, // Short TypedArray
+	PRIM_BULK_PLAIN: 0x78, // Bulk of plain objects
+	PRIM_BULK_KNOWN: 0x79, // Bulk of known objects
+	PRIM_CHUNK_END:  0x7B, // End of primary chunk
+	PRIM_SHORT:		 0x7C, // Short primitive Array that doesn't benefit from optimisation
+	PRIM_CHUNK:		 0x7D, // Chunked primitive Array
+	EMPTY:			 0x7E, // Empty Array
 };
 
 /**
@@ -388,6 +392,7 @@ var _NUMTYPE = [
 	'INT32',
 	'FLOAT32',
 	'FLOAT64',
+	'NUMERIC',
 	'UNKNOWN',
 	'NaN',
 ];
@@ -720,6 +725,13 @@ function __newObjectID() {
 	return '_'+(++__objectID);
 }
 
+function fds( v_min, v_max ) {
+
+	var d_min = Math.log10(v_min),
+		d_max = Math.log10(v_max);
+
+}
+
 /**
  * Get the scale factor for the specified float-based delta encoding
  * using the NUMTYPE_DOWNSCALE and DELTASCALE provided.
@@ -929,59 +941,216 @@ function getTypedArrayType( v ) {
 		return NUMTYPE.UINT32;
 	} else if (v instanceof Int32Array) {
 		return NUMTYPE.INT32;
-	} else  {
+	} else if (v instanceof Array) {
+
+		// Sneaky but fast way to check if array is 100% numeric
+		// by testing the first, last and middle elemnet
+
+		var a=0,b=v.length-1,c=Math.floor((b-a)/2);
+		if((typeof v[a] === "number") &&
+		   (typeof v[b] === "number") &&
+		   (typeof v[c] === "number")) {
+		   	return NUMTYPE.NUMERIC;
+		} else {
+			return NUMTYPE.UNKNOWN;
+		}
+
+	} else {
 		return NUMTYPE.UNKNOWN;
 	}
 }
 
 /**
- * Get the smallest possible numeric type fits this number
+ * Get the smallest possible numeric type fits this numberic bounds
  *
- * @param {number} - The number to test
+ * @param {number} vmin - The minimum number to check
+ * @param {number} vmax - The maximum number to check
+ * @param {boolean} is_float - Set to 'true' to assume that the numbers are float
  * @return {NUMTYPE} - The numerical type to rerutn
  */
-function getNumType( v ) {
-	if (typeof v != "number") return NUMTYPE.NAN;
-	if (isNaN(v)) return NUMTYPE.NAN;
+function getNumType( vmin, vmax, is_float ) {
+	if (typeof vmin !== "number") return NUMTYPE.NAN;
+	if (typeof vmax !== "number") return NUMTYPE.NAN;
+	if (isNaN(vmin) || isNaN(vmax)) return NUMTYPE.NAN;
 
-	if (v % 1 !== 0) {
-		// Check for Float32 or Float64
-		if (((v !== 0) && (Math.abs(v % 1) < FLOAT32_SMALL)) || 
-			 (v < FLOAT32_NEG) || (v > FLOAT32_POS)) {
-			return NUMTYPE.FLOAT64;
+	// If float, test only-floats
+	if (is_float) {
+
+		// Try to find smallest value for float32 minimum tests
+		var smallest;
+		if (vmin === 0) {
+			// vmin is 0, which makes vmax positive, so 
+			// test vmax for smallest
+			smallest = vmax;
+		} else if (vmax === 0) {
+			// if vmax is 0, it makes vmin negative, which
+			// means we should test it's positive version
+			smallest = -vmax;
 		} else {
+			// if vmin is positive, both values are positive
+			// so get the smallest for small test (vmin)
+			if (vmin > 0) {
+				smallest = vmin;
+
+			// if vmax is negative, both values are negative
+			// so get the biggest for small test (vmax)
+			} else if (vmax < 0) {
+				smallest = -vmax;
+
+			// if vmin is negative and vmax positive, get the
+			// smallest of their absolute values
+			} else if ((vmin < 0) && (vmax > 0)) {
+				smallest = -vmin;
+				if (vmax < smallest) smallest = vmax;
+			}
+		}
+
+		// Test if float number fits on 32 or 64 bits
+		if ((vmin > FLOAT32_NEG) && (vmax < FLOAT32_POS) && (smallest > FLOAT32_SMALL)) {
 			return NUMTYPE.FLOAT32;
-		}
-	} else {
-		// Check for signed or unsigned
-		if (v < 0) {
-			if (v > INT8_MIN) {
-				return NUMTYPE.INT8;
-			} else if (v > INT16_MIN) {
-				return NUMTYPE.INT16;
-			} else if (v > INT32_MIN) {
-				return NUMTYPE.INT32;
-			} else {
-				return NUMTYPE.FLOAT64;
-			}
 		} else {
-			if (v < INT8_MAX) {
-				return NUMTYPE.INT8;
-			} else if (v < UINT8_MAX) {
-				return NUMTYPE.UINT8;
-			} else if (v < INT16_MAX) {
-				return NUMTYPE.INT16;
-			} else if (v < UINT16_MAX) {
-				return NUMTYPE.UINT16;
-			} else if (v < INT32_MAX) {
-				return NUMTYPE.INT32;
-			} else if (v < UINT32_MAX) {
-				return NUMTYPE.UINT32;
-			} else {
-				return NUMTYPE.FLOAT64;
-			}
+			return NUMTYPE.FLOAT64;
 		}
+
 	}
+
+	// If we have a negative value, switch to signed tests
+	if ((vmax < 0) || (vmin < 0)) {
+
+		// Get absolute maximum of bound values
+		var amax = -vmin;
+		if (vmax < 0) {
+			if (-vmax > amax) amax = -vmax;
+		} else {
+			if (vmax > amax) amax = vmax;
+		}
+
+		// Test for integer bounds
+		if (amax < INT8_MAX) {
+			return NUMTYPE.INT8;
+
+		} else if (amax < INT16_MAX) {
+			return NUMTYPE.INT16;
+
+		} else if (amax < INT32_MAX) {
+			return NUMTYPE.INT32;
+
+		} else {
+			return NUMTYPE.FLOAT64;
+
+		}
+
+	// Otherwise perform unsigned tests
+	} else {
+
+		// Check for unsigned cases
+		if (vmax < UINT8_MAX) {
+			return NUMTYPE.UINT8;
+
+		} else if (vmax < UINT16_MAX) {
+			return NUMTYPE.UINT16;
+
+		} else if (vmax < UINT32_MAX) {
+			return NUMTYPE.UINT32;
+
+		} else {
+			return NUMTYPE.FLOAT64;
+
+		}
+
+	}
+
+}
+
+/**
+ * Analyze the specified numeric array and return analysis details
+ *
+ * @param {Array} v - The array to analyze
+ * @param {Boolean} include_delta - Set to true to include delta analysis
+ * @return {object} - Return an object with the analysis results
+ */
+function analyzeNumericArray( v, include_delta ) {
+	var min = v[0], max = min, is_int = false, is_float = false, is_same = true,
+		dmin=0, dmax=0, dl10min=0, dl10max=0, is_dfloat = false,
+		cd, cdl10, cv, lv;
+
+	// Anlyze array items		
+	for (var i=0, l=v.length; i<l; i++) {
+		cv = v[i];
+
+		// Exit on non-numeric cases
+		if (typeof cv !== 'number')
+			return null;
+
+		// Update bounds
+		if (cv < min) min = cv;
+		if (cv > max) max = cv;
+
+		// Update delta
+		if (include_delta && (i !== 0)) {
+			cd = lv - cv; if (cd < 0) cd = -cd;
+			cdl10 = Math.log10(cd);
+			if (i === 1) {
+				dmin = cd;
+				dmax = cd;
+				dl10min = cdl10;
+				dl10max = cdl10;
+			} else {
+				if (cd < dmin) dmin = cd;
+				if (cd > dmax) dmax = cd;
+				if (cdl10 < dl10min) dl10min = cdl10;
+				if (cdl10 > dl10max) dl10max = cdl10;
+			}
+
+			// Check if delta is float
+			if ((cd !== 0) && (cd % 1 !== 0))
+				is_dfloat = true;
+		}
+
+		// Check for same values
+		if (is_same && (cv !== lv))
+			is_same = false;
+
+		// Skip zeros from further analysis
+		if (cv === 0) continue;
+
+		// Update integer/float
+		if (cv % 1 !== 0) {
+			is_int = true;
+		} else {
+			is_float = true;
+		}
+
+		// Keep last value
+		lv = cv;
+	}
+
+	// Based on information detected so far, populate
+	// the analysis results
+	return {
+
+		// Get numeric type
+		'type'		: getNumType( min, max, is_float ),
+		'delta_type': include_delta ? getNumType( dmin, dmax, is_dfloat ) : NUMTYPE.UNKNOWN,
+
+		// Log numeric bounds
+		'min'		: min,
+		'max'		: max,
+
+		// Log delta bounds
+		'dmin'		: dmin,
+		'dmax' 		: dmax,
+		'log10_min' : dl10min,
+		'log10_max' : dl10max,
+
+		// Expose information details
+		'integer' 	: is_int && !is_float,
+		'float' 	: is_float && !is_int,
+		'mixed' 	: is_float && is_int,
+		'same'		: is_same,
+
+	};
+
 }
 
 /**
@@ -1070,6 +1239,7 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
  * @param {boolean} allowMixFloats - Allow mixing of floats and integers (not always good)
  * @param {boolean} precisionOverSize - Prefer precision over size
  */
+/*
 function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	var min = array[0], max = array[0], amin, amax, // Bounds
 		is_integer = false,	is_float = false, // Types
@@ -1249,6 +1419,7 @@ function analyzeNumArray( array, allowMixFloats, precisionOverSize ) {
 	return [ ARR_OP.RAW, type ];
 
 }
+*/
 
 /**
  * Encode an integer array with delta encoding
@@ -1348,16 +1519,7 @@ var FOR_NUMTYPE = 0,
 /**
  * Select an encoder according to bit size
  */
-function pickStream(encoder, t, encType) {
-
-	// If we have an encoded type, change type now
-	if (encType === FOR_DWS_TO) { // Downscale type
-		t = NUMTYPE_DOWNSCALE.TO_DWS[t];
-	} else if (encType === FOR_DELTA_TO) { // Delta type
-		t = NUMTYPE_DOWNSCALE.TO_DELTA[t];
-	} else if (encType === FOR_DELTA_FROM) { // From downscale
-		t = NUMTYPE_DOWNSCALE.FROM[t];
-	}
+function pickStream(encoder, t) {
 
 	// Handle type
 	switch (t) {
@@ -1380,6 +1542,7 @@ function pickStream(encoder, t, encType) {
 /**
  * Write a numerical array header + length
  */
+/*
 function encodeNumArrayHeader( encoder, array, op ) {
 	// Write header
 	if ((op & 0xF8) === ARR_OP.SHORT) { // 8-bit length prefix
@@ -1406,6 +1569,7 @@ function encodeNumArrayHeader( encoder, array, op ) {
 		};
 	}
 }
+*/
 
 /**
  * Isolate the next chunk of interest in a primitive array
@@ -1666,13 +1830,11 @@ function chunkForwardAnalysis( encoder, array, start, enableBulkDetection ) {
 
 }
 
-/**
- * Encode numeric-only array
- */
+/*
 function encodeNumArray( encoder, data ) {
 
 	// Run analysis on the numbers and return false if not numbers
-	var numAnalysis = analyzeNumArray( data, /* optimisation flags -> */ false, true );
+	var numAnalysis = analyzeNumArray( data, optimisation flags -> false, true );
 	if (numAnalysis === undefined)
 		return false;
 
@@ -1755,10 +1917,12 @@ function encodeNumArray( encoder, data ) {
 	return true;
 
 }
+*/
 
 /**
  * Encode a bulk of entities by weaving their properties
  */
+ /*
 function encodeBulkArray( encoder, entities, eid ) {
 	var PROPERTIES = encoder.objectTable.PROPERTIES[eid],
 		weaveArrays = [];
@@ -1789,33 +1953,12 @@ function encodeBulkArray( encoder, entities, eid ) {
 	// encodeArray( encoder, weaveArrays );
 
 }
+*/
 
 /**
  * Encode a bulk of plain objects with weaved properties
  */
-function encodePlainBulkArray_v1( encoder, entities, properties ) {
-
-	// Weave all properties
-	var props = [], pl = properties.length;
-	for (var i=0, il=entities.length; i<il; i++)
-		for (var j=0; j<pl; j++)
-			props.push( entities[i][properties[j]] );
-
-	// Write down the keys
-	encoder.stream8.write( pack1b( pl , false ) );
-	for (var i=0; i<pl; i++)
-		encoder.stream16.write( pack2b( encoder.stringID(properties[i]) ) );
-
-	// Encode array
-	encoder.log( LOG.BULK, "Bulk len="+entities.length+", signature="+properties.join("+") );
-	encodePrimitive( encoder, props );
-
-}
-
-
-/**
- * Encode a bulk of plain objects with weaved properties
- */
+/*
 function encodePlainBulkArray( encoder, entities, properties ) {
 
 	// Write down the keys
@@ -1848,10 +1991,12 @@ function encodePlainBulkArray( encoder, entities, properties ) {
 	// console.log(">>WEAVE>>", weaveArrays);
 	// encodeArray( encoder, weaveArrays );
 }
+*/
 
 /**
  * Encode array chunk header
  */
+/*
 function encodeArrayChunkHeader( encoder, op, length ) {
 	if (length < UINT8_MAX) {
 		encoder.stream8.write( pack1b( op | NUMTYPE_LEN.UINT8 ) );
@@ -1871,48 +2016,284 @@ function encodeArrayChunkHeader( encoder, op, length ) {
 		encoder.counters.arr_chu+=9;
 	}
 }
+*/
 
 /**
- * Encode the specified array
+ * Encode array data as downscaled
  */
-function encodeArray( encoder, data ) {
+function encodeArray_NUM_DWS( encoder, data, n_from, n_to ) {
 
-	// Check for empty array
-	if (data.length === 0) {
-		encoder.log(LOG.ARR, "empty");
-		encoder.stream8.write( pack1b( ARR_OP.EMPTY ) );
-		encoder.counters.op_prm+=1;
-		return;
+	//
+	// Downscaled Numeric Array (NUM_DWS)
+	//
+	// ...  ....       .   +   Data Length
+	// 000 [DWS_TYPE] [LN]    [16bit/32bit]
+	//
+
+	// Get downscale type
+	var n_dws_type = downscaleType( n_from, n_to );
+
+	if (array.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_DWS | NUMTYPE_LN.UINT16 | (n_dws_type << 1) ) );
+		encoder.stream16.write( pack2b( array.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_DWS | NUMTYPE_LN.UINT32 | (n_dws_type << 1) ) );
+		encoder.stream16.write( pack4b( array.length, false ) );
+		encoder.counters.arr_hdr+=5;
 	}
 
-	// Check for numerical array
-	if ((data instanceof Uint8Array) || (data instanceof Int8Array) ||
-		(data instanceof Uint16Array) || (data instanceof Int16Array) ||
-		(data instanceof Uint32Array) || (data instanceof Int32Array) ||
-		(data instanceof Float32Array) || (data instanceof Float64Array) ||
-		((data instanceof Array) && (data.every(function(v){ return typeof v === 'number'; }))) ) {
+	encoder.log(LOG.ARR, "NUM_DWS, len="+data.length+", from=");
 
-		// Encode numeric array
-		if (encodeNumArray(encoder, data))
-			return;
+	// Encode value
+	pickStream( encoder, n_to )
+		.write( packTypedArray( convertArray( data, n_to ) ) );
+
+}
+
+/**
+ * Encode array data as delta
+ */
+function encodeArray_NUM_DELTA_INT( encoder, data, n_from, n_to ) {
+
+	//
+	// Delta Numeric Array (NUM_DELTA_INT)
+	//
+	// ...  ....       .   +   Data Length
+	// 001 [DWS_TYPE] [LN]    [16bit/32bit]
+	//
+
+	// Get downscale type
+	var n_delta_type = deltaEncType( n_from, n_to );
+
+	if (array.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_DELTA | NUMTYPE_LN.UINT16 | (n_delta_type << 1) ) );
+		encoder.stream16.write( pack2b( array.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_DELTA | NUMTYPE_LN.UINT32 | (n_delta_type << 1) ) );
+		encoder.stream16.write( pack4b( array.length, false ) );
+		encoder.counters.arr_hdr+=5;
+	}
+
+	encoder.log(LOG.ARR, "NUM_DWS, len="+data.length+", from=");
+
+}
+
+/**
+ * Encode array data as delta
+ */
+function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to ) {
+
+	//
+	// Delta Numeric Array (NUM_DELTA_FLOAT)
+	//
+	// .... ...       .   +   Data Length
+	// 0110
+	//
+}
+
+/**
+ * Encode array data as repeated
+ */
+function encodeArray_NUM_REPEATED( encoder, data, n_type ) {
+
+	//
+	// Repeated Numeric Array (NUM_REPEATED)
+	//
+	// ....  ...    .   +   Data Length
+	// 0100 [TYPE] [LN]    [16bit/32bit]
+	//
+
+	if (array.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_REPEATED | NUMTYPE_LN.UINT16 | (n_type << 1) ) );
+		encoder.stream16.write( pack2b( array.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_REPEATED | NUMTYPE_LN.UINT32 | (n_type << 1) ) );
+		encoder.stream16.write( pack4b( array.length, false ) );
+		encoder.counters.arr_hdr+=5;
+	}
+
+	encoder.log(LOG.ARR, "NUM_REPEATED, len="+data.length);
+
+	// Encode only the number
+	var arr = new NUMTYPE_CLASS[ n_type ](1);
+	arr[0] = data[0];
+
+	// Encode value
+	pickStream( encoder, n_type )
+		.write( packTypedArray( arr ) );
+
+}
+
+/**
+ * Encode array data as raw
+ */
+function encodeArray_NUM_RAW( encoder, data, n_type ) {
+
+	//
+	// RAW Numeric Array (NUM_RAW)
+	//
+	// ....  ...    .   +   Data Length
+	// 0101 [TYPE] [LN]    [16bit/32bit]
+	//
+
+	if (array.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_RAW | NUMTYPE_LN.UINT16 | (n_type << 1) ) );
+		encoder.stream16.write( pack2b( array.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.NUM_RAW | NUMTYPE_LN.UINT32 | (n_type << 1) ) );
+		encoder.stream16.write( pack4b( array.length, false ) );
+		encoder.counters.arr_hdr+=5;
+	}
+
+	encoder.log(LOG.ARR, "NUM_RAW, len="+data.length);
+
+	// Encode the short array
+	pickStream( encoder, n_type )
+		.write( packTypedArray( convertArray( data, n_type ) ) );
+
+}
+
+/**
+ * Encode array data as short typed
+ */
+function encodeArray_NUM_SHORT( encoder, data, n_type ) {
+
+	//
+	// Short Numeric Array (NUM_SHORT)
+	//
+	// .....  ...
+	// 01110 [TYPE]
+	//
+
+	// Encode primitives one after the other
+	encoder.stream8.write( pack1b( ARR_OP.NUM_SHORT | n_type ) );
+	encoder.stream8.write( pack1b( data.length, false ) );
+	encoder.counters.arr_hdr+=2;
+
+	encoder.log(LOG.ARR, "NUM_SHORT, len="+data.length);
+
+	// Encode the short array
+	pickStream( encoder, n_type )
+		.write( packTypedArray( convertArray( data, n_type ) ) );
+
+}
+
+/**
+ * Encode array data as bulk of plain objects
+ */
+function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
+
+	//
+	// Bulk Array of Primitives (PRIM_BULK_PLAIN)
+	//
+	// ........ + Signature ID
+	// 01111000     [16-bit]
+	//
+
+	// Put opcode
+	encoder.stream8.write( pack1b( ARR_OP.PRIM_BULK_PLAIN ) );
+
+	// Encode array
+	var eid = encoder.getSignatureID( properties );
+	encoder.log( LOG.BULK, "PRIM_BULK_PLAIN len="+data.length+", signature="+properties.toString()+", eid="+eid );
+	encoder.stream16.write( pack2b( eid, false ) );
+	encoder.counters.arr_hdr+=3;
+
+	// Write bulked properties
+	// var weaveArrays = [];
+	for (var i=0, pl=properties.length; i<pl; i++) {
+
+		// Read property of all entries
+		var prop = [], p = properties[i];
+		for (var j=0, el=data.length; j<el; j++) {
+			prop.push( data[j][p] );
+			// weaveArrays.push( data[j][p] );
+		}
+
+		// Align values of same property for optimal encoding
+		encodeArray( encoder, prop );
 
 	}
 
-	// If not numeric, process array in chunks of up to 255 items
-	// that share a characteristic
-	encoder.log(LOG.ARR, "primitive, len="+data.length+", [");
+}
+
+/**
+ * Encode array data as bulk of known objects
+ */
+function encodeArray_PRIM_BULK_KNOWN( encoder, data ) {
+
+	//
+	// Bulk Array for Known Object (PRIM_BULK_KNOWN)
+	//
+	// ........
+	// 01111001
+	//
+
+}
+
+/**
+ * Encode array data as a short array of primitives
+ */
+function encodeArray_PRIM_SHORT( encoder, data ) {
+
+	//
+	// Short Primitive Array (PRIM_SHORT)
+	//
+	// ........
+	// 01111100
+	//
+
+	// Encode primitives one after the other
+	encoder.stream8.write( pack1b( ARR_OP.PRIM_SHORT ) );
+	encoder.stream8.write( pack1b( data.length, false ) );
+	encoder.counters.arr_hdr+=2;
+
+	// Open log group
+	encoder.log(LOG.ARR, "PRIM_SHORT, len="+data.length+", [");
 	encoder.logIndent(1);
 
-	// Write header & array
-	encodeNumArrayHeader( encoder, data, ARR_OP.PRIMITIVE );
+	// Encode each primitive individually
+	for (var i=0, llen=data.length; i<llen; i++) {
+		encodePrimitive( encoder, data[i] );
+	}
+
+	// Close log group
+	encoder.logIndent(-1);
+	encoder.log(LOG.ARR, "]");
+
+}
+
+/**
+ * Encode array data as one or more chunks of other types
+ */
+function encodeArray_PRIM_CHUNK( encoder, data ) {
+
+	//
+	// Chunked Primitive Array (PRIM_CHUNK)
+	//
+	// ........
+	// 01111101
+	//
+
+	var chunk, chunkType, chunkSize, chunkSubType;
+
+	// Write chunk header
+	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
+
+	encoder.log(LOG.ARR, "PRIM_CHUNK, len="+data.length+", [");
+	encoder.logIndent(1);
 
 	// Write chunks with forward analysis
 	// console.log("CFWA->", data);
 	for (var i=0, llen=data.length; i<llen;) {
 
 		// Forward chunk analysis
-		var chunk = chunkForwardAnalysis( encoder, data, i, true ),
-			chunkType = chunk[0], chunkSize = chunk[1], chunkSubType = chunk[2];
+		chunk = chunkForwardAnalysis( encoder, data, i, true );
+		chunkType = chunk[0]; chunkSize = chunk[1]; chunkSubType = chunk[2];
 
 		// Handle chunk data
 		// console.log(">> ofs="+i+", len="+chunkSize+", type="+chunkType+"]");
@@ -1920,49 +2301,53 @@ function encodeArray( encoder, data ) {
 		switch (chunkType) {
 			case ARR_CHUNK.REPEAT:
 
-				// Write header
-				encoder.log(LOG.CHU, "repeated x"+chunkSize);
-				encodeArrayChunkHeader( encoder, ARR_CHUNK.REPEAT, chunkSize );
+				// // Write header
+				// encoder.log(LOG.CHU, "chunk[repeated] x"+chunkSize);
+				// encodeArrayChunkHeader( encoder, ARR_CHUNK.REPEAT, chunkSize );
 
-				// Write the repeated primitive
-				encodePrimitive( encoder, data[i] );
+				// // Write the repeated primitive
+				// encodePrimitive( encoder, data[i] );
 				break;
 
 			case ARR_CHUNK.PRIMITIVES:
 
-				// Write the actual primitive
-				encoder.log(LOG.CHU, "primitive x"+chunkSize);
-				encodeArrayChunkHeader( encoder, ARR_CHUNK.PRIMITIVES, chunkSize );
+				// // Write the actual primitive
+				// encoder.log(LOG.CHU, "chunk[primitive] x"+chunkSize);
+				// encodeArrayChunkHeader( encoder, ARR_CHUNK.PRIMITIVES, chunkSize );
 
-				// Encode the primitives in sequence
-				for (var j=i; j<i+chunkSize; j++) encodePrimitive( encoder, data[j] );
+				// // Encode the primitives in sequence
+				// for (var j=i; j<i+chunkSize; j++) encodePrimitive( encoder, data[j] );
 				break;
 
 			case ARR_CHUNK.BULK_PLAIN:
 
-				// Write header
-				encoder.log(LOG.CHU, "bulk x"+chunkSize+", signature="+chunkSubType.join("+"));
-				encodeArrayChunkHeader( encoder, ARR_CHUNK.BULK_PLAIN, chunkSize );
+				// // Write header
+				// encoder.log(LOG.CHU, "chunk[bulk] x"+chunkSize+", signature="+chunkSubType.join("+"));
+				// encodeArrayChunkHeader( encoder, ARR_CHUNK.BULK_PLAIN, chunkSize );
 
-				// Encode plain bulk array
-				encodePlainBulkArray( encoder, data.slice(i, i+chunkSize), chunkSubType );
+				// // Encode plain bulk array
+				// encodePlainBulkArray( encoder, data.slice(i, i+chunkSize), chunkSubType );
 				break;
 
 			case ARR_CHUNK.NUMERIC:
 
-				// Write header
-				encoder.log(LOG.CHU, "numeric x"+chunkSize);
-				encoder.stream8.write( pack1b( ARR_CHUNK.NUMERIC ) );
-				encoder.counters.arr_chu+=1;
+				// // Write header
+				// encoder.log(LOG.CHU, "chunk[numeric] x"+chunkSize);
+				// encodeArrayChunkHeader( encoder, ARR_CHUNK.NUMERIC, chunkSize );
+				// encoder.counters.arr_chu+=1;
 
-				// Write the numeric array
-				if (!encodeNumArray(encoder, data.slice(i, i+chunkSize))) {
-					throw {
-						'name' 		: 'AssertError',
-						'message'	: 'Forward analysis reported numeric chunk but numeric encoding failed! Data: '+util.inspect(data.slice(i, i+chunkSize)),
-						toString 	: function(){return this.name + ": " + this.message;}
-					}
-				}
+				// // Analyze array part
+				// part = data.slice(i, i+chunkSize);
+				// na = analyzeNumericArray( part, true );
+
+				// // Write the numeric array
+				// if (!encodeNumArray(encoder, part, na.type, na )); {
+				// 	throw {
+				// 		'name' 		: 'AssertError',
+				// 		'message'	: 'Forward analysis reported numeric chunk but numeric encoding failed! Data: '+util.inspect(data.slice(i, i+chunkSize)),
+				// 		toString 	: function(){return this.name + ": " + this.message;}
+				// 	}
+				// }
 
 				break;
 
@@ -1976,6 +2361,136 @@ function encodeArray( encoder, data ) {
 
 	encoder.logIndent(-1);
 	encoder.log(LOG.ARR, "]");
+
+	// Write chunk ending
+	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK_END ) );
+
+}
+
+/**
+ * Encode array data as an empty array
+ */
+function encodeArray_EMPTY( encoder ) {
+
+	//
+	// Empty Array (EMPTY)
+	//
+	// ........
+	// 01111110
+	//
+
+	encoder.log(LOG.ARR, "empty");
+	encoder.stream8.write( pack1b( ARR_OP.EMPTY ) );
+	encoder.counters.op_prm+=1;
+
+}
+
+/**
+ * Encode an array that is already classified as numeric
+ */
+function encodeArray_Numeric( encoder, data, n_type ) {
+	var na, skip = false;
+
+	// Separate small array case
+	if (data.length < 256) {
+
+		// If the numeric type is unknown, try to find actual type
+		if (n_type === NUMTYPE.NUMERIC) {
+
+			// Perform fast numeric analysis (skip delta)
+			na = analyzeNumericArray( data, false );
+
+			// Check if this is not a numeric array (getTypedArrayType can fail
+			// in Array cases since it's optimised for speed, not accuracy)
+			if (na === null) {
+				skip = true;
+			} else {
+				n_type = na.type;
+			}
+
+		}
+
+		// Encode small numeric array
+		if (!skip) {
+			encodeArray_NUM_SHORT( encoder, data, n_type );
+		}
+
+	} else {
+
+		// Perform full numeric type analysis and encode numeric array
+		na = analyzeNumericArray( data, true );
+
+		// Check if this is not a numeric array (getTypedArrayType can fail
+		// in Array cases since it's optimised for speed, not accuracy)
+		if (na !== null) {
+
+			// If all values are the same, encode using same numeric encoding
+			if (na.same) {
+				encodeArray_NUM_REPEATED( encoder, data, n_type );
+				return;
+			}
+
+			// Get sizes of different encoding approaches
+			var b_raw = sizeOfType( n_type ),
+				b_dws = sizeOfType( na.type ),
+				b_delta = sizeOfType( na.delta_type ),
+				b_min = Math.min(b_raw, b_dws, b_delta);
+
+			// Pick best, according to speed preference
+			if (b_min === b_raw) {
+				// Encode raw
+				encodeArray_NUM_RAW( encoder, data, n_type );
+			} else if (b_min === b_dws) {
+				// Encode downscaled
+				encodeArray_NUM_DWS( encoder, data, n_type, na.type );
+			} else if (b_min === b_delta) {
+				// Encode delta
+				encodeArray_NUM_DELTA( encoder, data, n_type, na.delta_type );
+			}
+
+		}
+
+	}
+
+}
+
+/**
+ * Encode an array that is already classified as primitive
+ */
+function encodeArray_Primitive( encoder, data ) {
+
+	// Check for small primitive array
+	if (data.ength < 256) {
+		encodeArray_PRIM_SHORT( encoder, data );
+		return;
+	}
+
+	// If not numeric, process array in chunks that share some characteristic,
+	// that being same value, same type or same just bulk values.
+	encodeArray_PRIM_CHUNK( encoder, data );
+
+}
+
+/**
+ * Encode the specified array
+ */
+function encodeArray( encoder, data ) {
+	
+	// Check for empty array
+	if (data.length === 0) {
+		encodeArray_EMPTY( encoder );
+		return;
+	}
+
+	// Get typed array typed
+	var tt = getTypedArrayType(data);
+
+	// Check for numerical array
+	if ( tt <= NUMTYPE.NUMERIC ) {
+		encodeArray_Numeric( encoder, data, tt );
+	} else {
+		encodeArray_Primitive( encoder, data );
+	}
 
 }
 
