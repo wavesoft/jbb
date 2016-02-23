@@ -281,11 +281,11 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 	// Load all items in parallel
 	for (var i=0; i<items.length; i++) {
 		var item = items[i],
-			loader = item[0], key = item[1],
+			loaderClass = item[0], key = item[1],
 			loaderConfig = applyFullPath( this.bundleURL, item[2] );
 
 		// If this is a binary blob, don't go through the profile compiler
-		if (loader.toLowerCase() == "blob") {
+		if (loaderClass.toLowerCase() == "blob") {
 
 			// Check if we have mime details
 			var file = null, mime = null;
@@ -316,21 +316,26 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 
 		} else {
 
-			// Use profile loader to load this
-			this.bundles.profileLoader.load( loaderConfig, key, loader,
-				function(err, objects) {
-					// Collect resources
-					for (var k in objects) {
+			// Try all loaded profile loaders until something works ount
+			var loaders = this.bundles.profileLoaders, loaded = false;
+			for (var i=0, l<loaders.length; i<l; i++) {
 
-						// Expose resources
-						self.resources[k] = objects[k];
-						self.bundles.database[self.name+'/'+k] = objects[k];
+				// Try this bundle loader to load the specified resources
+				loaded = loaders[i].load( loaderClass, loaderConfig, key,
+					function(err, objects) {
+						// Collect resources
+						for (var k in objects) {
 
+							// Expose resources
+							self.resources[k] = objects[k];
+							self.bundles.database[self.name+'/'+k] = objects[k];
+
+						}
+						// Decrement counter
+						setTimeout(load_callback, 1);
 					}
-					// Decrement counter
-					setTimeout(load_callback, 1);
-				}
-			);
+				);
+			}
 
 		}
 
@@ -417,7 +422,7 @@ var BundlesLoader = function( profileLoader, baseURL ) {
 	/**
 	 * Keep profile loader reference
 	 */
-	this.profileLoader = profileLoader;
+	this.profileLoaders = [];
 
 	/**
 	 * Load callbacks
@@ -435,6 +440,16 @@ var BundlesLoader = function( profileLoader, baseURL ) {
 	this.bundleSuffix = ".jbbsrc";
 
 };
+
+/**
+ * Include a loader profile
+ */
+BundlesLoader.prototype.addProfileLoader = function( profileLoader ) {
+
+	// Include this profile loader on stack
+	this.profileLoaders.push( profileLoader );
+
+}
 
 /**
  * Put a bundle in the queue, by it's name
