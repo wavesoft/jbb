@@ -55,8 +55,18 @@ var NUMTYPE_DOWNSCALE = {
 		NUMTYPE.INT32,
 		NUMTYPE.UINT32,
 		NUMTYPE.INT32,
+
 		NUMTYPE.FLOAT32,
 		NUMTYPE.FLOAT32,
+		NUMTYPE.FLOAT32,
+		NUMTYPE.FLOAT32,
+
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
 	],
 	// Destination conversion type (for downscaling)
 	TO_DWS: [
@@ -66,8 +76,18 @@ var NUMTYPE_DOWNSCALE = {
 		NUMTYPE.INT8,
 		NUMTYPE.UINT16,
 		NUMTYPE.INT16,
+
+		NUMTYPE.UINT8,
 		NUMTYPE.INT8,
+		NUMTYPE.UINT16,
 		NUMTYPE.INT16,
+
+		NUMTYPE.UINT8,
+		NUMTYPE.UINT16,
+		NUMTYPE.INT16,
+		NUMTYPE.UINT32,
+		NUMTYPE.INT32,
+		NUMTYPE.FLOAT32
 	],
 	// Destination conversion type (for delta encoding)
 	TO_DELTA: [
@@ -77,8 +97,18 @@ var NUMTYPE_DOWNSCALE = {
 		NUMTYPE.INT8,
 		NUMTYPE.INT16,
 		NUMTYPE.INT16,
+
+		NUMTYPE.INT8,
 		NUMTYPE.INT8,
 		NUMTYPE.INT16,
+		NUMTYPE.INT16,
+
+		NUMTYPE.INT8,
+		NUMTYPE.INT16,
+		NUMTYPE.INT16,
+		NUMTYPE.INT32,
+		NUMTYPE.INT32,
+		NUMTYPE.FLOAT32
 	]
 };
 
@@ -368,8 +398,8 @@ function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
  */
 function decodeDeltaArrayInt( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ]( len ),
-		v = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ],
-		values = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[ num_type ] ]( len );
+		v = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ](),
+		values = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[ num_type ] ]( len - 1 );
 
 	// Decode array
 	ans[0] = v;
@@ -664,10 +694,10 @@ function decodeArray( bundle, database, op ) {
 
 		// Return
 		return DEBUG
-			? __debugMeta( nArr, 'array.numeric.downscaled', { 'typ': type } )
+			? __debugMeta( nArr, 'array.numeric.downscaled', { 'type': type } )
 			: nArr;
 
-	} else if ((op & 0xE0) === 0x20) { // NUM_DELTA
+	} else if ((op & 0xE0) === 0x20) { // NUM_DELTA_INT
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x0F;
@@ -682,17 +712,18 @@ function decodeArray( bundle, database, op ) {
 		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
 
-		// Create repeated array
+		// Repeat value
 		vArr = bundle.readTypedNum[ type ]();
-		for (i=0; i<len; i++)
-			nArr.push( vArr );
+		nArr = new NUMTYPE_CLASS[ type ]( len );
+		nArr.fill(vArr);
+		// for (i=0; i<len; i++) nArr[i]=vArr;
 
 		// Return
 		return DEBUG
-			? __debugMeta( nArr, 'array.numeric.repeated', { 'typ': type } )
+			? __debugMeta( nArr, 'array.numeric.repeated', { 'type': type } )
 			: nArr;
 
-	} else if ((op & 0xE0) === 0x50) { // NUM_RAW
+	} else if ((op & 0xF0) === 0x50) { // NUM_RAW
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
@@ -703,7 +734,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Return
 		return DEBUG
-			? __debugMeta( nArr, 'array.numeric.typed', { 'typ': type } )
+			? __debugMeta( nArr, 'array.numeric.raw', { 'type': type } )
 			: nArr;
 
 	} else if ((op & 0xF8) === 0x60) { // NUM_SHORT
@@ -716,7 +747,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Return
 		return DEBUG
-			? __debugMeta( nArr, 'array.numeric.short', { 'typ': type } )
+			? __debugMeta( nArr, 'array.numeric.short', { 'type': type } )
 			: nArr;
 
 	} else if ((op & 0xFE) === 0x68) { // PRIM_REPEATED
@@ -724,14 +755,15 @@ function decodeArray( bundle, database, op ) {
 		ln = op & 0x01;
 		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
 
-		// Create repeated array
+		// Repeat value
 		vArr = decodePrimitive( bundle, database );
-		for (i=0; i<len; i++)
-			nArr.push( vArr );
+		nArr = new Array( len );
+		nArr.fill(vArr);
+		// for (i=0; i<len; i++) nArr[i]=vArr;
 
 		// Return
 		return DEBUG
-			? __debugMeta( nArr, 'array.primitive.repeated', { 'typ': type } )
+			? __debugMeta( nArr, 'array.primitive.repeated', { 'type': type } )
 			: nArr;
 
 
@@ -813,7 +845,7 @@ function decodeArray( bundle, database, op ) {
 			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ]( vArr );
 
 		return DEBUG
-			? __debugMeta( nArr, 'array.downscaled', { 'typ': typ } )
+			? __debugMeta( nArr, 'array.downscaled', { 'type': typ } )
 			: nArr;
 
 	} else if ((op & 0x78) === 0x70) { // Short

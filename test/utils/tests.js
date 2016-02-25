@@ -89,7 +89,7 @@ function match_metaType( matchType ) {
  */
 function match_chunkTypes( chunkTypes ) {
 	return function(meta) {
-		assert.equal( meta.type, 'array.chunked', 'array must be chunked' );
+		assert.equal( meta.type, 'array.primitive.chunked', 'array must be chunked' );
 		assert.equal( meta.meta.chunks.length, chunkTypes.length, 'expected chunk count differ' );
 		for (var i=0; i<meta.meta.chunks.length; i++) {
 			assert.equal( meta.meta.chunks[i].type, chunkTypes[i], 'mismatch chunk #'+i+' type' );
@@ -102,7 +102,7 @@ function match_chunkTypes( chunkTypes ) {
  */
 function match_rawArrayType( matchType ) {
 	return function(meta) {
-		assert.equal( meta.type, 'array.raw', 'array must be raw' );
+		assert.equal( meta.type, 'array.numeric.raw', 'array must be raw' );
 		assert.equal( meta.meta.type, matchType, 'array types do not match' );
 	}
 }
@@ -143,16 +143,16 @@ function it_should_return(primitive, repr, metaMatchFn) {
 		var ans = encode_decode( primitive, SimpleOT );
 		if (typeof primitive == 'number') {
 			if (isNaN(ans) && isNaN(primitive)) return;
-			assert.equal( primitive, ans );
+			assert.equal( primitive, ans, 'encoded and decoded numbers to not match' );
 		} else if (typeof primitive == 'object') {
-			assert.deepEqual( primitive, ans );
+			assert.deepEqual( primitive, ans, 'encoded and decoded objects to not match' );
 			if (metaMatchFn) {
 				if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
 				for (var i=0; i<metaMatchFn.length; i++)
 					metaMatchFn[i]( ans.__meta );
 			}
 		} else {
-			assert.equal( primitive, ans );
+			assert.equal( primitive, ans, 'encoded and decoded primitives to not match' );
 		}
 	});
 }

@@ -92,9 +92,9 @@ describe('[Core Tests]', function() {
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
-			assert.equal( u32[3], 8,			'32-bit table size');
-			assert.equal( u32[4], 14,			'16-bit table size');
-			assert.equal( u32[5], 55,			'8-bit table size');
+			assert.equal( u32[3], 4,			'32-bit table size');
+			assert.equal( u32[4], 20,			'16-bit table size');
+			assert.equal( u32[5], 56,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -241,13 +241,13 @@ describe('[Core Tests]', function() {
 		it_should_return_array_seq('Float64Array',256,4123.123,0, [match_metaType('array.numeric.repeated')]);		// = 8bit
 
 		// Repeated tricky and simple primitives
-		it_should_return_array_rep('Array', 255, undefined, [match_chunkTypes(['repeat'])]);
-		it_should_return_array_rep('Array', 255, false, [match_chunkTypes(['repeat'])]);
-		it_should_return_array_rep('Array', 255, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
+		it_should_return_array_rep('Array', 255, undefined, [match_metaType('array.primitive.repeated')]);
+		it_should_return_array_rep('Array', 255, false, [match_metaType('array.primitive.repeated')]);
+		it_should_return_array_rep('Array', 255, {'simple':'object'}, [match_metaType('array.primitive.repeated')]);
 
 		// Test bigger indices in a single chunk
-		it_should_return_array_rep('Array', 1024, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
-		it_should_return_array_rep('Array', 65536, {'simple':'object'}, [match_chunkTypes(['repeat'])]);
+		it_should_return_array_rep('Array', 1024, {'simple':'object'}, [match_metaType('array.primitive.repeated')]);
+		it_should_return_array_rep('Array', 65536, {'simple':'object'}, [match_metaType('array.primitive.repeated')]);
 
 	});
 
@@ -256,7 +256,7 @@ describe('[Core Tests]', function() {
 		//// Integer delta-encoding ////
 
 		// UINT8	-> No delta-encoding
-		it_should_return_array_seq('Uint8Array', 256,	256,	1,	 [match_metaType('array.raw')]);
+		it_should_return_array_seq('Uint8Array', 256,	256,	1,	 [match_metaType('array.numeric.raw')]);
 
 		// UINT16	-> INT8
 		it_should_return_array_seq('Uint16Array',256,	256,	1,	 [match_metaType('array.delta.int')]);
@@ -295,32 +295,32 @@ describe('[Core Tests]', function() {
 		//// Integer downscaling ////
 
 		// UINT16	-> UINT8
-		it_should_return_array_rand('Uint16Array',1024,	0,	255,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Uint16Array',1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 		// INT16	-> INT8
-		it_should_return_array_rand('Int16Array', 1024,	-127, 127,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Int16Array', 1024,	-127, 127,		[match_metaType('array.numeric.downscaled')]);
 
 		// INT16	-> UINT8 (Shout opt-out from downscaling)
-		it_should_return_array_rand('Int16Array', 1024,	0,	255,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Int16Array', 1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 
 		// UINT32	-> UINT8
-		it_should_return_array_rand('Uint32Array',1024,	0,	255,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Uint32Array',1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 		// INT32	-> INT8
-		it_should_return_array_rand('Int32Array', 1024,	-127, 127,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Int32Array', 1024,	-127, 127,		[match_metaType('array.numeric.downscaled')]);
 
 		// INT32	-> UINT8 (Should opt-out from downscaling)
-		it_should_return_array_rand('Int32Array', 1024,	0,	255,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Int32Array', 1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 
 		// UINT32	-> UINT16
-		it_should_return_array_rand('Uint32Array',1024,	0,	65535,		[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Uint32Array',1024,	0,	65535,		[match_metaType('array.numeric.downscaled')]);
 		// INT32	-> INT16
-		it_should_return_array_rand('Int32Array',1024,	-32768, 32768,	[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Int32Array',1024,	-32768, 32768,	[match_metaType('array.numeric.downscaled')]);
 
 		//// Float downscaling ////
 
 		// FLOAT32	-> INT8
-		it_should_return_array_rand('Float32Array',1024,	0,	127,	[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Float32Array',1024,	0,	127,	[match_metaType('array.numeric.downscaled')]);
 		// FLOAT32	-> INT16
-		it_should_return_array_rand('Float32Array',1024,	0,	32768,	[match_metaType('array.downscaled')]);
+		it_should_return_array_rand('Float32Array',1024,	0,	32768,	[match_metaType('array.numeric.downscaled')]);
 
 	});
 
