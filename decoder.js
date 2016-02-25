@@ -168,7 +168,7 @@ var PRIM_SIMPLE = [ undefined, null, false, true ],
 function __debugMeta( object, type, meta ) {
 	// Dont' re-define meta
 	if ((object !== undefined) && (object.__meta === undefined)) {
-		if (typeof object == 'object')
+		if (typeof object === 'object')
 			Object.defineProperty(
 				object, "__meta", {
 					enumerable: false,
@@ -366,14 +366,19 @@ function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
 /**
  * Decode delta-encoded float array
  */
-function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
-	var ans = new array_class( values.length + 1 ),
-		v = value_0;
+function decodeDeltaArrayInt( bundle, database, len, num_type ) {
+	var ans = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ]( len ),
+		v = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ],
+		values = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[ num_type ] ]( len );
+
+	// Decode array
 	ans[0] = v;
 	for (var i=0, llen=values.length; i<llen; i++) {
 		v += values[i];
 		ans[i+1] = v;
 	}
+
+	// Return
 	return DEBUG
 		? __debugMeta( ans, 'array.delta.int', {} )
 		: ans;
@@ -382,7 +387,7 @@ function decodeDeltaArrayInt( bundle, value_0, values, array_class ) {
 /**
  * Decode plain bulk array
  */
-function decodePlainBulkArray( bundle, database, len ) {
+function decodePlainBulkArray( bundle, database ) {
 
 	// // Read plain object keys and create object
 	// // factory class for faster parsing
@@ -420,12 +425,12 @@ function decodePlainBulkArray( bundle, database, len ) {
 
 	// Create objects
 	var ans = [];
-	for (var i=0; i<len; i++)
+	for (var i=0, len=values[0].length; i<len; i++)
 		ans.push( objectFactory(values, i) );
 		// ans.push( objectFactory(values, values.length / properties.length, i) );
 
 	return DEBUG
-		? __debugMeta( ans, 'array.plainbulk', { 'sid': sid } )
+		? __debugMeta( ans, 'array.primitive.bulk_plain', { 'sid': sid } )
 		: ans;
 	
 }
@@ -470,6 +475,7 @@ function decodeBulkArray( bundle, database, len ) {
 /**
  * Decode chunked array
  */
+/*
 function decodeChunkedArray( bundle, database, length ) {
 	var i=0, ans = [], size=0, flag=10, flen=0, prim=null,
 		chunks_meta = [], op, op_sz;
@@ -563,11 +569,198 @@ function decodeChunkedArray( bundle, database, length ) {
 		? __debugMeta( ans, 'array.chunked', { 'chunks': chunks_meta } )
 		: ans;
 }
+*/
+
+/**
+ * Read an array from the bundle
+ */
+function decodeChunkedArray( bundle, database ) {
+	var op = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+		ans =[], chunk, chunk_op = [];
+
+	// Process chunks till PRIM_CHUNK_END
+	while (op !== 0x7F) {
+
+		// Collect chunk ops
+		chunk_op.push( op );
+		chunk = decodeArray( bundle, database, op );
+
+		// Test for non-arrays
+		if (chunk.length === undefined)
+			throw {
+				'name' 		: 'AssertError',
+				'message'	: 'Encountered non-array chunk as part of chunked array!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			};
+
+		// Merge
+		ans = ans.concat( Array.prototype.slice.call(chunk) );
+
+		// Get next op-code
+		op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+	}
+
+	// Return chunked array
+	return DEBUG
+		? __debugMeta( ans, 'array.primitive.chunked', { 'chunks': chunk_op } )
+		: ans;
+}
 
 /**
  * Read an array from the bundle
  */
 function decodeArray( bundle, database, op ) {
+	var i, type, ln, len, vArr, nArr = [];
+
+	if (op === 0x6C) { // PRIM_BULK_PLAIN
+
+		// Decode and return plain bulk array
+		return decodePlainBulkArray( bundle, database );
+
+	} else if (op === 0x6D) { // PRIM_BULK_KNOWN
+
+		// NOT USED
+
+	} else if (op === 0x6E) { // PRIM_SHORT
+
+		// Collect up to 255 primitives
+		len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		for (i=0; i<len; i++)
+			nArr.push( decodePrimitive( bundle, database ) );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.primitive.short', {} )
+			: nArr;
+
+	} else if (op === 0x6F) { // PRIM_CHUNK
+
+		// Return chunked array
+		return decodeChunkedArray( bundle, database );
+
+	} else if (op === 0x7E) { // EMPTY
+
+		// Return empty array
+		return DEBUG
+			? __debugMeta( [], 'array.empty', {} )
+			: [];
+
+	} else if (op === 0x7F) { // PRIM_CHUNK_END
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Encountered PRIM_CHUNK_END outside of chunked array!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+
+	} else if ((op & 0xE0) === 0x00) { // NUM_DWS
+
+		ln = op & 0x01;
+		type = (op >> 1) & 0x0F;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Read from and encode to
+		vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DWS[type] ]( len );
+		nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.numeric.downscaled', { 'typ': type } )
+			: nArr;
+
+	} else if ((op & 0xE0) === 0x20) { // NUM_DELTA
+
+		ln = op & 0x01;
+		type = (op >> 1) & 0x0F;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Return delta-encoded array
+		return decodeDeltaArrayInt( bundle, database, len, type );
+
+	} else if ((op & 0xF0) === 0x40) { // NUM_REPEATED
+
+		ln = op & 0x01;
+		type = (op >> 1) & 0x07;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Create repeated array
+		vArr = bundle.readTypedNum[ type ]();
+		for (i=0; i<len; i++)
+			nArr.push( vArr );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.numeric.repeated', { 'typ': type } )
+			: nArr;
+
+	} else if ((op & 0xE0) === 0x50) { // NUM_RAW
+
+		ln = op & 0x01;
+		type = (op >> 1) & 0x07;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Read raw array
+		nArr = bundle.readTypedArray[ type ]( len );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.numeric.typed', { 'typ': type } )
+			: nArr;
+
+	} else if ((op & 0xF8) === 0x60) { // NUM_SHORT
+
+		type = op & 0x07;
+		len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+
+		// Read raw array
+		nArr = bundle.readTypedArray[ type ]( len );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.numeric.short', { 'typ': type } )
+			: nArr;
+
+	} else if ((op & 0xFE) === 0x68) { // PRIM_REPEATED
+
+		ln = op & 0x01;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Create repeated array
+		vArr = decodePrimitive( bundle, database );
+		for (i=0; i<len; i++)
+			nArr.push( vArr );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.primitive.repeated', { 'typ': type } )
+			: nArr;
+
+
+	} else if ((op & 0xFE) === 0x6A) { // PRIM_RAW
+
+		ln = op & 0x01;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Compile primitives
+		for (i=0; i<len; i++)
+			nArr.push( decodePrimitive( bundle, database ) );
+
+		// Return
+		return DEBUG
+			? __debugMeta( nArr, 'array.primitive.raw', {} )
+			: nArr;
+
+	} else {
+		throw {
+			'name' 		: 'AssertError',
+			'message'	: 'Unknown array op-code #'+op+'!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
+
+	}
+
+
+
+	/*	
 	var ln3 = (((op & 0x8) >> 3) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32, 
 		ln0 = ((op & 0x1) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32,
 		scl = (op & 0x30) >> 4,
@@ -661,6 +854,7 @@ function decodeArray( bundle, database, op ) {
 		}
 
 	}
+	*/
 }
 
 /**

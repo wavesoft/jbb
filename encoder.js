@@ -37,7 +37,7 @@ const FLOAT32_POS 	= 3.40282347e+38; // largest positive number in float32
 const FLOAT32_NEG 	= -3.40282347e+38; // largest negative number in float32
 const FLOAT32_SMALL = 1.175494351e-38; // smallest number in float32
 
-/* Note that all these values are exclusive (ex v < UING8_MAX) */
+/* Note that all these values are exclusive, for positive test (ex v < UING8_MAX) */
 
 const UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
 const UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
@@ -1080,7 +1080,7 @@ function getNumType( vmin, vmax, is_float ) {
  *
  */
 function getFloatScale( dmin, dmax, fmin, fmax, error ) {
-	var scale, sv, usv;
+	var scale, sv, usv, delta;
 
 	// Calculate delta in decimals
 	delta = dmax - dmin;
@@ -1207,7 +1207,7 @@ function analyzeNumericArray( v, include_costly ) {
 
 		// Get numeric type
 		'type'		: getNumType( min, max, is_float ),
-		'float_type': (include_costly && is_float) ? getFloatScale( fl10min, fl10max, fmin, fmax, 0.01 ) : [0, NUMTYPE.UNKNOWN],
+		'float_type': (include_costly && is_float) ? getFloatScale( fl10min, fl10max, min, max, 0.01 ) : [0, NUMTYPE.UNKNOWN],
 		'delta_type': include_costly ? getNumType( dmin, dmax, is_dfloat ) : NUMTYPE.UNKNOWN,
 
 		// Log numeric bounds
@@ -1566,8 +1566,8 @@ function analyzeDeltaBounds( min_delta, max_delta, is_float, precisionOverSize )
  *
  * @return {array} - An array with the initial value and the delta-encoded payload
  */
-function deltaEncodeIntegers( array, arrayClass ) {
-	var delta = new arrayClass( array.length - 1 ), l = array[0];
+function deltaEncodeIntegers( array, numType ) {
+	var delta = new NUMTYPE_CLASS[numType]( array.length - 1 ), l = array[0];
 	for (var i=1; i<array.length; i++) {
 		var v = array[i]; delta[i-1] = v - l; l = v;
 	}
@@ -1739,6 +1739,9 @@ function encodeArray_NUM_DELTA( encoder, data, n_from, n_to ) {
 	encoder.log(LOG.ARR, "array.numeric.delta, len="+data.length+
 		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
 		", type="+_NUMTYPE_DOWNSCALE_DELTA[n_dws_type]);
+
+	// Delta-encode integers
+	deltaEncodeIntegers( encoder, n_to );
 
 }
 
@@ -1963,7 +1966,7 @@ function encodeArray_PRIM_REPEATED( encoder, data ) {
 function encodeArray_PRIM_RAW( encoder, data ) {
 
 	//
-	// Chunked Primitive Array (PRIM_RAW)
+	// Raw Primitive Array (PRIM_RAW)
 	//
 	// .......  .   + Signature ID
 	// 0110101 [LN]     [16-bit]
@@ -1980,7 +1983,6 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 	}
 
 	// Write chunk header
-	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
 	encoder.log(LOG.ARR, "array.prim.raw, len="+data.length+
 		", peek="+data[0]+" [");
 	encoder.logIndent(1);
@@ -2016,14 +2018,14 @@ function encodeArray_PRIM_CHUNK( encoder, data, first_chunk ) {
 	encoder.logIndent(1);
 
 	// Write first chunk
-	encodeArray_Chunk( encoder, data, first_chunk );
+	encodeArray_Chunk( encoder, data.slice(0, first_chunk[0]), first_chunk );
 
 	// Write chunks with forward analysis
 	for (var i=first_chunk[1], llen=data.length; i<llen;) {
 		// Forward chunk analysis
 		chunk = chunkForwardAnalysis( encoder, data, i );
 		// Encode Chunk
-		encodeArray_Chunk( encoder, data, chunk );
+		encodeArray_Chunk( encoder, data.slice(i,i+chunk[1]), chunk );
 		// Next chunk
 		i += chunk[1];
 	}
@@ -2111,7 +2113,7 @@ function encodeArray_Chunk( encoder, data, chunk ) {
  * Encode an array that is already classified as numeric
  */
 function encodeArray_Numeric( encoder, data, n_type ) {
-	var na, skip = false;
+	var na, skip = false, v, lv, same = true;
 
 	// Separate small array case
 	if (data.length < 256) {
@@ -2130,11 +2132,33 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				n_type = na.type;
 			}
 
+			// Check for same
+			same = na.same;
+
+		} else {
+
+			// Test for same
+			lv = data[0];
+			for (var i=1, len=data.length; i<len; i++) {
+				v = data[i];
+				if (v !== lv) {
+					same = false;
+					break;
+				}
+				lv = v;
+			}
+
 		}
 
 		// Encode small numeric array
 		if (!skip) {
-			encodeArray_NUM_SHORT( encoder, data, n_type );
+			if (same) {
+				// If all values are the same, prefer repeated instead of short
+				encodeArray_NUM_REPEATED( encoder, data, n_type );
+			} else {
+				encodeArray_NUM_SHORT( encoder, data, n_type );
+			}
+			return;
 		}
 
 	} else {
@@ -2145,6 +2169,11 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 		// Check if this is not a numeric array (getTypedArrayType can fail
 		// in Array cases since it's optimised for speed, not accuracy)
 		if (na !== null) {
+
+			// Define unspecified type
+			if (n_type === NUMTYPE.NUMERIC) {
+				n_type = na.type;
+			}
 
 			// If all values are the same, encode using same numeric encoding
 			if (na.same) {
@@ -2560,7 +2589,7 @@ function encodePrimitive( encoder, data ) {
 		} else {
 
 			// Get type
-			var numType = getNumType( data );
+			var numType = getNumType( data, data, (data % 1) !== 0 );
 			if (numType > NUMTYPE.FLOAT64) {
 				throw {
 					'name' 		: 'AssertError',
@@ -2568,6 +2597,15 @@ function encodePrimitive( encoder, data ) {
 					toString 	: function(){return this.name + ": " + this.message;}
 				}
 			}
+
+			// Write header
+			encoder.log(LOG.PRM, "number, type="+_NUMTYPE[numType]+", n="+data);
+			encoder.stream8.write( pack1b( PRIM_OP.NUMBER | numType ) );
+			encoder.counters.op_prm+=1;
+
+			// Write data
+			pickStream( encoder, numType )
+				.write( packByNumType[numType]( data ) );
 
 		}
 
