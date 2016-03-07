@@ -19,7 +19,6 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var util 	= require('util');
 var assert 	= require('assert');
 var path 	= require('path');
 var temp 	= require('temp');
@@ -70,17 +69,19 @@ JBBProfileThreeLoader.initialize();
  */
 function describe_clojure( bundleName, testFn ) {
 	return function() {
-		var srcDB, binDB, tmpFile;
+		var srcDB, binDB, tmpFile, sourceLoadingTime, binaryLoadingTime;
 
 		it('should properly load the source bundle', function( done ) {
 
 			/* Load the source bundle */
 			var unmute = mute();
 			var sourceLoader = new JBBSourceLoader( JBBProfileThreeLoader, mediaDir );
+			sourceLoadingTime = Date.now();
 			sourceLoader.add( bundleName );
 			sourceLoader.load(function( err ) {
 				unmute();
 				assert.ok( err == null, err );
+				sourceLoadingTime = Date.now() - sourceLoadingTime;
 
 				/* Keep the database for the next test */
 				srcDB = sourceLoader.database;
@@ -122,10 +123,12 @@ function describe_clojure( bundleName, testFn ) {
 			/* Load the source bundle */
 			// var unmute = mute();
 			var binaryLoader = new JBBBinaryLoader( JBBProfileThree, path.dirname(tmpFile) );
+			binaryLoadingTime = Date.now();
 			binaryLoader.addByBuffer( common.readChunk(tmpFile) );
 			binaryLoader.load(function( err ) {
 				// unmute();
 				assert.ok( err == null, err );
+				binaryLoadingTime = Date.now() - binaryLoadingTime;
 
 				/* Delete bundle */
 				fs.unlink( tmpFile );
@@ -144,6 +147,11 @@ function describe_clojure( bundleName, testFn ) {
 			testFn( srcDB, binDB );
 			done();
 
+		});
+		it('should be loaded faster than the source bundle', function(done) {
+			var percent = 100 * (binaryLoadingTime - sourceLoadingTime) / sourceLoadingTime;
+			assert.ok( binaryLoadingTime < sourceLoadingTime, 'binary bundle loaded slower (' + percent.toFixed(2) + ' %)' );
+			done();
 		});
 
 	};
@@ -178,13 +186,29 @@ describe('[THREE.js Profile Tests]', function() {
 
 	}));
 
+	describe('vrml.jbbsrc', describe_clojure( 'vrml', function( original, encoded ) {
+
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: [ 'uuid', 'parent' ],
+			ignoreClasses: [ ],
+			numericTollerance: 0.001
+		};
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['vrml/house'], 
+								   encoded['vrml/house'], 
+								   'in vrml/house', config );
+
+	}));
+
 	describe('md2.jbbsrc', describe_clojure( 'md2', function( original, encoded ) {
 
 		// Configuration for explicit deep equal
 		var config = {
 			ignoreKeys: [ 'uuid', 'parent' ],
 			ignoreClasses: [ ],
-			numericTollerance: 0.0001
+			numericTollerance: 0.001
 		};
 
 		// Explicit deep equal comparison

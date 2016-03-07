@@ -92,7 +92,12 @@ function match_chunkTypes( chunkTypes ) {
 		assert.equal( meta.type, 'array.primitive.chunked', 'array must be chunked' );
 		assert.equal( meta.meta.chunks.length, chunkTypes.length, 'expected chunk count differ' );
 		for (var i=0; i<meta.meta.chunks.length; i++) {
-			assert.equal( meta.meta.chunks[i].type, chunkTypes[i], 'mismatch chunk #'+i+' type' );
+			assert.equal(
+				meta.meta.chunks[i].type & chunkTypes[i][1],
+				chunkTypes[i][0], 
+				'mismatch chunk #'+i+' type: '+chunkTypes[i][0]+' (expected), '
+				+(meta.meta.chunks[i].type & chunkTypes[i][1])+' (actual)'
+			);
 		}
 	}
 }
@@ -117,7 +122,7 @@ function match_rawArrayType( matchType ) {
 function it_should_match(a, b, repr) {
 	var text = repr || util.inspect(a,{'depth':0});
 	it('should match `'+text+'`, as encoded', function () {
-		assert.deepEqual( a, b );
+		assert.deepEqual( a, b, "encoded and decoded values to not match" );
 	});
 }
 
@@ -168,7 +173,7 @@ function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) 
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans );
+		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
 			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
@@ -188,7 +193,7 @@ function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) 
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans );
+		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
 			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
@@ -208,7 +213,7 @@ function it_should_return_array_rep( typeName, length, value, metaMatchFn ) {
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans );
+		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
 			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)

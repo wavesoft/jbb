@@ -25,10 +25,14 @@ var BinaryBundle = require("./lib/BinaryBundle");
 if (typeof PROD === 'undefined') var PROD = false;
 if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
 
+/* Size constants */
+const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+
 /**
  * Bundle loading states
  */
-var PBUND_REQUESTED = 0,
+const PBUND_REQUESTED = 0,
 	PBUND_LOADED = 1,
 	PBUND_PARSED = 2,
 	PBUND_ERROR = 3;
@@ -36,7 +40,7 @@ var PBUND_REQUESTED = 0,
 /**
  * Numerical types
  */
-var NUMTYPE = {
+const NUMTYPE = {
 	UINT8: 	 0, INT8:    1,
 	UINT16:  2, INT16:   3,
 	UINT32:  4, INT32:   5,
@@ -46,15 +50,15 @@ var NUMTYPE = {
 /**
  * Downscaling numtype conversion table
  */
-var NUMTYPE_DOWNSCALE = {
+const NUMTYPE_DOWNSCALE = {
 	// Source conversion type (actual)
 	FROM: [
 		NUMTYPE.UINT16,
-		NUMTYPE.INT16,
+		NUMTYPE.INT16 ,
 		NUMTYPE.UINT32,
-		NUMTYPE.INT32,
+		NUMTYPE.INT32 ,
 		NUMTYPE.UINT32,
-		NUMTYPE.INT32,
+		NUMTYPE.INT32 ,
 
 		NUMTYPE.FLOAT32,
 		NUMTYPE.FLOAT32,
@@ -65,57 +69,76 @@ var NUMTYPE_DOWNSCALE = {
 		NUMTYPE.FLOAT64,
 		NUMTYPE.FLOAT64,
 		NUMTYPE.FLOAT64,
-		NUMTYPE.FLOAT64,
+
 		NUMTYPE.FLOAT64,
 	],
 	// Destination conversion type (for downscaling)
-	TO_DWS: [
-		NUMTYPE.UINT8,
-		NUMTYPE.INT8,
-		NUMTYPE.UINT8,
-		NUMTYPE.INT8,
-		NUMTYPE.UINT16,
-		NUMTYPE.INT16,
+	TO: [
+		NUMTYPE.UINT8  ,
+		NUMTYPE.INT8   ,
+		NUMTYPE.UINT8  ,
+		NUMTYPE.INT8   ,
+		NUMTYPE.UINT16 ,
+		NUMTYPE.INT16  ,
 
-		NUMTYPE.UINT8,
-		NUMTYPE.INT8,
-		NUMTYPE.UINT16,
-		NUMTYPE.INT16,
+		NUMTYPE.UINT8  ,
+		NUMTYPE.INT8   ,
+		NUMTYPE.UINT16 ,
+		NUMTYPE.INT16  ,
 
-		NUMTYPE.UINT8,
-		NUMTYPE.UINT16,
-		NUMTYPE.INT16,
-		NUMTYPE.UINT32,
-		NUMTYPE.INT32,
+		NUMTYPE.UINT8  ,
+		NUMTYPE.INT8   ,
+		NUMTYPE.UINT16 ,
+		NUMTYPE.INT16  ,
+
 		NUMTYPE.FLOAT32
 	],
-	// Destination conversion type (for delta encoding)
-	TO_DELTA: [
-		NUMTYPE.INT8,
-		NUMTYPE.INT8,
-		NUMTYPE.INT8,
-		NUMTYPE.INT8,
-		NUMTYPE.INT16,
-		NUMTYPE.INT16,
+};
 
-		NUMTYPE.INT8,
-		NUMTYPE.INT8,
+/**
+ * Delta-Encoding for integers
+ */
+const NUMTYPE_DELTA_INT = {
+	FROM: [
+		NUMTYPE.UINT16,
+		NUMTYPE.INT16 ,
+		NUMTYPE.UINT32,
+		NUMTYPE.INT32 ,
+		NUMTYPE.UINT32,
+		NUMTYPE.INT32 ,
+	],
+	TO: [
+		NUMTYPE.INT8 ,
+		NUMTYPE.INT8 ,
+		NUMTYPE.INT8 ,
+		NUMTYPE.INT8 ,
 		NUMTYPE.INT16,
 		NUMTYPE.INT16,
+	]
+};
 
-		NUMTYPE.INT8,
+/**
+ * Delta-Encoding for floats
+ */
+const NUMTYPE_DELTA_FLOAT = {
+	FROM: [
+		NUMTYPE.FLOAT32,
+		NUMTYPE.FLOAT32,
+		NUMTYPE.FLOAT64,
+		NUMTYPE.FLOAT64,
+	],
+	TO: [
+		NUMTYPE.INT8 ,
 		NUMTYPE.INT16,
+		NUMTYPE.INT8 ,
 		NUMTYPE.INT16,
-		NUMTYPE.INT32,
-		NUMTYPE.INT32,
-		NUMTYPE.FLOAT32
 	]
 };
 
 /**
  * Numerical type classes
  */
-var NUMTYPE_CLASS = [
+const NUMTYPE_CLASS = [
 	Uint8Array,
 	Int8Array,
 	Uint16Array,
@@ -127,37 +150,9 @@ var NUMTYPE_CLASS = [
 ];
 
 /**
- * Numerical downscale classes
- */
-var NUMTYPE_DOWNSCALE_DWS_CLASS = [
-	Uint8Array,
-	Int8Array,
-	Uint8Array,
-	Int8Array,
-	Uint16Array,
-	Int16Array,
-	Int8Array,
-	Int16Array
-];
-
-/**
- * Numerical delta encoded classes
- */
-var NUMTYPE_DOWNSCALE_DELTA_CLASS = [
-	Int8Array,
-	Int8Array,
-	Int8Array,
-	Int8Array,
-	Int16Array,
-	Int16Array,
-	Int8Array,
-	Int16Array
-];
-
-/**
  * Lookup table of numerical type for NL (1-but) length fields
  */
-var LN_NUMTYPE = [
+const LN_NUMTYPE = [
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32
 ];
@@ -165,7 +160,7 @@ var LN_NUMTYPE = [
 /**
  * Lookup table of numerical type for LEN (2-but) length fields
  */
-var LEN_NUMTYPE = [
+const LEN_NUMTYPE = [
 	NUMTYPE.UINT8,
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32,
@@ -175,7 +170,7 @@ var LEN_NUMTYPE = [
 /**
  * Delta encoding scale factor
  */
-var DELTASCALE = {
+const DELTASCALE = {
 	S_001 : 1, 	// Divide by 100 the value
 	S_1	  : 2, 	// Keep value as-is
 	S_R   : 3, 	// Multiply by 127 on 8-bit and by 32768 on 16-bit
@@ -185,7 +180,7 @@ var DELTASCALE = {
 /**
  * Simple primitive translation
  */
-var PRIM_SIMPLE = [ undefined, null, false, true ],
+const PRIM_SIMPLE = [ undefined, null, false, true ],
 	PRIM_SIMPLE_EX = [ NaN, /* Reserved */ ];
 
 //////////////////////////////////////////////////////////////////
@@ -378,16 +373,23 @@ function decodeObject( bundle, database, op ) {
 }
 
 /**
- * Decode delta-encoded float array
+ * Decode pivot-encoded float array
  */
-function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
-	var ans = new Float32Array( values.length + 1 ),
-		v = value_0;
-	ans[0] = v;
-	for (var i=0, llen=values.length; i<llen; i++) {
-		v += values[i] / scale;
-		ans[i+1] = v;
+function decodePivotArrayFloat( bundle, database, len, num_type ) {
+	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
+		num_type_to = NUMTYPE_DELTA_FLOAT.TO[ num_type ],
+		pivot = bundle.readTypedNum[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ](),
+		scale = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
+		values = bundle.readTypedArray[ num_type_to ]( len );
+
+	// console.log(">> DELTA_FLOAT len=",len,"type=",num_type,"scale=",scale,"pivot=",pivot);
+
+	// Decode
+	for (var i=0; i<len; i++) {
+		ans[i] = pivot + (values[i] * scale);
+		// console.log("<<<", values[i],"->", ans[i]);
 	}
+
 	return DEBUG
 		? __debugMeta( ans, 'array.delta.float', {} )
 		: ans;
@@ -397,9 +399,9 @@ function decodeDeltaArrayFloat( bundle, value_0, values, scale ) {
  * Decode delta-encoded float array
  */
 function decodeDeltaArrayInt( bundle, database, len, num_type ) {
-	var ans = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ]( len ),
-		v = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[ num_type ] ](),
-		values = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[ num_type ] ]( len - 1 );
+	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_INT.FROM[ num_type ] ]( len ),
+		v = bundle.readTypedNum[ NUMTYPE_DELTA_INT.FROM[ num_type ] ](),
+		values = bundle.readTypedArray[ NUMTYPE_DELTA_INT.TO[ num_type ] ]( len - 1 );
 
 	// Decode array
 	ans[0] = v;
@@ -418,16 +420,6 @@ function decodeDeltaArrayInt( bundle, database, len, num_type ) {
  * Decode plain bulk array
  */
 function decodePlainBulkArray( bundle, database ) {
-
-	// // Read plain object keys and create object
-	// // factory class for faster parsing
-	// var numKeys = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-	// 	keys = [], factoryFn = "return {";
-	// for (var i=0; i<numKeys; i++) {
-	// 	var k = bundle.readStringLT(); keys.push( k );
-	// 	factoryFn += "'"+k+"': props["+i+"][i],";
-	// }
-	// factoryFn += "}";
 
 	// Get signature ID
 	var sid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
@@ -503,117 +495,21 @@ function decodeBulkArray( bundle, database, len ) {
 }
 
 /**
- * Decode chunked array
- */
-/*
-function decodeChunkedArray( bundle, database, length ) {
-	var i=0, ans = [], size=0, flag=10, flen=0, prim=null,
-		chunks_meta = [], op, op_sz;
-
-	// Collect chunks
-	while (size<length) {
-		// Get the chunk operator
-		op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
-		op_sz = op & 0x03;
-		switch (op & 0xFC) {
-			case 0x10: // REPEAT
-
-				// Get size and primitive
-				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
-				prim = decodePrimitive( bundle, database );
-				// console.log("<< CHU[repeat] x"+flen+" @", bundle.i8);
-
-				// Update debug
-				DEBUG && chunks_meta.push({ 'len':flen, 'type':'repeat', 'value': prim });
-
-				// Repeat and update size
-				for (var i=0; i<flen; i++) ans.push(prim);
-				size += flen;
-				break;
-
-			case 0x20: // PRIMITIVES
-
-				// Read primitives
-				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
-				for (var i=0; i<flen; i++)
-					ans.push( decodePrimitive( bundle, database ) );
-				// console.log("<< CHU[primitives] x"+flen+" @", bundle.i8);
-
-				// Update debug
-				DEBUG && chunks_meta.push({ 'len':flen, 'type':'primitives' });
-
-				// Update size
-				size += flen;
-				break;
-
-			case 0x30: // NUMERIC
-
-				// Decode numeric array and merge
-				prim = decodePrimitive( bundle, database );
-				ans = ans.concat( Array.prototype.slice.call(prim) );
-				// console.log("<< CHU[numeric] x"+prim.length+" @", bundle.i8);
-				size += prim.length;
-
-				// Update debug
-				DEBUG && chunks_meta.push({ 'len':prim.length, 'type':'numeric' });
-				break;
-
-			case 0x40: // BULK_PLAIN
-
-				// Decode plain bulk array
-				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
-				// console.log("<< CHU[bulk.plain] x"+flen+" @", bundle.i8);
-				prim = decodePlainBulkArray( bundle, database, flen );
-				ans = ans.concat( prim );
-				size += prim.length;
-
-				// Update debug
-				DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk.plain' });
-				break;
-
-			case 0x50: // BULK_OBJECT
-
-				// Decode plain bulk array
-				flen = bundle.readTypedNum[ LEN_NUMTYPE[op_sz] ]();
-				// console.log("<< CHU[bulk.object] x"+flen+" @", bundle.i8);
-				prim = decodeBulkArray( bundle, database, flen );
-				ans = ans.concat( prim );
-				size += prim.length;
-
-				// Update debug
-				DEBUG && chunks_meta.push({ 'len':flen, 'type':'bulk.known' });
-				break;
-
-			default:
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'Unknown chunk operator #'+op+' at offset='+bundle.i8+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
-
-		}
-	}
-
-	// Return array
-	return DEBUG
-		? __debugMeta( ans, 'array.chunked', { 'chunks': chunks_meta } )
-		: ans;
-}
-*/
-
-/**
  * Read an array from the bundle
  */
 function decodeChunkedArray( bundle, database ) {
 	var op = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-		ans =[], chunk, chunk_op = [];
+		ans =[], chunk, chunk_meta = [];
 
 	// Process chunks till PRIM_CHUNK_END
 	while (op !== 0x7F) {
 
 		// Collect chunk ops
-		chunk_op.push( op );
 		chunk = decodeArray( bundle, database, op );
+		chunk_meta.push({
+			type: op,
+			len: chunk.length
+		});
 
 		// Test for non-arrays
 		if (chunk.length === undefined)
@@ -632,7 +528,7 @@ function decodeChunkedArray( bundle, database ) {
 
 	// Return chunked array
 	return DEBUG
-		? __debugMeta( ans, 'array.primitive.chunked', { 'chunks': chunk_op } )
+		? __debugMeta( ans, 'array.primitive.chunked', { 'chunks': chunk_meta } )
 		: ans;
 }
 
@@ -689,7 +585,8 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
 
 		// Read from and encode to
-		vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DWS[type] ]( len );
+		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
+		vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO[type] ]( len );
 		nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 		// Return
@@ -697,14 +594,23 @@ function decodeArray( bundle, database, op ) {
 			? __debugMeta( nArr, 'array.numeric.downscaled', { 'type': type } )
 			: nArr;
 
-	} else if ((op & 0xE0) === 0x20) { // NUM_DELTA_INT
+	} else if ((op & 0xF0) === 0x20) { // NUM_DELTA_INT
 
 		ln = op & 0x01;
-		type = (op >> 1) & 0x0F;
+		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
 
-		// Return delta-encoded array
+		// Return delta-encoded integers
 		return decodeDeltaArrayInt( bundle, database, len, type );
+
+	} else if ((op & 0xF0) === 0x30) { // NUM_DELTA_FLOAT
+
+		ln = op & 0x01;
+		type = (op >> 1) & 0x07;
+		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+
+		// Return pivot-encoded floats
+		return decodePivotArrayFloat( bundle, database, len, type );
 
 	} else if ((op & 0xF0) === 0x40) { // NUM_REPEATED
 
@@ -730,6 +636,7 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
 
 		// Read raw array
+		// console.log("Reading NUM_RAW len="+len+", ln="+ln);
 		nArr = bundle.readTypedArray[ type ]( len );
 
 		// Return
@@ -743,7 +650,8 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
 
 		// Read raw array
-		nArr = bundle.readTypedArray[ type ]( len );
+		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
+  		nArr = bundle.readTypedArray[ type ]( len );
 
 		// Return
 		return DEBUG
@@ -789,104 +697,6 @@ function decodeArray( bundle, database, op ) {
 		}
 
 	}
-
-
-
-	/*	
-	var ln3 = (((op & 0x8) >> 3) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32, 
-		ln0 = ((op & 0x1) === 0) ? NUMTYPE.UINT16 : NUMTYPE.UINT32,
-		scl = (op & 0x30) >> 4,
-		typ = (op & 0x7);
-
-	if ((op & 0x40) === 0x00) { // Delta-Encoded
-		var l = bundle.readTypedNum[ ln3 ](),
-			v0 = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[typ] ](),
-			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DELTA[typ] ]( l - 1 );
-
-		if (typ < 6) {
-			// Return delta-decoded integer array
-			return decodeDeltaArrayInt(bundle,
-				v0,
-				vArr,
-				NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ] );
-		} else {
-			// Return delta-decoded float array
-			return decodeDeltaArrayFloat(bundle,
-				v0,
-				vArr,
-				getFloatDeltaScale(typ, scl) );
-		}
-
-
-	} else if ((op & 0x70) === 0x40) { // Raw
-		var l = bundle.readTypedNum[ ln3 ]();
-
-		// Return raw array
-		return DEBUG
-			? __debugMeta( bundle.readTypedArray[ typ ]( l ), 'array.raw', { 'type': typ } )
-			: bundle.readTypedArray[ typ ]( l );
-
-	} else if ((op & 0x70) === 0x50) { // Repeated
-		var l = bundle.readTypedNum[ ln3 ](),
-			v0 = bundle.readTypedNum[ typ ](),
-			arr = new NUMTYPE_CLASS[ typ ]( l );
-
-		// Repeat value
-		for (var i=0; i<l; i++) arr[i]=v0;
-		return DEBUG
-			? __debugMeta( arr, 'array.repeated', { 'value':v0 } )
-			: arr;
-
-	} else if ((op & 0x70) === 0x60) { // Downscaled
-		var l = bundle.readTypedNum[ ln3 ](),
-			v0 = bundle.readTypedNum[ NUMTYPE_DOWNSCALE.FROM[typ] ](),
-			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO_DWS[typ] ]( l ),
-			// Type-cast constructor
-			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[typ] ]( vArr );
-
-		return DEBUG
-			? __debugMeta( nArr, 'array.downscaled', { 'type': typ } )
-			: nArr;
-
-	} else if ((op & 0x78) === 0x70) { // Short
-		var l = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-			vArr = bundle.readTypedArray[ typ ]( l );
-
-		// Return short array
-		return DEBUG
-			? __debugMeta( vArr, 'array.short', { } )
-			: vArr;
-
-	} else if ((op & 0x7C) === 0x78) { // Flag
-		// This operator is used ONLY as indicator when parsing a primitive array
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Encountered FLAG operator outside a primitive array!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
-
-	} else if ((op & 0x7E) === 0x7C) { // Chunked
-		var l = bundle.readTypedNum[ ln0 ]() | 0;
-
-		// Return decoded chunked array
-		return decodeChunkedArray( bundle, database, l );
-
-	} else if ((op & 0x7F) === 0x7E) { // Empty
-
-		// Return empty array
-		return DEBUG
-			? __debugMeta( [], 'array.empty', {} )
-			: [];
-
-	} else if ((op & 0x7F) === 0x7F) { // Extended
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Encountered RESERVED array operator!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
-
-	}
-	*/
 }
 
 /**

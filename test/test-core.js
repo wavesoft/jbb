@@ -35,13 +35,34 @@ const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 /**
  * Numerical types
  */
-var NUMTYPE = {
+const NUMTYPE = {
 	// For protocol use
 	UINT8: 	 0, INT8:    1,
 	UINT16:  2, INT16:   3,
 	UINT32:  4, INT32:   5,
 	FLOAT32: 6, FLOAT64: 7
 };
+
+/**
+ * Array Op-Codes
+ */
+const ARR_OP = {
+	NUM_DWS: 		 0x00, // Downscaled Numeric Type
+	NUM_DELTA_INT:	 0x20, // Delta-Encoded Integer Array
+	NUM_DELTA_FLOAT: 0x78, // Delta-Encoded Float Array
+	NUM_REPEATED: 	 0x40, // Repeated Numeric Value
+	NUM_RAW: 		 0x50, // Raw Numeric Value
+	NUM_SHORT: 		 0x60, // Short Numeric Value
+	PRIM_REPEATED: 	 0x68, // Repeated Primitive Value
+	PRIM_RAW: 		 0x6A, // Raw Primitive Array
+	PRIM_BULK_PLAIN: 0x6C, // Bulk Array of Plain Objects
+	PRIM_BULK_KNOWN: 0x6D, // Bulk Array of Known Objects
+	PRIM_SHORT: 	 0x6E, // Short Primitive Array
+	PRIM_CHUNK: 	 0x6F, // Chunked Primitive ARray
+	EMPTY: 			 0x7E, // Empty Array
+	PRIM_CHUNK_END:  0x7F, // End of primary chunk
+};
+
 
 ////////////////////////////////////////////////////////////////
 // Test Entry Point
@@ -92,9 +113,9 @@ describe('[Core Tests]', function() {
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
-			assert.equal( u32[3], 4,			'32-bit table size');
-			assert.equal( u32[4], 20,			'16-bit table size');
-			assert.equal( u32[5], 56,			'8-bit table size');
+			assert.equal( u32[3], 8,			'32-bit table size');
+			assert.equal( u32[4], 12,			'16-bit table size');
+			assert.equal( u32[5], 55,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -300,14 +321,14 @@ describe('[Core Tests]', function() {
 		it_should_return_array_rand('Int16Array', 1024,	-127, 127,		[match_metaType('array.numeric.downscaled')]);
 
 		// INT16	-> UINT8 (Shout opt-out from downscaling)
-		it_should_return_array_rand('Int16Array', 1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
+		it_should_return_array_rand('Int16Array', 1024,	0,	255,		[match_metaType('array.numeric.raw')]);
 
 		// UINT32	-> UINT8
 		it_should_return_array_rand('Uint32Array',1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 		// INT32	-> INT8
 		it_should_return_array_rand('Int32Array', 1024,	-127, 127,		[match_metaType('array.numeric.downscaled')]);
 
-		// INT32	-> UINT8 (Should opt-out from downscaling)
+		// INT32	-> INT16
 		it_should_return_array_rand('Int32Array', 1024,	0,	255,		[match_metaType('array.numeric.downscaled')]);
 
 		// UINT32	-> UINT16
@@ -357,21 +378,21 @@ describe('[Core Tests]', function() {
 		// console.log(values);
 		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', 
 			[/*function(meta) { console.log(meta.meta.chunks); },*/ match_chunkTypes([
-				'numeric',		// 100 numeric items
-				'primitives',	// 'Break'
-				'numeric',		// 100 numeric items
-				'primitives',	// 'Break'
-				'numeric',		// 100 numeric items
-				'primitives'	// 'Break'
+				[ ARR_OP.NUM_SHORT, 0xF8 ],		// 100 numeric items
+				[ ARR_OP.PRIM_SHORT, 0xFF ],	// 'Break'
+				[ ARR_OP.NUM_SHORT, 0xF8 ],		// 100 numeric items
+				[ ARR_OP.PRIM_SHORT, 0xFF ],	// 'Break'
+				[ ARR_OP.NUM_SHORT, 0xF8 ],		// 100 numeric items
+				[ ARR_OP.PRIM_SHORT, 0xFF ], 	// 'Break'
 			])] );
 
 		// Repeated composites (Ideally future-optimised)
 		values = []; matchTypes = [];
 		var rep = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
 		var repTypes = [
-			'primitives',	// true, false, undefined
-			'numeric',		// 255, 128, 67, 65535, 32535, 4294967295
-			'primitives',	// {'plain':'object'}
+			[ ARR_OP.PRIM_SHORT, 0xFF ],	// true, false, undefined
+			[ ARR_OP.NUM_SHORT, 0xF8 ],		// 255, 128, 67, 65535, 32535, 4294967295
+			[ ARR_OP.PRIM_SHORT, 0xFF ],	// {'plain':'object'}
 		];
 		for (var i=0; i<100; i++) {
 			values = values.concat(rep);
