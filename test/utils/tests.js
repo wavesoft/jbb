@@ -48,9 +48,11 @@ function gen_array_rand( typeName, length, min, max ) {
 	var arr = new global[typeName](length), range = max-min, v;
 	var mid = (min + max) / 2;
 	var smallest = Math.min(Math.abs(min), Math.abs(max)) % 1;
+	var integers = (min % 1 === 0) && (max %1 === 0);
 	// console.log(">> smallest ("+min+","+max+")=",smallest);
 	for (var i=0; i<length; i++) {
 		v = min + (Math.random() * range);
+		if (integers) v = Math.round(v);
 		if (Math.abs(v % 1) < smallest) {
 			// console.log("!!",v," < smallest");
 			v = ( v < mid ) ? min : max;
