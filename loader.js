@@ -318,10 +318,10 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 
 			// Try all loaded profile loaders until something works ount
 			var loaders = this.bundles.profileLoaders, loaded = false;
-			for (var i=0, l=loaders.length; i<l; i++) {
+			for (var j=0, l=loaders.length; j<l; j++) {
 
 				// Try this bundle loader to load the specified resources
-				loaded = loaders[i].load( loaderClass, loaderConfig, key,
+				loaded = loaders[j].load( loaderClass, loaderConfig, key,
 					function(err, objects) {
 						// Collect resources
 						for (var k in objects) {
