@@ -295,15 +295,18 @@ describe('[Core Tests]', function() {
 
 		//// Float delta-encoding ////
 
+		// Until we have a better idea this is disabled through
+		// optimisation flags.
+
 		// FLOAT32	-> INT8
-		it_should_return_array_seq('Float32Array',256,	0,	0.5, 	 [match_metaType('array.delta.float')]);	
+		// it_should_return_array_seq_almost('Float32Array',256,	0,	0.5, 	0.01, [match_metaType('array.delta.float')]);	
 		// FLOAT32	-> INT16
-		it_should_return_array_seq('Float32Array',256,	0,	32.125,  [match_metaType('array.delta.float')]);
+		// it_should_return_array_seq_almost('Float32Array',256,	0,	0.125,  0.01, [match_metaType('array.delta.float')]);
 
 		//// Incomplete types ////
 
 		// FLOAT64	-> (Should opt out from Delta-Encoding without issues)
-		it_should_return_array_seq('Float64Array',256,	0,	256, [match_metaType('array.delta.float')]);
+		it_should_return_array_seq('Float64Array',256,	0,	256, [match_metaType('array.numeric.downscaled')]);
 
 		//// Test if the 32-bit index works ////
 
@@ -441,7 +444,7 @@ describe('[Core Tests]', function() {
 				'same': 4,
 				'string': 'This is a string'
 			});
-		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]', [match_metaType('array.primitive.chunked')] );
+		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]', [match_metaType('array.primitive.bulk_plain')] );
 
 	});
 

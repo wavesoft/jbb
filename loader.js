@@ -402,7 +402,7 @@ QueuedBundle.prototype.triggerCallbacks = function( error ) {
 /**
  * Bundle manager
  */
-var BundlesLoader = function( profileLoader, baseURL ) {
+var BundlesLoader = function( baseURL ) {
 
 	/**
 	 * Queued bundles

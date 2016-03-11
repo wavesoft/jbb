@@ -21,6 +21,7 @@
 
 var util   	= require('util');
 var assert 	= require('assert');
+var compare = require('./compare');
 
 require('./common').static(global);
 require('./ot').static(global);
@@ -185,6 +186,36 @@ function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) 
 }
 
 /**
+ * Accelerator function for sequential array checking
+ */
+function it_should_return_array_seq_almost( typeName, length, min, step, tollerance, metaMatchFn ) {
+	var array = gen_array_seq(typeName, length, min, step);
+	var config = {
+		ignoreKeys: [],
+		ignoreClasses: [],
+		numericTollerance: tollerance
+	};
+
+	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[array.length-1]+'/'+step+'±'+tollerance+']`, as encoded', function () {
+		var ans = encode_decode( array, SimpleOT );
+		// Perform strong type checks on typed arrays
+		if (typeName != 'Array')
+			assert.equal( array.constructor, ans.constructor );
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( array, ans, 
+			"encoded and decoded arrays not within tollerance", config );
+
+		// Check for meta-match function
+		if (metaMatchFn) {
+			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			for (var i=0; i<metaMatchFn.length; i++)
+				metaMatchFn[i]( ans.__meta );
+		}
+	});
+}
+
+/**
  * Accelerator function for random array checking
  */
 function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) {
@@ -239,6 +270,7 @@ var exports = module.exports = {
 	'it_should_return_array_seq': it_should_return_array_seq,
 	'it_should_return_array_rand': it_should_return_array_rand,
 	'it_should_return_array_rep': it_should_return_array_rep,
+	'it_should_return_array_seq_almost': it_should_return_array_seq_almost,
 };
 module.exports.static = function(scope) {
 	Object.keys(exports).forEach(function(key,index) {

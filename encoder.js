@@ -60,7 +60,7 @@ Known Limitations
  * If this constant is true, the packing functions will do sanity checks,
  * which might increase the build time.
  */
-const SAFE = 1;
+const SAFE = 0;
 
 /**
  * Fake DOM environment when from node
@@ -2290,7 +2290,7 @@ function encodeArray_Chunk( encoder, data, chunk ) {
 	var chunkType = chunk[0],
 		chunkSize = chunk[1],
 		chunkSubType = chunk[2],
-		n_type;
+		n_type, na;
 
 	// console.log(">>> CFWA Chunk=", chunk,":",data);
 
@@ -2312,6 +2312,14 @@ function encodeArray_Chunk( encoder, data, chunk ) {
 			// Check if the repeated items are numeric or primitivie
 			n_type = getTypedArrayType( data );
 			if ( n_type <= NUMTYPE.NUMERIC ) {
+
+				/* If that's numeric, perform fast numeric analysis to 
+				   find it's type. */
+				if (n_type === NUMTYPE.NUMERIC) {
+					na = analyzeNumericArray( data, false );
+					n_type = na.type;
+				}
+
 				// Encode numeric repeated array if number
 				encodeArray_NUM_REPEATED( encoder, data, n_type );
 			} else {
@@ -2438,7 +2446,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				// console.log(">ARR>",data.length,"itms as DELTA");
 				if (na.dmode == 1) {
 					encodeArray_NUM_DELTA_INT( encoder, data, n_type, na.delta_type );
-				} else if (na.dmode == 2) {
+				} else if ((na.dmode == 2) && encoder.optimize.float_int_downscale) {
 					encodeArray_NUM_DELTA_FLOAT( encoder, data, n_type, na.delta_type, na.mean, na.fscale );
 				} else {
 					encodeArray_NUM_RAW( encoder, data, n_type );
@@ -3006,7 +3014,8 @@ var BinaryEncoder = function( filename, config ) {
 
 	// Optimisation flags
 	this.optimize = {
-		cfwa_object_byval: true,	// By-value de-duplication of objects
+		cfwa_object_byval: false,	// By-value de-duplication of objects in chunk forward analysis
+		float_int_downscale: false,	// Downscale floats to integers multiplied by scale
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8

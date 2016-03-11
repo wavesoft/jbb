@@ -147,7 +147,8 @@ function compile( bundleData, bundleFile, config, callback ) {
 	}
 
 	// Load profile table and compiler helper
-	bundleLoader = new BundlesLoader( profileLoader, baseDir );
+	bundleLoader = new BundlesLoader( baseDir );
+	bundleLoader.addProfileLoader( profileLoader );
 
 	// Initialize profile compiler
 	profileLoader.initialize( 
