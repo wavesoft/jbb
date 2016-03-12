@@ -20,22 +20,30 @@
  */
 
 var assert 	= require('assert');
+var mute 	= require('mute');
 
 /**
  * assert.equal with deep comparion only on some objects 
  */
 function explicitDeepEqual( actual, expected, message, config, path ) {
 	var path = path || "object",
-		config = config || {};
+		config = config || {}, a, b, unmute;
 	if (typeof actual == "object") {
 		for (var k in actual) {
+
+			// Get values
+			unmute = mute();
+			a = actual[k];
+			b = expected[k];
+			unmute();
+
 			// Skip ignored keys and classes
 			if (config.ignoreKeys.indexOf(k) >= 0) continue;
 			for (var i=0; i<config.ignoreClasses.length; i++)
-				if (actual[k] instanceof config.ignoreClasses[i])
+				if (a instanceof config.ignoreClasses[i])
 					continue;
 			// Deep comparison
-			explicitDeepEqual( actual[k], expected[k], message, config, path+"["+k+"]" );
+			explicitDeepEqual( a, b, message, config, path+"["+k+"]" );
 		}
 	} else if (typeof actual == "number") {
 		if (Math.abs(actual - expected) > config.numericTollerance) {
