@@ -60,7 +60,7 @@ Known Limitations
  * If this constant is true, the packing functions will do sanity checks,
  * which might increase the build time.
  */
-const SAFE = 0;
+const SAFE = 1;
 
 /**
  * Fake DOM environment when from node
@@ -1463,7 +1463,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		have_optimised_items = false,
 		c_same = 0, c_numeric = 0, c_plain = 0,			// Counters of individually optimisied items
 		c_unoptimised = 0,
-		last_test_mode, last_value, last_numtype,		// Last state variables
+		last_test_mode, last_value, last_numtype, first_value, // Last state variables
 		last_keys = [], all_positive = false, type_oscilating = false,
 		min_num, max_num;
 
@@ -1491,6 +1491,9 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		last_test_mode = TEST_PRIMITIVE;
 	}
 	last_value = v;
+
+	// First values
+	first_value = v;
 
 	// Scan items
 	for (var i=start+1, il=array.length; i<il; i++) {
@@ -1520,6 +1523,8 @@ function chunkForwardAnalysis( encoder, array, start ) {
 			test_mode = TEST_PRIMITIVE;
 		}
 
+		// console.log("v=",v,"last_value=",last_value,"test_mode=",test_mode,"last_test_mode=",last_test_mode);
+
 		// If test mode is the same, check if values remain the same
 		if (test_mode === last_test_mode) {
 			break_candidate = true;
@@ -1536,31 +1541,35 @@ function chunkForwardAnalysis( encoder, array, start ) {
 			switch (test_mode) {
 				case TEST_NUMBER:
 					if (last_value === v) {
+						if (first_value !== v) {
+							if (c_numeric) c_numeric--;
+							break_candidate = true;
+							break;
+						}
 						c_same++;
 						have_optimised_items = true;
 						break_candidate = false;
-					} else {
-
-						// Check for numeric subclass
-						if (!isFloatMixing(last_numtype, numtype)) {
-							// Allow type upscale
-							if (isNumericSubclass(last_numtype, min_num, max_num, numtype)) {
-								// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
-								last_numtype = numtype;
-							}
-							// Accept only numeric subclasses
-							if (isNumericSubclass(numtype, v, v, last_numtype)) {
-								c_numeric++;
-								have_optimised_items = true;
-								break_candidate = false;
-							// } else {
-								// console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
-							}
-						// } else {
-							// console.log(">> " + "Mixing floats".red);
-						}
-
 					}
+
+					// Check for numeric subclass
+					if (!isFloatMixing(last_numtype, numtype)) {
+						// Allow type upscale
+						if (isNumericSubclass(last_numtype, min_num, max_num, numtype)) {
+							// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
+							last_numtype = numtype;
+						}
+						// Accept only numeric subclasses
+						if (isNumericSubclass(numtype, v, v, last_numtype)) {
+							c_numeric++;
+							have_optimised_items = true;
+							break_candidate = false;
+						// } else {
+							// console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
+						}
+					// } else {
+						// console.log(">> " + "Mixing floats".red);
+					}
+
 					break;
 
 				case TEST_PLAIN:
@@ -1568,41 +1577,53 @@ function chunkForwardAnalysis( encoder, array, start ) {
 							? deepEqual( v, last_value )
 							: (v === last_value) 
 						) {
+						if ( encoder.optimize.cfwa_object_byval 
+							? !deepEqual( v, first_value )
+							: (v !== first_value) ) {
+							if (c_plain) c_plain--;
+							break_candidate = true;
+							break;
+						}
 						c_same++;
 						have_optimised_items = true;
 						break_candidate = false;
-					} else {
-
-						// Calculate key differences
-						keys = Object.keys( v ).sort();
-						new_keys = 0; some_overlap = false;
-						old_keys = last_keys.length;
-						for (var ja=0, jb=0, jl=last_keys.length; (ja<jl) && (jb<jl) ;) {
-							if (keys[ja] < last_keys[jb]) {
-								jb++;
-								new_keys++;
-								last_keys.push( keys[ja] )
-							} else if (keys[ja] > last_keys[jb]) {
-								ja++;
-							} else {
-								ja++;
-								jb++;
-								some_overlap = true;
-							}
-						}
-
-						// Allow up to 25% extension of the key set
-						if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
-							c_plain++;
-							have_optimised_items = true;
-							break_candidate = false;
-						}
-
 					}
+
+					// Calculate key differences
+					keys = Object.keys( v ).sort();
+					new_keys = 0; some_overlap = false;
+					old_keys = last_keys.length;
+					for (var ja=0, jb=0, jl=last_keys.length; (ja<jl) && (jb<jl) ;) {
+						if (keys[ja] < last_keys[jb]) {
+							jb++;
+							new_keys++;
+							last_keys.push( keys[ja] )
+						} else if (keys[ja] > last_keys[jb]) {
+							ja++;
+						} else {
+							ja++;
+							jb++;
+							some_overlap = true;
+						}
+					}
+
+					// Allow up to 25% extension of the key set
+					if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
+						c_plain++;
+						have_optimised_items = true;
+						break_candidate = false;
+					}
+
 					break;
 
 				case TEST_PRIMITIVE:
 					if (last_value === v) {
+
+						if (first_value !== v) {
+							if (c_unoptimised) c_unoptimised--;
+							break_candidate = true;
+							break;
+						}
 
 						// If we have oscillating primitive values but sudently we have
 						// a stable, continuous stream, roll back the last optimised value
@@ -1653,7 +1674,6 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		// Keep current state as last
 		all_positive = all_positive && is_positive;
 		last_test_mode = test_mode;
-		last_numtype = numtype;
 		last_value = v;
 
 		// Update min/max on numeric values
@@ -3014,7 +3034,7 @@ var BinaryEncoder = function( filename, config ) {
 
 	// Optimisation flags
 	this.optimize = {
-		cfwa_object_byval: false,	// By-value de-duplication of objects in chunk forward analysis
+		cfwa_object_byval: true,	// By-value de-duplication of objects in chunk forward analysis
 		float_int_downscale: false,	// Downscale floats to integers multiplied by scale
 	};
 
