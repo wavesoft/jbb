@@ -22,7 +22,7 @@
 var BinaryBundle = require("./lib/BinaryBundle");
 
 /* Production optimisations and debug metadata flags */
-if (typeof PROD === 'undefined') var PROD = false;
+if (typeof PROD === 'undefined') var PROD = true;
 if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
 
 /* Size constants */
@@ -254,7 +254,7 @@ function decodeBlobURL( bundle, length ) {
  */
 function decodeBuffer( bundle, len, buf_type ) {
 	var lnType = [ NUMTYPE.UINT8, NUMTYPE.UINT16, NUMTYPE.UINT32, NUMTYPE.FLOAT64 ][ len ],
-		length = bundle.readTypedNum[ lnType ](), ans;
+		length = bundle.readTypedNum( lnType ), ans;
 
 	// Process buffer according to type
 	if (buf_type === 0) { // STRING_LATIN
@@ -298,7 +298,7 @@ function decodeBuffer( bundle, len, buf_type ) {
 function decodeObject( bundle, database, op ) {
 	if ( !(op & 0x20) || ((op & 0x30) === 0x20) ) { // Predefined objects
 		var eid = op;
-		if (op & 0x20) eid = bundle.readTypedNum[ NUMTYPE.UINT8 ]() | ((op & 0x0F) << 8);
+		if (op & 0x20) eid = bundle.readTypedNum( NUMTYPE.UINT8 ) | ((op & 0x0F) << 8);
 
 		// Fetch object class
 		var ENTITY = bundle.ot.ENTITIES[eid];
@@ -329,8 +329,8 @@ function decodeObject( bundle, database, op ) {
 		var poid = (op & 0x03);
 		switch (poid) {
 			case 0:
-				var date = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
-					tzOffset = bundle.readTypedNum[ NUMTYPE.INT8 ]() * 10;
+				var date = bundle.readTypedNum( NUMTYPE.FLOAT64 ),
+					tzOffset = bundle.readTypedNum( NUMTYPE.INT8 ) * 10;
 
 				// Return date
 				return DEBUG 
@@ -346,7 +346,7 @@ function decodeObject( bundle, database, op ) {
 		}
 
 	} else if ((op & 0x38) === 0x30) { // Simple object with known signature
-		var eid = ((op & 0x07) << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+		var eid = ((op & 0x07) << 8) | bundle.readTypedNum( NUMTYPE.UINT8 ),
 			factory = bundle.factory_plain[ eid ];
 		if (factory === undefined) {
 			throw {
@@ -378,14 +378,14 @@ function decodeObject( bundle, database, op ) {
 function decodePivotArrayFloat( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
 		num_type_to = NUMTYPE_DELTA_FLOAT.TO[ num_type ],
-		pivot = bundle.readTypedNum[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ](),
-		scale = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
+		pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ),
+		scale = bundle.readTypedNum( NUMTYPE.FLOAT64 ),
 		values = bundle.readTypedArray[ num_type_to ]( len );
 
 	// console.log(">> DELTA_FLOAT len=",len,"type=",num_type,"scale=",scale,"pivot=",pivot);
 
 	// Decode
-	for (var i=0; i<len; i++) {
+	for (var i=0; i<len; ++i) {
 		ans[i] = pivot + (values[i] * scale);
 		// console.log("<<<", values[i],"->", ans[i]);
 	}
@@ -400,12 +400,12 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
  */
 function decodeDeltaArrayInt( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_INT.FROM[ num_type ] ]( len ),
-		v = bundle.readTypedNum[ NUMTYPE_DELTA_INT.FROM[ num_type ] ](),
+		v = bundle.readTypedNum( NUMTYPE_DELTA_INT.FROM[ num_type ] ),
 		values = bundle.readTypedArray[ NUMTYPE_DELTA_INT.TO[ num_type ] ]( len - 1 );
 
 	// Decode array
 	ans[0] = v;
-	for (var i=0, llen=values.length; i<llen; i++) {
+	for (var i=0, llen=values.length; i<llen; ++i) {
 		v += values[i];
 		ans[i+1] = v;
 	}
@@ -422,7 +422,7 @@ function decodeDeltaArrayInt( bundle, database, len, num_type ) {
 function decodePlainBulkArray( bundle, database ) {
 
 	// Get signature ID
-	var sid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
+	var sid = bundle.readTypedNum( NUMTYPE.UINT16 ),
 		properties = bundle.signature_table[sid],
 		objectFactory = bundle.factory_plain_bulk[sid];
 	if (!properties) {
@@ -435,12 +435,12 @@ function decodePlainBulkArray( bundle, database ) {
 
 	// Read property arrays
 	var values = [];
-	for (var i=0, l=properties.length; i<l; i++)
+	for (var i=0, l=properties.length; i<l; ++i)
 		values.push(decodePrimitive( bundle, database ));
 
 	// Create objects
 	var ans = [], len=values[0].length;
-	for (var i=0; i<len; i++)
+	for (var i=0; i<len; ++i)
 		ans.push( objectFactory(values, i) );
 		// ans.push( objectFactory(values, values.length / properties.length, i) );
 
@@ -454,27 +454,27 @@ function decodePlainBulkArray( bundle, database ) {
  * Decode bulk array of entities
  */
 function decodeBulkArray( bundle, database, len ) {
-	var eid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
+	var eid = bundle.readTypedNum( NUMTYPE.UINT16 ),
 		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
 		ENTITY = bundle.ot.ENTITIES[ eid ];
 
 	// Fabricate all objects
 	var ans = [], prop_tables=[];
-	for (var i=0; i<len; i++) {
+	for (var i=0; i<len; ++i) {
 		// Call entity factory
 		ans.push( ENTITY[1]( ENTITY[0] ) );
 		prop_tables.push( [] );
 	}
 
 	// Weave-create property tables
-	for (var j=0, pl=PROPERTIES.length; j<pl; j++) {
+	for (var j=0, pl=PROPERTIES.length; j<pl; ++j) {
 		var props = decodePrimitive( bundle, database );
-		for (var i=0; i<len; i++)
+		for (var i=0; i<len; ++i)
 			prop_tables[i].push( props[i] );
 	}
 
 	// Run initializers
-	for (var i=0; i<len; i++) {
+	for (var i=0; i<len; ++i) {
 		// Run initializers
 		ENTITY[2]( ans[i], PROPERTIES, prop_tables[i] );
 	}
@@ -491,18 +491,20 @@ function decodeBulkArray( bundle, database, len ) {
  * Read an array from the bundle
  */
 function decodeChunkedArray( bundle, database ) {
-	var op = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-		ans =[], chunk, chunk_meta = [];
+	var op = bundle.readTypedNum( NUMTYPE.UINT8 ),
+		chunk, chunk_meta = [],	ans =[];
 
 	// Process chunks till PRIM_CHUNK_END
 	while (op !== 0x7F) {
 
 		// Collect chunk ops
 		chunk = decodeArray( bundle, database, op );
-		chunk_meta.push({
-			type: op,
-			len: chunk.length
-		});
+		if (DEBUG) {
+			chunk_meta.push({
+				type: op,
+				len: chunk.length
+			});
+		}
 
 		// Test for non-arrays
 		if (chunk.length === undefined)
@@ -512,11 +514,11 @@ function decodeChunkedArray( bundle, database ) {
 				toString 	: function(){return this.name + ": " + this.message;}
 			};
 
-		// Merge
-		ans = ans.concat( Array.prototype.slice.call(chunk) );
+		// Collect
+		ans.push.apply( ans, chunk );
 
 		// Get next op-code
-		op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		op = bundle.readTypedNum( NUMTYPE.UINT8 );
 	}
 
 	// Return chunked array
@@ -543,8 +545,8 @@ function decodeArray( bundle, database, op ) {
 	} else if (op === 0x6E) { // PRIM_SHORT
 
 		// Collect up to 255 primitives
-		len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
-		for (i=0; i<len; i++)
+		len = bundle.readTypedNum( NUMTYPE.UINT8 );
+		for (i=0; i<len; ++i)
 			nArr.push( decodePrimitive( bundle, database ) );
 
 		// Return
@@ -575,7 +577,7 @@ function decodeArray( bundle, database, op ) {
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x0F;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Read from and encode to
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
@@ -591,7 +593,7 @@ function decodeArray( bundle, database, op ) {
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Return delta-encoded integers
 		return decodeDeltaArrayInt( bundle, database, len, type );
@@ -600,7 +602,7 @@ function decodeArray( bundle, database, op ) {
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Return pivot-encoded floats
 		return decodePivotArrayFloat( bundle, database, len, type );
@@ -609,13 +611,13 @@ function decodeArray( bundle, database, op ) {
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
-		vArr = bundle.readTypedNum[ type ]();
+		vArr = bundle.readTypedNum( type );
 		nArr = new NUMTYPE_CLASS[ type ]( len );
 		nArr.fill(vArr);
-		// for (i=0; i<len; i++) nArr[i]=vArr;
+		// for (i=0; i<len; ++i) nArr[i]=vArr;
 
 		// Return
 		return DEBUG
@@ -626,7 +628,7 @@ function decodeArray( bundle, database, op ) {
 
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Read raw array
 		// console.log("Reading NUM_RAW len="+len+", ln="+ln);
@@ -640,7 +642,7 @@ function decodeArray( bundle, database, op ) {
 	} else if ((op & 0xF8) === 0x60) { // NUM_SHORT
 
 		type = op & 0x07;
-		len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		len = bundle.readTypedNum( NUMTYPE.UINT8 );
 
 		// Read raw array
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
@@ -654,7 +656,7 @@ function decodeArray( bundle, database, op ) {
 	} else if ((op & 0xFE) === 0x68) { // PRIM_REPEATED
 
 		ln = op & 0x01;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
 		vArr = decodePrimitive( bundle, database );
@@ -671,10 +673,10 @@ function decodeArray( bundle, database, op ) {
 	} else if ((op & 0xFE) === 0x6A) { // PRIM_RAW
 
 		ln = op & 0x01;
-		len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Compile primitives
-		for (i=0; i<len; i++)
+		for (i=0; i<len; ++i)
 			nArr.push( decodePrimitive( bundle, database ) );
 
 		// Return
@@ -696,7 +698,7 @@ function decodeArray( bundle, database, op ) {
  * Read a primitive from the bundle
  */
 function decodePrimitive( bundle, database ) {
-	var op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+	var op = bundle.readTypedNum( NUMTYPE.UINT8 );
 	if ((op & 0x80) === 0x00) { // Array
 		return decodeArray(bundle, database,
 			(op & 0x7F) );
@@ -711,7 +713,7 @@ function decodePrimitive( bundle, database ) {
 			(op & 0x07) );
 
 	} else if ((op & 0xF0) === 0xE0) { // I-Ref
-		var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
+		var id = ((op & 0x0F) << 16) | bundle.readTypedNum( NUMTYPE.UINT16 );
 		if (id >= bundle.iref_table.length) throw {
 			'name' 		: 'IrefError',
 			'message'	: 'Invalid IREF #'+id+'!',
@@ -722,7 +724,7 @@ function decodePrimitive( bundle, database ) {
 			: bundle.iref_table[id];
 
 	} else if ((op & 0xF8) === 0xF0) { // Number
-		return bundle.readTypedNum[ op & 0x07 ]();
+		return bundle.readTypedNum( op & 0x07 );
 
 	} else if ((op & 0xFC) === 0xF8) { // Simple
 		return PRIM_SIMPLE[ op & 0x03 ];
@@ -756,7 +758,7 @@ function decodePrimitive( bundle, database ) {
  */
 function parseBundle( bundle, database ) {
 	while (!bundle.eof()) {
-		var op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		var op = bundle.readTypedNum( NUMTYPE.UINT8 );
 		switch (op) {
 			case 0xF8: // Export
 				var export_name = bundle.prefix + bundle.readStringLT();
@@ -938,7 +940,7 @@ BinaryLoader.prototype = {
 
 		// First make sure that there are no bundles pending loading
 		var pendingLoading = false;
-		for (var i=0; i<this.queuedRequests.length; i++) {
+		for (var i=0; i<this.queuedRequests.length; ++i) {
 			if (this.queuedRequests[i].status === PBUND_REQUESTED) {
 				pendingLoading = true;
 				break;
@@ -963,7 +965,7 @@ BinaryLoader.prototype = {
 
 			// Place all requests in parallel
 			var triggeredError = false;
-			for (var i=0; i<this.queuedRequests.length; i++) {
+			for (var i=0; i<this.queuedRequests.length; ++i) {
 				var req = this.queuedRequests[i];
 				if (req.status === PBUND_REQUESTED) {
 
@@ -1004,7 +1006,7 @@ BinaryLoader.prototype = {
 		// Parse all loaded bundles (synchronous)
 		////////////////////////////////////////////////////////
 
-		for (var i=0; i<this.queuedRequests.length; i++) {
+		for (var i=0; i<this.queuedRequests.length; ++i) {
 			var req = this.queuedRequests[i];
 			if (req.status === PBUND_LOADED) {
 				// try {
