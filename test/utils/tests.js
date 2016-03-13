@@ -146,21 +146,25 @@ function it_should_throw(primitive, repr, isCorrectException) {
  * Accelerator function for primitive checking
  */
 function it_should_return(primitive, repr, metaMatchFn) {
+	if (typeof repr === 'object') {
+		metaMatchFn = repr;
+		repr = undefined;
+	}
 	var text = repr || util.inspect(primitive,{'depth':0});
 	it('should return `'+text+'`, as encoded', function () {
 		var ans = encode_decode( primitive, SimpleOT );
 		if (typeof primitive == 'number') {
 			if (isNaN(ans) && isNaN(primitive)) return;
-			assert.equal( primitive, ans, 'encoded and decoded numbers to not match' );
+			assert.equal( ans, primitive, 'encoded and decoded numbers to not match' );
 		} else if (typeof primitive == 'object') {
-			assert.deepEqual( primitive, ans, 'encoded and decoded objects to not match' );
+			assert.deepEqual( ans, primitive, 'encoded and decoded objects to not match' );
 			if (metaMatchFn) {
 				if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
 				for (var i=0; i<metaMatchFn.length; i++)
 					metaMatchFn[i]( ans.__meta );
 			}
 		} else {
-			assert.equal( primitive, ans, 'encoded and decoded primitives to not match' );
+			assert.equal( ans, primitive, 'encoded and decoded primitives to not match' );
 		}
 	});
 }

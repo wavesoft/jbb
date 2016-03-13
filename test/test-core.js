@@ -19,9 +19,9 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var util   			= require('util');
-var assert 			= require('assert');
-var BinaryBundle 	= require("../lib/BinaryBundle");
+var util = require('util');
+var assert = require('assert');
+var BinaryBundle = require("../lib/BinaryBundle");
 
 // Static import of utility functions
 require('./utils/common').static(global);
@@ -440,11 +440,24 @@ describe('[Core Tests]', function() {
 		var bulkrep = [];
 		for (var i=0; i<65535; i++)
 			bulkrep.push({
-				'value': Math.floor(Math.random() * 255),
+				'value': i,
 				'same': 4,
 				'string': 'This is a string'
 			});
-		it_should_return( bulkrep, '[ 65,535 x { value: [random] } ]', [match_metaType('array.primitive.bulk_plain')] );
+		it_should_return( bulkrep, '[ 65,535 x { value: [variable] } ]', [match_metaType('array.primitive.bulk_plain')] );
+
+		// Corner-case of repeated objects
+		it_should_return( [2000, 20, 20, 30, 30, 30, undefined, undefined ], [match_metaType('array.primitive.chunked')] );
+		it_should_return( [20, 20, 30, 30, 20, 20, 30, 30, 20, 30, 20, 30, undefined ], [match_metaType('array.primitive.chunked')] );
+		it_should_return( [10, 20, 20, 20, 30, 40, 40, 40, undefined ], [match_metaType('array.primitive.chunked')] );
+
+		// Adoption of incremental/decremental numeric type in chunks
+		var two_chunks = [
+			[ ARR_OP.NUM_SHORT, 0xF8 ],
+			[ ARR_OP.PRIM_SHORT, 0xFF ]
+		];
+		it_should_return( [ 5, 34, 546, 57890, 451106, 5693986, 72802850, 1146544674, null ], [match_chunkTypes(two_chunks)] );
+		it_should_return( [ 1146544674, 72802850, 5693986, 451106, 57890, 546, 34, 5, null ], [match_chunkTypes(two_chunks)] );
 
 	});
 
@@ -475,6 +488,24 @@ describe('[Core Tests]', function() {
 		it_should_throw ( obj8, '[ObjectD] (Not part of OT)', function(err) {
 			return (err.name == 'EncodingError');
 		});
+
+		// Simple nested object case
+		var obj9 = new ObjectA(), // Target
+			obj10 = new ObjectB( obj9,  "first" ), // First reference
+			obj11 = new ObjectC( [obj10, obj9], "complex" ); // Second, nested reference
+		it_should_return( obj11, '[ Nested object references ]', [match_metaType('object.known')] );
+
+		// Deep, complicated nesting scenarios with objects from OT
+		var obj9 = new ObjectA(),
+			obj10 = new ObjectB( obj9,  "first" ),
+			obj11 = new ObjectB( obj10, 2.3192379474639893 ),
+			obj12 = new ObjectB( obj11, { "index": "third", "num": 3, "o": { "at": 3 } } ),
+			obj13 = new ObjectB( obj12, new ObjectA() ),
+			obj14 = new ObjectC( [obj10, obj11, obj12, obj13], "complex" ),
+			obj15 = new ObjectB( [obj10, obj14], "further-nesting" ),
+			obj16 = new ObjectB( [obj11, obj12, obj13], "another-turn" ),
+			obj17 = new ObjectC( [obj13, obj15, obj16], "complex" );
+		it_should_return( obj17, '[ Complicated nested objects ]', [match_metaType('object.known')] );
 
 	});
 
@@ -537,8 +568,8 @@ describe('[Core Tests]', function() {
 			});
 
 			// Make sure xrefs are correct
-			assert( openBundle.database['test/obj3'].propA == "yes-imported-1" );
-			assert( openBundle.database['test/obj4'].propA == "yes-imported-2" );
+			assert( openBundle.database['test/obj3'].objCpropA == "yes-imported-1" );
+			assert( openBundle.database['test/obj4'].objCpropA == "yes-imported-2" );
 
 			// Cleanup
 			cleanup_encoder( encoder );
@@ -573,8 +604,8 @@ describe('[Core Tests]', function() {
 			var openBundle = open_decoder( encoder, SimpleOT, db);
 
 			// Make sure xrefs are correct
-			assert( openBundle.database['test/obj3'].propA.propA == obj1.propA );
-			assert( openBundle.database['test/obj6'].propA.propA.propA == obj2.propA );
+			assert( openBundle.database['test/obj3'].objCpropA.objApropA == obj1.objApropA );
+			assert( openBundle.database['test/obj6'].objCpropA.objBpropA.objBpropA == obj2.objBpropA );
 
 			// Cleanup
 			cleanup_encoder( encoder );

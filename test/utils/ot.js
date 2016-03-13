@@ -21,25 +21,25 @@
 
 // A coule of local objects, part of Object Table
 var ObjectA = function() {
-	this.propA = 125;
-	this.propB = 65532;
-	this.propC = "A string";
+	this.objApropA = 125;
+	this.objApropB = 65532;
+	this.objApropC = "A string";
 };
 var ObjectB = function( propA, propB ) {
-	this.propA = propA;
-	this.propB = propB;
-	this.propC = [ 1, 4, 120, 4123 ]
+	this.objBpropA = propA;
+	this.objBpropB = propB;
+	this.objBpropC = [ 1, 4, 120, 4123 ]
 };
 var ObjectC = function( propA, propB ) {
-	this.propA = propA;
-	this.propB = propB;
-	this.propC = { 'some': { 'sub': 'object' } };
-	this.propD = "I am ignored :(";
+	this.objCpropA = propA;
+	this.objCpropB = propB;
+	this.objCpropC = { 'some': { 'sub': 'object' } };
+	this.objCpropD = "I am ignored :(";
 };
 var ObjectD = function() {
-	this.propA = 0;
-	this.propB = 1;
-	this.propC = "Not part of ObjectTable";
+	this.objDpropA = 0;
+	this.objDpropB = 1;
+	this.objDpropC = "Not part of ObjectTable";
 };
 
 // Default & Unconstructed factories
@@ -59,8 +59,8 @@ var DefaultInit = function( instance, properties, values ) {
 var ObjectCInit = function( instance, properties, values ) {
 	DefaultInit( instance, properties, values );
 	instance.constructor.call(
-			instance, instance.propA,
-					  instance.propB
+			instance, instance.objCpropA,
+					  instance.objCpropB
 		);
 }
 
@@ -73,9 +73,9 @@ var SimpleOT = {
 		[ ObjectC, UnconstructedFactory, ObjectCInit ]
 	],
 	'PROPERTIES': [
-		[ 'propA', 'propB', 'propC' ],
-		[ 'propA', 'propB', 'propC' ],
-		[ 'propA', 'propB', 'propC' ]
+		[ 'objApropA', 'objApropB', 'objApropC' ],
+		[ 'objBpropA', 'objBpropB', 'objBpropC' ],
+		[ 'objCpropA', 'objCpropB', 'objCpropC' ]
 	],
 };
 

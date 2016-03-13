@@ -487,17 +487,20 @@ var JBBBinaryLoader =
 			values.push(decodePrimitive( bundle, database ));
 
 		// Read weaved property array
-		// var values = decodePrimitive( bundle, database );
+		// var values = decodePrimitive( bundle, database ),
+		// 	len = values.length / properties.length;
 		// console.log("<<WAVE<<", values);
 
 		// // Create factory function
 		// var makeObject = Function("props","i", factoryFn);
 
 		// Create objects
-		var ans = [];
-		for (var i=0, len=values[0].length; i<len; i++)
+		var ans = [], len = values[0].length;
+		for (var i=0; i<len; i++)
 			ans.push( objectFactory(values, i) );
 			// ans.push( objectFactory(values, values.length / properties.length, i) );
+
+		// console.log("decodePlainBulkArray() =",ans.length);
 
 		return  false
 			? __debugMeta( ans, 'array.primitive.bulk_plain', { 'sid': sid } )
@@ -583,12 +586,20 @@ var JBBBinaryLoader =
 	/**
 	 * Read an array from the bundle
 	 */
+	// var lt = 0;
 	function decodeArray( bundle, database, op ) {
 		var i, type, ln, len, vArr, nArr = [];
 
 		if (op === 0x6C) { // PRIM_BULK_PLAIN
 
 			// Decode and return plain bulk array
+			// var t = Date.now();
+			// var r = decodePlainBulkArray( bundle, database );
+			// t = Date.now() - t;
+			// lt += t;
+			// console.log("t=",lt);
+			// return r;
+
 			return decodePlainBulkArray( bundle, database );
 
 		} else if (op === 0x6D) { // PRIM_BULK_KNOWN
@@ -767,6 +778,11 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xF0) === 0xE0) { // I-Ref
 			var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
+			if (id >= bundle.iref_table.length) throw {
+				'name' 		: 'IrefError',
+				'message'	: 'Invalid IREF #'+id+'!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			}
 			return  false
 				? __debugMeta( bundle.iref_table[id], 'object.iref', { 'id': id } )
 				: bundle.iref_table[id];
@@ -1383,8 +1399,8 @@ var JBBBinaryLoader =
 		for (var i=0; i<this.signature_table.length; i++) {
 
 			// Build factory funtion
-			var factoryPlain = "return {", factoryBulk = factoryPlain,
-				props = this.signature_table[i], llen = props.length;
+			var props = this.signature_table[i], llen = props.length,
+				factoryPlain = "return {", factoryBulk = factoryPlain;
 			for (var j=0; j<llen; j++) {
 				factoryPlain += "'"+props[j]+"': values["+j+"],";
 				factoryBulk +=  "'"+props[j]+"': values["+j+"][i],";

@@ -19,12 +19,12 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
-var assert 	= require('assert');
-var path 	= require('path');
-var temp 	= require('temp');
-var fs 		= require('fs');
-var mute 	= require('mute');
-var common 	= require('./utils/common');
+var assert = require('assert');
+var path = require('path');
+var temp = require('temp');
+var fs = require('fs');
+var mute = require('mute');
+var common = require('./utils/common');
 var compare = require('./utils/compare');
 var JBBSourceLoader = require('../loader');
 var JBBBinaryLoader = require('../decoder');
@@ -121,9 +121,6 @@ function describe_clojure( bundleName, testFn ) {
 		});
 		it('should properly load the binary bundle on time', function( done ) {
 
-			/* This can take long time. Give it 2 minutes. */
-			this.timeout(120000);
-
 			/* Load the source bundle */
 			var unmute = mute();
 			var binaryLoader = new JBBBinaryLoader( JBBProfileThree, path.dirname(tmpFile) );
@@ -146,6 +143,9 @@ function describe_clojure( bundleName, testFn ) {
 		});
 		it('should be encoded correctly', function(done) {
 
+			/* This is not optimized, can take up to 10 seconds. */
+			this.timeout(10000);
+
 			assert.deepEqual( Object.keys(srcDB).sort(), Object.keys(binDB).sort(), 'database keys must be the same' );
 
 			testFn( srcDB, binDB );
@@ -153,8 +153,11 @@ function describe_clojure( bundleName, testFn ) {
 
 		});
 		it('should be loaded faster than the source bundle', function(done) {
-			var percent = 100 * (binaryLoadingTime - sourceLoadingTime) / sourceLoadingTime;
-			assert.ok( binaryLoadingTime < sourceLoadingTime, 'binary bundle loaded slower (by ' + percent.toFixed(2) + ' %)' );
+			// Give a tollerance of 5 ms
+			if (binaryLoadingTime > sourceLoadingTime + 5) {
+				var percent = 100 * (binaryLoadingTime - sourceLoadingTime) / sourceLoadingTime;
+				assert.ok( binaryLoadingTime < sourceLoadingTime, 'binary bundle loaded slower (by ' + percent.toFixed(2) + ' %)' );
+			}
 			done();
 		});
 
@@ -168,33 +171,37 @@ function describe_clojure( bundleName, testFn ) {
 // Profiled encoding/decoding
 describe('[THREE.js Profile Tests]', function() {
 
-	// describe('animated.jbbsrc', describe_clojure( 'animated', function( original, encoded ) {
+	var commonIgnoredKeys = [
+		'uuid', 'parent', 'onChangeCallback', 'solid', 'constructor', 'set', 'image'
+	];
 
-	// 	// Configuration for explicit deep equal
-	// 	var config = {
-	// 		ignoreKeys: [ 'uuid' ],
-	// 		ignoreClasses: [ ],
-	// 		numericTollerance: 0.0001
-	// 	};
+	describe('animated.jbbsrc', describe_clojure( 'animated', function( original, encoded ) {
 
-	// 	// Explicit deep equal comparison
-	// 	compare.explicitDeepEqual( original['animated/flamingo'], 
-	// 							   encoded['animated/flamingo'], 
-	// 							   'in animated/flamingo', config );
-	// 	compare.explicitDeepEqual( original['animated/horse'], 
-	// 							   encoded['animated/horse'], 
-	// 							   'in animated/horse', config );
-	// 	compare.explicitDeepEqual( original['animated/monster'], 
-	// 							   encoded['animated/monster'], 
-	// 							   'in animated/monster', config );
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: commonIgnoredKeys,
+			ignoreClasses: [ ],
+			numericTollerance: 0.0001
+		};
 
-	// }));
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['animated/flamingo'], 
+								   encoded['animated/flamingo'], 
+								   'in animated/flamingo', config );
+		compare.explicitDeepEqual( original['animated/horse'], 
+								   encoded['animated/horse'], 
+								   'in animated/horse', config );
+		compare.explicitDeepEqual( original['animated/monster'], 
+								   encoded['animated/monster'], 
+								   'in animated/monster', config );
+
+	}));
 
 	describe('vrml.jbbsrc', describe_clojure( 'vrml', function( original, encoded ) {
 
 		// Configuration for explicit deep equal
 		var config = {
-			ignoreKeys: [ 'uuid', 'parent', 'onChangeCallback', 'solid' ],
+			ignoreKeys: commonIgnoredKeys,
 			ignoreClasses: [ ],
 			numericTollerance: 0.001
 		};
@@ -206,20 +213,20 @@ describe('[THREE.js Profile Tests]', function() {
 
 	}));
 
-	// describe('md2.jbbsrc', describe_clojure( 'md2', function( original, encoded ) {
+	describe('md2.jbbsrc', describe_clojure( 'md2', function( original, encoded ) {
 
-	// 	// Configuration for explicit deep equal
-	// 	var config = {
-	// 		ignoreKeys: [ 'uuid', 'parent' ],
-	// 		ignoreClasses: [ ],
-	// 		numericTollerance: 0.001
-	// 	};
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: commonIgnoredKeys,
+			ignoreClasses: [ ],
+			numericTollerance: 0.001
+		};
 
-	// 	// Explicit deep equal comparison
-	// 	compare.explicitDeepEqual( original['md2/ratamahatta'], 
-	// 							   encoded['md2/ratamahatta'], 
-	// 							   'in md2/ratamahatta', config );
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['md2/ratamahatta'], 
+								   encoded['md2/ratamahatta'], 
+								   'in md2/ratamahatta', config );
 
-	// }));
+	}));
 
 });

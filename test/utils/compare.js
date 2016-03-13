@@ -28,16 +28,26 @@ var mute 	= require('mute');
 function explicitDeepEqual( actual, expected, message, config, path ) {
 	var path = path || "object",
 		config = config || {}, a, b, unmute;
+
+	if ( ((actual === undefined) && (expected !== undefined)) ||
+	     ((actual !== undefined) && (expected === undefined))) {
+		assert.equal( actual, expected, path + ' mismatch ' + message );
+	}
+
 	if (typeof actual == "object") {
 		for (var k in actual) {
 
 			// Get values
 			unmute = mute();
-			a = actual[k];
-			b = expected[k];
-			unmute();
+			try {
+				a = actual[k];
+				b = expected[k];
+			} finally {
+				unmute();
+			}
 
 			// Skip ignored keys and classes
+			if (typeof a === 'function') continue;
 			if (config.ignoreKeys.indexOf(k) >= 0) continue;
 			for (var i=0; i<config.ignoreClasses.length; i++)
 				if (a instanceof config.ignoreClasses[i])

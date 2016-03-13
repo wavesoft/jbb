@@ -438,16 +438,9 @@ function decodePlainBulkArray( bundle, database ) {
 	for (var i=0, l=properties.length; i<l; i++)
 		values.push(decodePrimitive( bundle, database ));
 
-	// Read weaved property array
-	// var values = decodePrimitive( bundle, database );
-	// console.log("<<WAVE<<", values);
-
-	// // Create factory function
-	// var makeObject = Function("props","i", factoryFn);
-
 	// Create objects
-	var ans = [];
-	for (var i=0, len=values[0].length; i<len; i++)
+	var ans = [], len=values[0].length;
+	for (var i=0; i<len; i++)
 		ans.push( objectFactory(values, i) );
 		// ans.push( objectFactory(values, values.length / properties.length, i) );
 
@@ -719,6 +712,11 @@ function decodePrimitive( bundle, database ) {
 
 	} else if ((op & 0xF0) === 0xE0) { // I-Ref
 		var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
+		if (id >= bundle.iref_table.length) throw {
+			'name' 		: 'IrefError',
+			'message'	: 'Invalid IREF #'+id+'!',
+			toString 	: function(){return this.name + ": " + this.message;}
+		}
 		return DEBUG
 			? __debugMeta( bundle.iref_table[id], 'object.iref', { 'id': id } )
 			: bundle.iref_table[id];

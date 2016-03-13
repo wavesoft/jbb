@@ -3289,7 +3289,7 @@ BinaryEncoder.prototype = {
 	'lookupIRef': function( object ) {
 		if (object.__iref__ === undefined) return -1;
 		return object.__iref__;
-		// return this.indexRefLookup[ object.__iref ];
+		// return this.indexRefLookup[ object.__iref__ ];
 
 		// var idx = this.indexRefLookup[object];
 		// if (idx === undefined) return -1;
@@ -3320,7 +3320,7 @@ BinaryEncoder.prototype = {
 		Object.defineProperty(
 			object, "__iref__", {
 				enumerable: false,
-				value: this.indexRef.length,
+				value: this.indexRef.length-1,
 			}
 		);
 
