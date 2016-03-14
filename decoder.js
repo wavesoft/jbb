@@ -22,7 +22,7 @@
 var BinaryBundle = require("./lib/BinaryBundle");
 
 /* Production optimisations and debug metadata flags */
-if (typeof PROD === 'undefined') var PROD = true;
+if (typeof PROD === 'undefined') var PROD = false;
 if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
 
 /* Size constants */
@@ -243,7 +243,7 @@ function getFloatDeltaScale(t, scale) {
  */
 function decodeBlobURL( bundle, length ) {
 	var mimeType = bundle.readStringLT(),
-		blob = new Blob([ bundle.readTypedArray[NUMTYPE.UINT8]( length ) ], { type: mimeType });
+		blob = new Blob([ bundle.readTypedArray(NUMTYPE.UINT8, length ) ], { type: mimeType });
 	return DEBUG
 		? __debugMeta( URL.createObjectURL(blob), 'buffer', { 'mime': mimeType, 'size': length } )
 		: URL.createObjectURL(blob);
@@ -258,13 +258,13 @@ function decodeBuffer( bundle, len, buf_type ) {
 
 	// Process buffer according to type
 	if (buf_type === 0) { // STRING_LATIN
-		ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT8 ]( length ) );
+		ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT8 , length ) );
 		return DEBUG
 			? __debugMeta( ans, 'string.latin', {} )
 			: ans;
 
 	} else if (buf_type === 1) { // STRING_UTF8
-		ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT16 ]( length ) );
+		ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT16 , length ) );
 		return DEBUG
 			? __debugMeta( ans, 'string.utf8', {} )
 			: ans;
@@ -380,7 +380,7 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
 		num_type_to = NUMTYPE_DELTA_FLOAT.TO[ num_type ],
 		pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ),
 		scale = bundle.readTypedNum( NUMTYPE.FLOAT64 ),
-		values = bundle.readTypedArray[ num_type_to ]( len );
+		values = bundle.readTypedArray( num_type_to , len );
 
 	// console.log(">> DELTA_FLOAT len=",len,"type=",num_type,"scale=",scale,"pivot=",pivot);
 
@@ -401,7 +401,7 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
 function decodeDeltaArrayInt( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_INT.FROM[ num_type ] ]( len ),
 		v = bundle.readTypedNum( NUMTYPE_DELTA_INT.FROM[ num_type ] ),
-		values = bundle.readTypedArray[ NUMTYPE_DELTA_INT.TO[ num_type ] ]( len - 1 );
+		values = bundle.readTypedArray( NUMTYPE_DELTA_INT.TO[ num_type ] , len - 1 );
 
 	// Decode array
 	ans[0] = v;
@@ -492,7 +492,7 @@ function decodeBulkArray( bundle, database, len ) {
  */
 function decodeChunkedArray( bundle, database ) {
 	var op = bundle.readTypedNum( NUMTYPE.UINT8 ),
-		chunk, chunk_meta = [],	ans =[];
+		chunk, chunk_meta = [],	ans =[], first = true;
 
 	// Process chunks till PRIM_CHUNK_END
 	while (op !== 0x7F) {
@@ -581,7 +581,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Read from and encode to
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-		vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO[type] ]( len );
+		vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
 		nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 		// Return
@@ -632,7 +632,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Read raw array
 		// console.log("Reading NUM_RAW len="+len+", ln="+ln);
-		nArr = bundle.readTypedArray[ type ]( len );
+		nArr = bundle.readTypedArray( type , len );
 
 		// Return
 		return DEBUG
@@ -646,7 +646,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Read raw array
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-  		nArr = bundle.readTypedArray[ type ]( len );
+  		nArr = bundle.readTypedArray( type , len );
 
 		// Return
 		return DEBUG
