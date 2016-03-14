@@ -1,5 +1,6 @@
-
 # Bundle Format Specifications
+
+:warning: **This document is slightly outdated and is not reflecting the v1.2.0 version of the bundle.**
 
 The bundle format is optimised for use in conjunction with javascript `TypedArray`. Therefore, it's contents are laid out appropriately in order to minimise alignment padding.
 
