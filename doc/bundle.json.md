@@ -112,8 +112,8 @@ in your own `bundle.json` file:
         // Specify the loader class that is capapble of loading the resources
         // in this group.
         //
-        // This key is profile-specific, therefore you will need to the jbb
-        // profile for more details.
+        // This key is profile-specific, therefore you should refer to the
+        // appropriate jbb profile documentation for more details.
         //
         "THREE.JSONLoader": {
 
@@ -130,15 +130,28 @@ in your own `bundle.json` file:
             // this is just a string pointing to the resources, relative to
             // the bundle folder.
             // 
-            // The macro ${BUNDLE} is provided for convenience, and it
-            // expands to the base directory of the bundle.
+            // On a more complicated scenarios, the macro ${BUNDLE} is
+            // provided for convenience, and it expands to the base directory
+            // of the bundle. Refer on the THREE.MD2CharacterLoader example
+            // below for an example.
             //
             "test-model": "${BUNDLE}/models/test.json",
 
             //
-            // You can export as many modules as you want ...
+            // If the ${BUNDLE} macro is not used, the path to the resources
+            // should be relative to the bundle directory
             //
-            "another-model": "modeuls/world.json"
+            "another-model": "modeuls/world.json",
+
+            //
+            // There is no limitation on how many resources you can export
+            //
+            "big-model": "models/big.json",
+            "strong-model": "models/strong.json",
+            "tall-model": "models/tall.json",
+            "short-model": "models/short.json",
+            "thin-model": "models/thin.json",
+            ...
 
         },
 
@@ -150,7 +163,7 @@ in your own `bundle.json` file:
             
             //
             // For example, the MD2CharacterLoader requires detailed
-            // configuration for various parts:
+            // configuration for various parts (hence the need for             // the ${BUNDLE} macro)
             //
             "ratamahatta": {
                 "baseUrl": "${BUNDLE}/mesh/ratamahatta/",
