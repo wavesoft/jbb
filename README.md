@@ -94,7 +94,7 @@ To properly describe these resources you will need to specify the correct loader
 }
 ```
 
-*NOTE:* You don't need to specify the images or other depending resources (unless you explicitly need to refer to them). Whatever resources are referenced by the data structures at them moment of creation, will be automatically identified and collected at compile-time (including some DOM elements, such as `<img>` and `<script>`).
+*NOTE:* You don't need to include any depending resources, such as images (unless you explicitly need to refer to them). Whichever resources are referenced by the structures being created, will be automatically detected and collected at compile-time (including some DOM elements, such as `<img>` and `<script>`).
 
 ### Compiling with CLI
 
