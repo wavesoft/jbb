@@ -366,6 +366,50 @@ describe('[Core Tests]', function() {
 
 	});
 
+	describe('Object Bulks', function () {
+
+		// Compile some plain object arrays
+		var plain01 = [], plain02 = [], plain03 = [], f = new Float32Array(1);
+		for (var i=0; i<1000; i++) {
+			f[0] = Math.random();
+
+			plain01.push({
+				"a": f[0], "b": i, "c": false, "d": null, "e": undefined
+			});
+			plain02.push({
+				"same": "everywhere"
+			});
+			plain03.push({
+				"unmergable": [
+					true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String"
+				][ Math.floor(Math.random()*9) ]
+			});
+		}
+
+		// Plain objects
+		// it_should_return( plain01, 'Plain Buk of [ 10,000 x { "a": num, "b": num, "c": false, "d": null, "e": undefined } ]' );
+		// it_should_return( plain02, 'Plain Buk of [ 10,000 x { "same": "everywhere" } ]' );
+		it_should_return( plain03, 'Plain Buk of [ 10,000 x { "unmergable": [varies] } ]' );
+
+		// Compile some known objects
+		var known01 = [], known02 = [], known03 = [],
+			inst_set = [
+				new ObjectB("first",1), new ObjectB("second", 2), new ObjectB("third", 3),
+				new ObjectB("fourth",4), new ObjectB("fifth", 5), new ObjectB("sixth", 6),
+			];
+		for (var i=0; i<100; i++) {
+			known01.push( inst_set[Math.floor(Math.random() * inst_set.length)] ); // IREF In first occurance
+			known02.push( new ObjectA() ); // All IREF by value
+			known03.push( new ObjectB(i, "object-"+i) ); // All different
+		}
+
+		// Known objects
+		// it_should_return( known01, 'Known Bulk of [ 10,000 x [ Variety of x'+inst_set.length+' ] ]' );
+		// it_should_return( known02, 'Known Bulk of [ 10,000 x ObjectA() ]' );
+		// it_should_return( known03, 'Known Bulk of [ 10,000 x ObjectB( [varies], [varies] ) ]' );
+
+	});
+
 	describe('Chunked Arrays', function () {
 		var values, matchTypes;
 
@@ -429,12 +473,6 @@ describe('[Core Tests]', function() {
 			[ false ]
 		);
 		it_should_return( values, 'Repeated Chunk [ \'chunk_prefix\', 32,767 x \'same\', false ]', [match_metaType('array.primitive.chunked')] );
-		// values = [].concat(
-		// 	[ 'chunk_prefix' ],
-		// 	gen_array_rep( 'Array', 65535, 'same' ),
-		// 	[ false ]
-		// );
-		// it_should_return( values, 'Repeated Chunk [ 65,535 x \'same\' ]' );
 
 		// Create bulk array
 		var bulkrep = [];
@@ -458,6 +496,26 @@ describe('[Core Tests]', function() {
 		];
 		it_should_return( [ 5, 34, 546, 57890, 451106, 5693986, 72802850, 1146544674, null ], [match_chunkTypes(two_chunks)] );
 		it_should_return( [ 1146544674, 72802850, 5693986, 451106, 57890, 546, 34, 5, null ], [match_chunkTypes(two_chunks)] );
+
+		// Difficulty with non-continuous items
+		var difficult = [];
+		for (var i=0; i<2000; i++) {
+			difficult.push(
+				[ true, false, undefined, 148, 64473, 12847612, 40.1927375793457, "String",
+				  { 'some': 'object', 'a': 1, 'b': 2 }, new ObjectA(), new ObjectB( null, "test" )
+				][Math.floor(Math.random()*12)]
+			);
+		}
+		it_should_return( difficult, '[ 2,000 x [varying] ]' );
+
+		// Error case encountered before
+		var err = [];
+		for (var i=0; i<100; i++) {
+			err.push([
+					true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String"
+				][ Math.floor(Math.random()*9) ]);
+		}
+		it_should_return( err, '[ 100 x [varying] ]' );
 
 	});
 

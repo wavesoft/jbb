@@ -90,7 +90,7 @@ var ScriptElement = document.createElement('script').constructor;
  */
 var BinarySearchTree = bst.BinarySearchTree,
 	objectBstComparison = function(a,b) {
-		for (var i=0; i<a.length; i++) {
+		for (var i=0; i<a.length; ++i) {
 			if (a[i] < b[i]) return -1;
 			if (a[i] > b[i]) return 1;
 			if (a[i] !== b[i]) return 1;
@@ -99,7 +99,7 @@ var BinarySearchTree = bst.BinarySearchTree,
 		return 0;
 	},
 	objectBstEquals = function(a,b) {
-		for (var i=0; i<a.length; i++) {
+		for (var i=0; i<a.length; ++i) {
 			if (a[i] !== b[i]) return false;
 		}
 		return true;
@@ -334,9 +334,9 @@ const ARR_OP = {
 	PRIM_REPEATED: 	 0x68, // Repeated Primitive Value
 	PRIM_RAW: 		 0x6A, // Raw Primitive Array
 	PRIM_BULK_PLAIN: 0x6C, // Bulk Array of Plain Objects
-	PRIM_BULK_KNOWN: 0x6D, // Bulk Array of Known Objects
 	PRIM_SHORT: 	 0x6E, // Short Primitive Array
 	PRIM_CHUNK: 	 0x6F, // Chunked Primitive ARray
+	PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
 	EMPTY: 			 0x7E, // Empty Array
 	PRIM_CHUNK_END:  0x7F, // End of primary chunk
 };
@@ -349,7 +349,7 @@ const ARR_CHUNK = {
 	REPEAT: 	 2, // Repeated of the same primitive
 	NUMERIC: 	 3, // A numeric TypedArray
 	BULK_PLAIN:  4, // A bulk of many plain objects
-	BULK_OBJECT: 5, // A bulk of many objects
+	BULK_KNOWN:  5, // A bulk of known objects
 };
 
 /**
@@ -378,6 +378,15 @@ const PRIM_BUFFER_TYPE = {
 	BUF_IMAGE: 		 2,
 	BUF_SCRIPT: 	 3,
 	RESOURCE: 		 7,
+};
+
+/**
+ * BULK_KNOWN Array encoding operator codes
+ */
+const PRIM_BULK_KNOWN_OP = {
+	DEFINE 	: 0x00,		// Define a new object for IREF
+	IREF 	: 0x40,		// Refer to an IREF object
+	XREF 	: 0x80,		// Refer to an XREF object
 };
 
 /**
@@ -497,7 +506,7 @@ var packBuffer = new ArrayBuffer(8),
 		} }
 		if (signed) packViewI16[0] = num;
 		else packViewU16[0] = num;
-		for (var i=0; i<2; i++) n[i]=packViewU8[i];
+		for (var i=0; i<2; ++i) n[i]=packViewU8[i];
 		return n;
 	},
 	pack4b = function( num, signed ) {
@@ -527,7 +536,7 @@ var packBuffer = new ArrayBuffer(8),
 		} }
 		if (signed) packViewI32[0] = num;
 		else packViewU32[0] = num;
-		for (var i=0; i<4; i++) n[i]=packViewU8[i];
+		for (var i=0; i<4; ++i) n[i]=packViewU8[i];
 		return n;
 	},
 	pack4f = function( num ) {
@@ -539,7 +548,7 @@ var packBuffer = new ArrayBuffer(8),
 			toString 	: function(){return this.name + ": " + this.message;}
 		} };
 		packViewF32[0] = num;
-		for (var i=0; i<4; i++) n[i]=packViewU8[i];
+		for (var i=0; i<4; ++i) n[i]=packViewU8[i];
 		return n;
 	},
 	pack8f = function( num ) {
@@ -556,7 +565,7 @@ var packBuffer = new ArrayBuffer(8),
 			toString 	: function(){return this.name + ": " + this.message;}
 		} };
 		packViewF64[0] = num;
-		for (var i=0; i<8; i++) n[i]=packViewU8[i];
+		for (var i=0; i<8; ++i) n[i]=packViewU8[i];
 		return n;
 	},
 	packTypedArray = function( arr ) {
@@ -1087,7 +1096,7 @@ function getFloatScale( values, min, max, error ) {
 
 	// For the values given, check if 8-bit or 16-bit
 	// scaling brings smaller error value
-	for (var i=0, l=values.length; i<l; i++) {
+	for (var i=0, l=values.length; i<l; ++i) {
 
 		// Test 8-bit scaling
 		if (ok_8) {
@@ -1286,7 +1295,7 @@ function analyzeNumericArray( v, include_costly ) {
 		a, b, d_type, cd, cv, lv = v[0];
 
 	// Anlyze array items
-	for (var i=0, l=v.length; i<l; i++) {
+	for (var i=0, l=v.length; i<l; ++i) {
 		cv = v[i];
 
 		// Exit on non-numeric cases
@@ -1435,6 +1444,300 @@ function analyzeNumericArray( v, include_costly ) {
 
 }
 
+/**
+ * Analyze primitive array and return useful information
+ */
+function analyzePrimitiveArray( encoder, array ) {
+
+	const TEST_NUMBER = 0,
+		  TEST_PLAIN = 1,
+		  TEST_OBJECT = 2,
+		  TEST_PRIMITIVE = 3;
+
+	const BF_PRIM 	= 0x01,
+		  BF_REP	= 0x02,
+		  BF_NUM 	= 0x04,
+		  BF_PLAIN 	= 0x08,	
+		  BF_KNOWN  = 0x10;
+
+	var v, v_type, handled, id,
+		
+		t_mode, t_numtype, t_constr, t_keys,
+
+		new_keys, old_keys, some_overlap,
+
+		block_flags = new Uint8Array( array.length ),
+		ENTITIES = encoder.objectTable.ENTITIES,
+
+		b_prim = null, 	blocks_prim = [],
+		b_rep = null,	blocks_rep = [],
+		b_num = null,	blocks_num = [],
+		b_plain = null,	blocks_plain = [],
+		b_known = null,	blocks_known = [];
+
+	// Start scanning array elements
+	for (var i=0, l=array.length; i<l; ++i) {
+
+		// Reset test flags
+		t_numtype = NUMTYPE.NAN;
+
+		// Get test mode of the current value
+		v = array[i];
+		v_type = typeof v;
+		if (v_type === 'number') {
+			t_mode = TEST_NUMBER;
+			t_numtype = getNumType( v, v, ((v % 1) !== 0) );
+		} else if (v_type === 'string' ) {
+			t_mode = TEST_PRIMITIVE;
+		} else if (v_type === 'boolean' ) {
+			t_mode = TEST_PRIMITIVE;
+		} else if (v_type === 'undefined' ) {
+			t_mode = TEST_PRIMITIVE;
+		} else if (v === null) {
+			t_mode = TEST_PRIMITIVE;
+		} else if (v.constructor === ({}).constructor) {
+			t_mode = TEST_PLAIN;
+		} else { /* Other objects */
+			t_constr = v.constructor;
+			t_mode = TEST_OBJECT;
+		}
+
+		console.log("### v=",v,", t=",t_mode);
+
+		//
+		// [BLOCK #1] - Test for same value
+		//
+
+		if (b_rep===null) {
+			b_rep = [i, 1, v];
+		} else {
+			if (v===b_rep[2]) {
+				b_rep[1]++;
+			} else if (encoder.optimize.cfwa_object_byval
+				&& ((t_mode === TEST_OBJECT) || (t_mode === TEST_PLAIN))
+				&& deepEqual(b_rep[2], v)) {
+				b_rep[1]++;
+			} else {
+				if (b_rep[1]>1) {
+					blocks_rep.push(b_rep);
+				}
+				b_rep = [i, 1, v];
+			}
+		}
+
+		//
+		// [BLOCK #2] - Test for numbers
+		//
+		if (t_mode !== TEST_NUMBER) {
+			// Stopped being a number
+			if (b_num !== null) {
+				if (b_num[1]>1)
+					blocks_num.push( b_num );
+				b_num = null;
+			} 
+		} else {
+
+			// Check for first encounter
+			if (b_num === null) {
+				b_num = [i, 1, t_numtype, v, v];
+
+			} else {
+				handled = false;
+
+				// Check for numeric subclass
+				if (!isFloatMixing(b_num[2], t_numtype)) {
+
+					// Allow type upscale of numtype
+					if (isNumericSubclass(b_num[2], b_num[3], b_num[4], t_numtype)) {
+						// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[b_num[2]]+" to "+_NUMTYPE[t_numtype]).cyan);
+						b_num[2] = t_numtype;
+					}
+
+					// Accept only numeric subclasses
+					if (isNumericSubclass(t_numtype, v, v, b_num[2])) {
+						handled = true;
+						b_num[1]++;
+
+						// Update bounds (for subclass testing)
+						if (v < b_num[3]) b_num[3] = v;
+						if (v > b_num[4]) b_num[4] = v;
+					}
+				}
+
+				// Stopped being an acceptable number (but still a number)
+				if (!handled) {
+					if (b_num[1]>1)
+						blocks_num.push( b_num );
+					b_num = [i, 1, t_numtype, v, v];
+				}
+
+			}
+		}
+
+		//
+		// [BLOCK #3] - Test for plain objects
+		//
+
+		if (t_mode !== TEST_PLAIN) {
+			// Stopped being a plain object
+			if (b_plain !== null) {
+				if (b_plain[1]>1)
+					blocks_plain.push( b_plain );
+				b_plain = null;
+			}
+		} else {
+
+			// Check for first encounter
+			if (b_plain===null) {
+				b_plain = [i, 1, Object.keys(v)];
+
+			} else {
+
+				// Calculate key differences
+				t_keys = Object.keys( v ).sort();
+				new_keys = 0; some_overlap = false;
+				old_keys = b_plain[2].length;
+				for (var ja=0, jb=0, jl=b_plain[2].length; (ja<jl) && (jb<jl) ;) {
+					if (t_keys[ja] < b_plain[2][jb]) {
+						jb++;
+						new_keys++;
+						b_plain[2].push( t_keys[ja] )
+					} else if (t_keys[ja] > b_plain[2][jb]) {
+						ja++;
+					} else {
+						ja++;
+						jb++;
+						some_overlap = true;
+					}
+				}
+
+				// Allow up to 25% extension of the key set
+				if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
+					b_plain[1]++;
+				} else {
+
+					// Stopped being a compatible plain object number (but still a plain object)
+					if (!handled) {
+						if (b_plain[1]>1)
+							blocks_plain.push( b_plain );
+						b_plain = [i, 1, Object.keys(v)];
+					}
+
+				}
+
+			}
+		}
+
+		//
+		// [BLOCK #4] - Test for possibly known objects
+		//
+
+		if (t_mode !== TEST_OBJECT) {
+			// Stopped being a known object
+			if (b_known !== null) {
+				if (b_known[1]>1)
+					blocks_known.push( b_known );
+				b_known = null;
+			}
+		} else {
+
+			// Check for first encounter
+			if (b_known===null) {
+
+				// Lookup constructor
+				id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
+					if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[i][0])) {
+						id = j;
+						break;
+					}
+				}
+
+				// Check if this is a known object
+				if (id > -1) {
+					b_known = [i, 1, id, v.constructor];
+				} else {
+					// Make this behave like a primitive
+					t_mode = TEST_PRIMITIVE;
+				}
+
+			} else {
+
+				// Check if we remain the same object
+				if (v.constructor === b_known[3]) {
+
+				} else {
+
+					// Stopped being a compatible known object number (but still a known object)
+					if (b_known[1]>1) 
+						blocks_known.push( b_known );
+
+					// Lookup constructor
+					id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
+						if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[i][0])) {
+							id = j;
+							break;
+						}
+					}
+
+					// Check if we are indeed a known object
+					if (id > -1) {
+						b_known = [i, 1, id, v.constructor];
+					} else {
+						// Make this behave like a primitive
+						t_mode = TEST_PRIMITIVE;
+					}
+
+				}
+
+			}
+
+		}
+
+		//
+		// [BLOCK #5] - Test for primitives
+		//
+
+		if (t_mode !== TEST_PRIMITIVE) {
+			// Stopped being a known object
+			if (b_prim !== null) {
+				if (b_prim[1]>1)
+					blocks_prim.push( b_prim );
+				b_prim = null;
+			}
+		} else {
+			if (b_prim === null) {
+				b_prim = [i, 1, null];
+			} else {
+				b_prim[1]++;
+			}
+		}
+
+	}
+
+	// Close blocks
+	if (b_rep && (b_rep[1]>1)) blocks_rep.push(b_rep);
+	if (b_num) blocks_num.push(b_num);
+	if (b_prim) blocks_prim.push(b_prim);
+	if (b_plain) blocks_plain.push(b_plain);
+	if (b_known) blocks_known.push(b_known);
+
+	// Perform bucket-fitting in order to use the smallest
+	// number of different blocks
+	console.log("-----------------------");
+	console.log("IN: ", array);
+	console.log("-----------------------");
+	console.log("B[REP]  :", blocks_rep);
+	console.log("B[NUM]  :", blocks_num);
+	console.log("B[PRIM] :", blocks_prim);
+	console.log("B[PLAIN]:", blocks_plain);
+	console.log("B[KNOWN]:", blocks_known);
+	console.log("-----------------------");
+
+	// Return blocks of [ length, type, subtype]
+	return [ [ array.length, ARR_CHUNK.PRIMITIVES, null ] ];
+
+}
+
 
 /**
  * Isolate the next chunk of interest in a primitive array
@@ -1462,7 +1765,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		keys, is_positive, new_keys, old_keys, is_numeric, some_overlap,
 		have_optimised_items = false,
 		c_same = 0, c_numeric = 0, c_plain = 0,			// Counters of individually optimisied items
-		c_unoptimised = 0,
+		c_unoptimised = 0, c_sameconstr = 0, last_test_constr, test_constr,
 		last_test_mode, last_value, last_numtype, first_value, // Last state variables
 		last_keys = [], all_positive = false, type_oscilating = false,
 		min_num, max_num;
@@ -1488,6 +1791,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		last_test_mode = TEST_PLAIN;
 		last_keys = Object.keys( v ).sort();
 	} else { /* Other objects */
+		last_test_constr = v.constructor;
 		last_test_mode = TEST_PRIMITIVE;
 	}
 	last_value = v;
@@ -1496,7 +1800,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 	first_value = v;
 
 	// Scan items
-	for (var i=start+1, il=array.length; i<il; i++) {
+	for (var i=start+1, il=array.length; i<il; ++i) {
 
 		// Get test mode of the current value
 		v = array[i];
@@ -1520,6 +1824,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 		} else if (v.constructor === ({}).constructor) {
 			test_mode = TEST_PLAIN;
 		} else { /* Other objects */
+			test_constr = v.constructor;
 			test_mode = TEST_PRIMITIVE;
 		}
 
@@ -1581,6 +1886,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 							? !deepEqual( v, first_value )
 							: (v !== first_value) ) {
 							if (c_plain) c_plain--;
+							console.log(">> "+("Candidate: Same plain objects").yellow);
 							break_candidate = true;
 							break;
 						}
@@ -1647,12 +1953,18 @@ function chunkForwardAnalysis( encoder, array, start ) {
 						}
 
 					}
+
+					// Count conecutive objects of same type
+					if (test_constr === last_test_constr) {
+						c_sameconstr++;
+					}
+
 					break;
 			}
 
 			// If we couldn't optimise anything, break
 			if (break_candidate) {
-				// console.log(">> "+("Breaking due to a break candidate").yellow);
+				console.log(">> "+("Breaking due to a break candidate").yellow);
 				break;
 			}
 
@@ -1666,7 +1978,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 				type_oscilating = true;
 			} else {
 				// Otherwise break
-				// console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
+				console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
 				break;
 			}
 		}
@@ -1687,7 +1999,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
 	}
 
 	// Find maximum for best fit
-	// console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
+	console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
 	var max = Math.max( c_same, c_numeric, c_plain, c_unoptimised );
 
 	// [0] Nothing found? That's a single primitive
@@ -1702,15 +2014,27 @@ function chunkForwardAnalysis( encoder, array, start ) {
 	} else if ( c_numeric === max ) {
 		return [ ARR_CHUNK.NUMERIC, c_numeric+1, last_numtype ];
 
-	// [3] Then prefer numeric arrays
+	// [3] Then prefer plain objects with same (or simmilar) signature
 	} else if ( c_plain === max ) {
 		return [ ARR_CHUNK.BULK_PLAIN, c_plain+1, last_keys ];
 
-	// [4] Finally, bulked, unoptimised primitives
-	} else {
-		return [ ARR_CHUNK.PRIMITIVES, c_unoptimised, null ];
+	// [4] Then prefer objects with same constructor
+	} else if ( c_sameconstr > 8 ) {
+
+		// Check if this constructor is part of a known entity
+		var ENTITIES = encoder.objectTable.ENTITIES;
+		for (var i=0, len=ENTITIES.length; i<len; ++i) {
+			if ((ENTITIES[i].length > 0) && (first_value instanceof ENTITIES[i][0])) {
+				// return [ ARR_CHUNK.BULK_KNOWN, c_sameconstr+1, i ];
+				break;
+			}
+		}
 
 	}
+
+	// [5] Finally, bulked, unoptimised primitives
+	return [ ARR_CHUNK.PRIMITIVES, c_unoptimised, null ];
+
 
 }
 
@@ -1719,7 +2043,7 @@ function chunkForwardAnalysis( encoder, array, start ) {
  */
 function downscaleType( fromType, toType ) {
 	// Lookup conversion on the downscale table
-	for (var i=0; i<NUMTYPE_DOWNSCALE.FROM.length; i++) {
+	for (var i=0; i<NUMTYPE_DOWNSCALE.FROM.length; ++i) {
 		if ( (NUMTYPE_DOWNSCALE.FROM[i] === fromType) && 
 			 (NUMTYPE_DOWNSCALE.TO[i] === toType) )
 			return i;
@@ -1733,7 +2057,7 @@ function downscaleType( fromType, toType ) {
  */
 function deltaEncTypeInt( fromType, toType ) {
 	// Lookup conversion on the downscale table
-	for (var i=0; i<NUMTYPE_DELTA_INT.FROM.length; i++) {
+	for (var i=0; i<NUMTYPE_DELTA_INT.FROM.length; ++i) {
 		if ( (NUMTYPE_DELTA_INT.FROM[i] === fromType) && 
 			 (NUMTYPE_DELTA_INT.TO[i] === toType) )
 			return i;
@@ -1747,7 +2071,7 @@ function deltaEncTypeInt( fromType, toType ) {
  */
 function deltaEncTypeFloat( fromType, toType ) {
 	// Lookup conversion on the downscale table
-	for (var i=0; i<NUMTYPE_DELTA_FLOAT.FROM.length; i++) {
+	for (var i=0; i<NUMTYPE_DELTA_FLOAT.FROM.length; ++i) {
 		if ( (NUMTYPE_DELTA_FLOAT.FROM[i] === fromType) && 
 			 (NUMTYPE_DELTA_FLOAT.TO[i] === toType) )
 			return i;
@@ -1766,7 +2090,7 @@ function deltaEncTypeFloat( fromType, toType ) {
  */
 function deltaEncodeIntegers( array, numType ) {
 	var delta = new NUMTYPE_CLASS[numType]( array.length - 1 ), l = array[0];
-	for (var i=1; i<array.length; i++) {
+	for (var i=1; i<array.length; ++i) {
 		var v = array[i]; delta[i-1] = v - l; l = v;
 	}
 	return delta;
@@ -1932,7 +2256,7 @@ function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to, pivot, f_scal
 
 	// Pivot-encode floats
 	var pivot_array = new NUMTYPE_CLASS[n_to]( data.length );
-	for (var i=1; i<data.length; i++) {
+	for (var i=1; i<data.length; ++i) {
 		pivot_array[i] = (data[i] - pivot) / f_scale;
 		// console.log(">>>", data[i],"->", pivot_array[i]);
 	}
@@ -2108,16 +2432,17 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 
 	// Write bulked properties
 	// var weaveArrays = [];
-	for (var i=0, pl=properties.length; i<pl; i++) {
+	for (var i=0, pl=properties.length; i<pl; ++i) {
 
 		// Read property of all entries
 		var prop = [], p = properties[i];
-		for (var j=0, el=data.length; j<el; j++) {
+		for (var j=0, el=data.length; j<el; ++j) {
 			prop.push( data[j][p] );
 			// weaveArrays.push( data[j][p] );
 		}
 
 		// Align values of same property for optimal encoding
+		console.log("ENCODE["+p+"]:",prop);
 		encodeArray( encoder, prop );
 
 	}
@@ -2131,14 +2456,130 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 /**
  * Encode array data as bulk of known objects
  */
-function encodeArray_PRIM_BULK_KNOWN( encoder, data ) {
+function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 
 	//
 	// Bulk Array for Known Object (PRIM_BULK_KNOWN)
 	//
-	// ........
-	// 01111001
+	// .......  .   +   Data Length  +  Entity ID
+	// 0111110 [LN]    [16bit/32bit]     [16bit]
 	//
+
+	// Lookup signature
+	var object, id, i, c_export = 0, _x=0,
+		PROPERTIES = encoder.objectTable.PROPERTIES[eid], plen = PROPERTIES.length,
+		propertyTable = [], waveTable = [], op8 = [], op16 = [];
+	encoder.log(LOG.ARR, "array.prim.known, len="+data.length+
+		", eid="+eid+", props="+PROPERTIES.join(",")+" [");
+	encoder.logIndent(1);
+
+	// Put header
+	if (data.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT16 ) );
+		encoder.stream16.write( pack2b( data.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT32 ) );
+		encoder.stream32.write( pack4b( data.length, false ) );
+		encoder.counters.arr_hdr+=5;
+	}
+
+	// Write header
+	encoder.stream16.write( pack2b( eid, false ) );
+	encoder.counters.arr_hdr+=2;
+
+	// Prepare Tables
+	for (i=0; i<plen; ++i) {
+		propertyTable.push( null );
+		waveTable.push( [] );
+	}
+
+	// Populate fields
+	for (var j=0, el=data.length; j<el; ++j) {
+		object = data[j];
+
+		// Check ByRef internally
+		id = encoder.lookupIRef( object );
+		if (id > -1) {
+			if (c_export > 0) {
+				// console.log(">>[known="+c_export+" (ref)]>>");
+				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				c_export = 0;
+			}
+			// console.log(">>[iref="+id+" (ref)]>>");
+			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.IREF | ((id << 16) & 0x0F) ) );
+			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			continue;
+		}
+
+		// Check ByRef externally
+		id = encoder.lookupXRef( object );
+		if (id > -1) {
+			if (c_export > 0) {
+				// console.log(">>[known="+c_export+" (ref)]>>");
+				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				c_export = 0;
+			}
+			// console.log(">>[xref="+id+"]>>");
+			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.XREF ) );
+			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			continue;
+		}
+
+		// Populate property table (for byval lookup)
+		for (i=0; i<plen; ++i) {
+			propertyTable[i] = object[ PROPERTIES[i] ];
+		}
+
+		// Check ByVal ref
+		id = encoder.lookupIVal( propertyTable, eid );
+		if (id > -1) {
+			if (c_export > 0) {
+				// console.log(">>[known="+c_export+" (ref)]>>");
+				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				c_export = 0;
+			}
+			// console.log(">>[iref="+id+" (val)]>>");
+			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.IREF | ((id << 16) & 0x0F) ) );
+			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			continue;
+		}
+
+		// Keep IREF
+		encoder.keepIRef( object, propertyTable, eid );
+
+		// Populate the weave table for the actual encoding.
+		for (i=0; i<plen; ++i) {
+			waveTable[i].push( object[ PROPERTIES[i] ] );
+		}
+
+		// Count how many objects are exported in a bulk,
+		// and flush every 63 items since that's how much
+		// we can fit in a single 8-bit command
+		c_export++;
+		_x++;
+		if (c_export > 62) {
+			// console.log(">>[known="+c_export+" (bulk)]>>");
+			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+			c_export = 0;
+		}
+
+	}
+
+	// Finalize export op-codes
+	if (c_export > 0) {
+		// console.log(">>[known="+c_export+" (end)]>>");
+		encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+	}
+
+	// Write weaved properties
+	for (i=0; i<plen; ++i) {
+		encodeArray( encoder, waveTable[i] );
+	}
+
+	// Close log group
+	encoder.logIndent(-1);
+	encoder.log(LOG.ARR, "]");
 
 }
 
@@ -2165,7 +2606,7 @@ function encodeArray_PRIM_SHORT( encoder, data ) {
 	encoder.logIndent(1);
 
 	// Encode each primitive individually
-	for (var i=0, llen=data.length; i<llen; i++) {
+	for (var i=0, llen=data.length; i<llen; ++i) {
 		encodePrimitive( encoder, data[i] );
 	}
 
@@ -2233,7 +2674,7 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 	encoder.logIndent(1);
 
 	// Write primitives
-	for (var i=0, l=data.length; i<l; i++)
+	for (var i=0, l=data.length; i<l; ++i)
 		encodePrimitive( encoder, data[i] );
 
 	// Close log group
@@ -2245,7 +2686,7 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 /**
  * Encode array data as one or more chunks of other types
  */
-function encodeArray_PRIM_CHUNK( encoder, data, first_chunk ) {
+function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	//
 	// Chunked Primitive Array (PRIM_CHUNK)
@@ -2259,21 +2700,13 @@ function encodeArray_PRIM_CHUNK( encoder, data, first_chunk ) {
 	// Write chunk header
 	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
 	encoder.log(LOG.ARR, "array.prim.chunk, len="+data.length+
-		", peek="+data[0]+" [");
+		", chunks="+chunks.length+", peek="+data[0]+" [");
 	encoder.logIndent(1);
 
-	// Write first chunk
-	encodeArray_Chunk( encoder, data.slice(0, first_chunk[1]), first_chunk );
-
-	// Write chunks with forward analysis
-	for (var i=first_chunk[1], llen=data.length; i<llen;) {
-
-		// Forward chunk analysis
-		chunk = chunkForwardAnalysis( encoder, data, i );
-		// Encode Chunk
-		encodeArray_Chunk( encoder, data.slice(i,i+chunk[1]), chunk );
-		// Next chunk
-		i += chunk[1];
+	// Encode individual chunks
+	for (var i=0, ofs=0, llen=chunks.length; i<llen; ++i) {
+		encodeArray_Chunk( encoder, data.slice(ofs, chunks[i][0]), chunks[i][1], chunks[i][2] );
+		ofs += chunks[i][0];
 	}
 
 	// Write chunk termination
@@ -2306,13 +2739,10 @@ function encodeArray_EMPTY( encoder ) {
  * Encode an array chunk, previously constructed
  * by chunkForwardanalysis
  */
-function encodeArray_Chunk( encoder, data, chunk ) {
-	var chunkType = chunk[0],
-		chunkSize = chunk[1],
-		chunkSubType = chunk[2],
-		n_type, na;
+function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
+	var n_type, na;
 
-	// console.log(">>> CFWA Chunk=", chunk,":",data);
+	console.log(">>> CFWA Chunk=", chunkType,":",data);
 
 	// Encode array component according to chunk type
 	switch (chunkType) {
@@ -2358,6 +2788,11 @@ function encodeArray_Chunk( encoder, data, chunk ) {
 			encodeArray_PRIM_BULK_PLAIN( encoder, data, chunkSubType );
 			break;
 
+		// Encode as a bulk of known objects
+		case ARR_CHUNK.BULK_KNOWN:
+			encodeArray_PRIM_BULK_KNOWN( encoder, data, chunkSubType );
+			break;
+
 		// Just precaution
 		default:
 			throw {
@@ -2397,7 +2832,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 
 			// Test for same
 			lv = data[0];
-			for (var i=1, len=data.length; i<len; i++) {
+			for (var i=1, len=data.length; i<len; ++i) {
 				v = data[i]; if (v !== lv) {
 					same = false; break;
 				} lv = v;
@@ -2489,7 +2924,7 @@ function encodeArray_Primitive( encoder, data ) {
 
 		// Test if these 255 values are the same
 		var v, lv=data[0], same=true;
-		for (var i=0, len=data.length; i<l; i++) {
+		for (var i=0, len=data.length; i<l; ++i) {
 			if ( encoder.optimize.cfwa_object_byval 
 					? !deepEqual( v, lv )
 					: (v !== lv) 
@@ -2510,18 +2945,40 @@ function encodeArray_Primitive( encoder, data ) {
 
 	// Perform a chunk forward analysis to classify the whole
 	// or part of the current array
-	var chunk = chunkForwardAnalysis( encoder, data, 0 );
+	// var chunk = chunkForwardAnalysis( encoder, data, 0 );
 
-	// Check if this is the whole array
-	if (chunk[1] === data.length) {
+	// // Check if this is the whole array
+	// if (chunk[1] === data.length) {
+
+	// 	// Just encode a single chunk as array component
+	// 	encodeArray_Chunk( encoder, data, chunk );
+
+	// } else {
+
+	// 	// We have more than one chunk, start encoding chunked array
+	// 	encodeArray_PRIM_CHUNK( encoder, data, chunk );
+
+	// }
+
+	var chunks = analyzePrimitiveArray( encoder, data );
+	if (chunks.length === 1) {
+
+		// Just check
+		if (chunks[0][0] !== data.length) {
+			throw {
+				'name' 		: 'AssertError',
+				'message'	: 'Primitive array analysis reported single chunk but does not match array length!',
+				toString 	: function(){return this.name + ": " + this.message;}
+			}
+		}
 
 		// Just encode a single chunk as array component
-		encodeArray_Chunk( encoder, data, chunk );
+		encodeArray_Chunk( encoder, data, chunks[0][1], chunks[0][2] );
 
 	} else {
 
 		// We have more than one chunk, start encoding chunked array
-		encodeArray_PRIM_CHUNK( encoder, data, chunk );
+		encodeArray_PRIM_CHUNK( encoder, data, chunks );
 
 	}
 
@@ -2634,7 +3091,7 @@ function encodeStringBuffer( encoder, str, utf8 ) {
 	// If we do not have an explicit utf8 or not decision, pick one now
 	if (utf8 === undefined) {
 		utf8 = false; // Assume false
-		for (var i=0, strLen=str.length; i<strLen; i++) {
+		for (var i=0, strLen=str.length; i<strLen; ++i) {
 			if (str.charCodeAt(i) > 255) {
 				utf8 = true; break;
 			}
@@ -2656,7 +3113,7 @@ function encodeStringBuffer( encoder, str, utf8 ) {
 	}
 
 	// Copy into buffer
-	for (var i=0, strLen=str.length; i<strLen; i++) {
+	for (var i=0, strLen=str.length; i<strLen; ++i) {
 		bufView[i] = str.charCodeAt(i);
 	}
 
@@ -2709,7 +3166,7 @@ function encodeObject( encoder, object ) {
 	// Lookup object type
 	var ENTITIES = encoder.objectTable.ENTITIES, eid = -1;
 	try {
-	for (var i=0, len=ENTITIES.length; i<len; i++)
+	for (var i=0, len=ENTITIES.length; i<len; ++i)
 		if ((ENTITIES[i].length > 0) && (object instanceof ENTITIES[i][0]))
 			{ eid = i; break; }
 	} catch (e) {
@@ -2729,7 +3186,7 @@ function encodeObject( encoder, object ) {
 	// Populate property table
 	var	PROPERTIES = encoder.objectTable.PROPERTIES[eid],
 		propertyTable = new Array( PROPERTIES.length );
-	for (var i=0, len=PROPERTIES.length; i<len; i++) {
+	for (var i=0, len=PROPERTIES.length; i<len; ++i) {
 		propertyTable[i] = object[ PROPERTIES[i] ];
 	}
 
@@ -2793,7 +3250,7 @@ function encodePlainObject( encoder, object ) {
 
 	// Collect values of all properties
 	var values = [];
-	for (var i=0, len=o_keys.length; i<len; i++)
+	for (var i=0, len=o_keys.length; i<len; ++i)
 		values.push( object[o_keys[i]] );
 
 	encoder.log(LOG.PLO, "plain["+sid+"], signature="+o_keys.toString()+", sid="+sid);
@@ -3110,7 +3567,7 @@ BinaryEncoder.prototype = {
 
 		// Write down null-terminated string lookup table in the end
 		var stream8offset = this.stream8.offset;
-		for (var i=0; i<this.stringLookup.length; i++) {
+		for (var i=0; i<this.stringLookup.length; ++i) {
 			this.stream8.write( new Buffer( this.stringLookup[i] ) );
 			this.stream8.write( new Buffer( [0] ) );
 		}
@@ -3118,7 +3575,7 @@ BinaryEncoder.prototype = {
 
 		// Encode the object signature table
 		var stream16offset = this.stream16.offset;
-		for (var i=0; i<this.plainObjectSignatureTable.length; i++)
+		for (var i=0; i<this.plainObjectSignatureTable.length; ++i)
 			this.stream16.write( this.plainObjectSignatureTable[i] );
 		// console.log("OT: len="+(this.stream16.offset - stream16offset)+", ot=", this.plainObjectSignatureTable );
 
@@ -3335,7 +3792,7 @@ BinaryEncoder.prototype = {
 
 		// Sort to values, arrays and objects
 		var lookupString = "";
-		for (var i=0; i<keys.length; i++) {
+		for (var i=0; i<keys.length; ++i) {
 			k = keys[i]; v = object[k];
 			if ((v instanceof Uint8Array) || (v instanceof Int8Array) ||
 				(v instanceof Uint16Array) || (v instanceof Int16Array) ||
@@ -3363,7 +3820,7 @@ BinaryEncoder.prototype = {
 
 		// Sort to values, arrays and objects
 		lookupString = "";
-		for (var i=0; i<keys.length; i++) {
+		for (var i=0; i<keys.length; ++i) {
 			k = keys[i]; v = object[k];
 			if ((v instanceof Uint8Array) || (v instanceof Int8Array) ||
 				(v instanceof Uint16Array) || (v instanceof Int16Array) ||
@@ -3388,15 +3845,15 @@ BinaryEncoder.prototype = {
 			// Compile signature
 			var sigbuf = [];
 			sigbuf.push( pack2b( lVals.length ) );
-			for (var i=0; i<lVals.length; i++) {
+			for (var i=0; i<lVals.length; ++i) {
 				sigbuf.push( pack2b( this.stringID(lVals[i]) ) );
 			}
 			sigbuf.push( pack2b( lArrays.length ) );
-			for (var i=0; i<lArrays.length; i++) {
+			for (var i=0; i<lArrays.length; ++i) {
 				sigbuf.push( pack2b( this.stringID(lArrays[i]) ) );
 			}
 			sigbuf.push( pack2b( lObjects.length ) );
-			for (var i=0; i<lObjects.length; i++) {
+			for (var i=0; i<lObjects.length; ++i) {
 				sigbuf.push( pack2b( this.stringID(lObjects[i]) ) );
 			}
 
@@ -3421,7 +3878,7 @@ BinaryEncoder.prototype = {
 			// Create new signature buffer
 			var sigbuf = [];
 			sigbuf.push( pack2b( keys.length, false ) );
-			for (var i=0, l=keys.length; i<l; i++) {
+			for (var i=0, l=keys.length; i<l; ++i) {
 				sigbuf.push( pack2b( this.stringID(keys[i]), false ) );
 			}
 
@@ -3453,7 +3910,7 @@ BinaryEncoder.prototype = {
 		if (!prefix) prefix="";
 		// Import into an easy-to-process format
 		var keys = Object.keys(db), k, v;
-		for (var i=0; i<keys.length; i++) {
+		for (var i=0; i<keys.length; ++i) {
 			k = keys[i]; v = db[k];
 			if (!db.hasOwnProperty(k)) continue;
 
@@ -3571,7 +4028,7 @@ BinaryEncoder.prototype = {
 	'logIndent': function(indent, c) {
 		var iChar = c || ">";
 		if (indent > 0) {
-			for (var i=0; i<indent; i++) this.logPrefix+=iChar;
+			for (var i=0; i<indent; ++i) this.logPrefix+=iChar;
 		} else {
 			this.logPrefix = this.logPrefix.substr(0,this.logPrefix.length+indent*iChar.length);
 		}

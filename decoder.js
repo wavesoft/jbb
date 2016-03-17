@@ -456,31 +456,75 @@ function decodePlainBulkArray( bundle, database ) {
 function decodeBulkArray( bundle, database, len ) {
 	var eid = bundle.readTypedNum( NUMTYPE.UINT16 ),
 		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
-		ENTITY = bundle.ot.ENTITIES[ eid ];
+		ENTITY = bundle.ot.ENTITIES[ eid ],
+		plen = PROPERTIES.length, popTable = [], 
+		refTable = Array( len ), ans = Array( len ),
+		obj, id, name, op, dat, i=0, propi=0, j=0,
+		propFactory = "", getProperties;
 
-	// Fabricate all objects
-	var ans = [], prop_tables=[];
-	for (var i=0; i<len; ++i) {
-		// Call entity factory
-		ans.push( ENTITY[1]( ENTITY[0] ) );
-		prop_tables.push( [] );
+	// Get property arrays
+	for (i=0; i<plen; ++i) {
+		popTable.push( decodePrimitive( bundle, database ) );
+		if (propFactory) propFactory += ",";
+		propFactory += "wavedProps["+i+"][i]";
 	}
 
-	// Weave-create property tables
-	for (var j=0, pl=PROPERTIES.length; j<pl; ++j) {
-		var props = decodePrimitive( bundle, database );
-		for (var i=0; i<len; ++i)
-			prop_tables[i].push( props[i] );
-	}
+	// Create de-weaving collector function
+	getProperties = new Function( "wavedProps", "i", "return ["+propFactory+"]" );
 
-	// Run initializers
-	for (var i=0; i<len; ++i) {
-		// Run initializers
-		ENTITY[2]( ans[i], PROPERTIES, prop_tables[i] );
+	// Start processing commands
+	i=0; while (i < len) {
+		op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		dat = op & 0x3F;
+		switch (op & 0xC0) {
+
+			case 0x00:
+				// Construct & Export to IREF table
+				for (j=0; j<dat; j++) {
+
+					// Create object from waved property table
+					obj = ENTITY[1]( ENTITY[0] );
+					ENTITY[2]( obj, PROPERTIES, getProperties(popTable, propi++) );
+
+					// Keep on IRef and return
+					bundle.iref_table.push(obj);
+					ans[i++] = obj;
+				}
+				break;
+
+			case 0x40:
+				// Import from IREF
+				id = bundle.readTypedNum( NUMTYPE.UINT16 );
+				if (id >= bundle.iref_table.length) throw {
+					'name' 		: 'IrefError',
+					'message'	: 'Invalid IREF #'+id+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				}
+				ans[i++] = bundle.iref_table[ (dat << 16) | id ];
+				break;
+
+			case 0x80:
+				// Import from XREF
+				name = bundle.readStringLT();
+				if (database[name] === undefined) throw {
+					'name' 		: 'ImportError',
+					'message'	: 'Cannot import undefined external reference '+name+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				};
+				ans[i++] = database[name];
+				break;
+
+			default:
+				throw {
+					'name' 		: 'AssertError',
+					'message'	: 'Unknown bulk array op-code #'+op+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				}
+
+		}
 	}
 
 	// Free proprty tables and return objects
-	prop_tables = [];
 	return DEBUG
 		? __debugMeta( ans, 'array.bulk', { 'eid': eid } )
 		: ans;
@@ -537,10 +581,6 @@ function decodeArray( bundle, database, op ) {
 
 		// Decode and return plain bulk array
 		return decodePlainBulkArray( bundle, database );
-
-	} else if (op === 0x6D) { // PRIM_BULK_KNOWN
-
-		// NOT USED
 
 	} else if (op === 0x6E) { // PRIM_SHORT
 
@@ -683,6 +723,14 @@ function decodeArray( bundle, database, op ) {
 		return DEBUG
 			? __debugMeta( nArr, 'array.primitive.raw', {} )
 			: nArr;
+
+	} else if ((op & 0xFE) === 0x7C) { // PRIM_BULK_KNOWN
+
+		ln = op & 0x01;
+		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
+
+		// Decode and return primitive bulk array
+		return decodeBulkArray( bundle, database, len );
 
 	} else {
 		throw {
