@@ -1290,7 +1290,8 @@ function getDownscaleType( n_type, analysis ) {
 function analyzeNumericArray( v, include_costly ) {
 	var min = v[0], max = min, is_int = false, is_float = false, is_same = true,
 		dmin=0, dmax=0, is_dfloat = false,
-		mean=0, n_type=0, d_mode=0, f_type=[0, NUMTYPE.UNKNOWN],
+		mean=0, n_type=0, d_mode=0, f_type=[0, NUMTYPE.UNKNOWN], 
+		c_same=0, same=0,
 		s_min = [min,min,min,min,min], s_min_i=0, s_max = [min,min,min,min,min], s_max_i=0, samples,
 		a, b, d_type, cd, cv, lv = v[0];
 
@@ -1345,8 +1346,14 @@ function analyzeNumericArray( v, include_costly ) {
 		}
 
 		// Check for same values
-		if (is_same && (cv !== lv))
+		if (cv === lv) {
+			c_same++;
+		} else {
+			if (c_same > same)
+				same = c_same;
 			is_same = false;
+			c_same = 0;
+		}
 
 		// Keep last value
 		lv = cv;
@@ -1363,7 +1370,8 @@ function analyzeNumericArray( v, include_costly ) {
 
 	}
 
-	// Finalize mean calculation
+	// Finalize counters
+	if (c_same > same) same = c_same;
 	mean /= v.length;
 
 	// Guess numerical type
@@ -1421,6 +1429,9 @@ function analyzeNumericArray( v, include_costly ) {
 		'type'		: n_type,
 		'delta_type': d_type,
 
+		// Percentage of same items
+		'psame'		: same / v.length,
+
 		// Log numeric bounds
 		'min'		: min,
 		'max'		: max,
@@ -1445,9 +1456,98 @@ function analyzeNumericArray( v, include_costly ) {
 }
 
 /**
+ * Pack the specified number of bins to the specified bounds
+ */
+function getBestBinFit( start, len, blocks ) {
+	var b, s, e, end = start + len, found = false,
+		c, last_c = 0, last_s = 0, last_i = -1, last_bin = null;
+
+	// Find the biggest chunk that can fit on these data
+	for (var bi=0, bl=blocks.length; bi<bl; ++bi) {
+		b = blocks[bi]; found = false;
+		for (var i=0, il=b.length; i<il; ++i) {
+			s = b[i][0]; e = s + b[i][1];
+
+			// Find the common region of block-scan frame
+			if ( ((s >= start) && (s < end-1)) ||	// Start in bounds
+				 ((e >= start) && (e < end-1)) ||	// End in bounds
+				 ((s <= start) && (e >= end)) )		// 
+			{
+
+				// Check bounds
+				if (s < start) s = start;
+				if (s > end-2) continue;
+				if (e > end) e = end;
+				if (s === e) continue;
+
+				// Test coverage
+				c = e - s;
+				if (c > last_c) {
+					last_c = c;
+					last_s = s;
+					last_bin = b[i];
+					found = true;
+				}
+
+			}
+
+		}
+
+		// Prefer priority to length across different blocks
+		// on the first block (repeated)
+		if ((bi === 0) && found)
+			return last_bin;
+
+	}
+
+	// Update bounds
+	if (last_bin) {
+		last_bin = last_bin.slice();
+		last_bin[0] = last_s;
+		last_bin[1] = last_c;
+	}
+
+	// Return last bin
+	return last_bin;
+}
+
+function arrangeBlocks( start, len, blocks ) {
+	var bin, sbin, l, r, end = start + len, ans;
+
+	// Find which block fits best
+	bin = getBestBinFit( start, len, blocks );
+	if (bin === null) {
+		ans = [ [start, len, ARR_CHUNK.PRIMITIVES, null] ];
+
+	} else {
+
+		// Prepare ans
+		ans = [ bin ];
+		l = bin[0]; r = l + bin[1];
+
+		// Fill left blank
+		if (l > start) {
+			sbin = arrangeBlocks( start, l-start, blocks );
+			ans = sbin.concat( ans );
+		}
+
+		// Fill right blank
+		if (r < end) {
+			sbin = arrangeBlocks( r, end-r, blocks );
+			ans = ans.concat( sbin );
+		}
+
+	}
+
+	return ans;
+}
+
+/**
  * Analyze primitive array and return useful information
  */
 function analyzePrimitiveArray( encoder, array ) {
+
+	const DEBUG_THIS = 0;
 
 	const TEST_NUMBER = 0,
 		  TEST_PLAIN = 1,
@@ -1460,13 +1560,12 @@ function analyzePrimitiveArray( encoder, array ) {
 		  BF_PLAIN 	= 0x08,	
 		  BF_KNOWN  = 0x10;
 
-	var v, v_type, handled, id,
+	var v, v_type, handled, id, ans, debug_str,
 		
 		t_mode, t_numtype, t_constr, t_keys,
 
 		new_keys, old_keys, some_overlap,
 
-		block_flags = new Uint8Array( array.length ),
 		ENTITIES = encoder.objectTable.ENTITIES,
 
 		b_prim = null, 	blocks_prim = [],
@@ -1483,45 +1582,60 @@ function analyzePrimitiveArray( encoder, array ) {
 
 		// Get test mode of the current value
 		v = array[i];
-		v_type = typeof v;
-		if (v_type === 'number') {
-			t_mode = TEST_NUMBER;
-			t_numtype = getNumType( v, v, ((v % 1) !== 0) );
-		} else if (v_type === 'string' ) {
-			t_mode = TEST_PRIMITIVE;
-		} else if (v_type === 'boolean' ) {
-			t_mode = TEST_PRIMITIVE;
-		} else if (v_type === 'undefined' ) {
-			t_mode = TEST_PRIMITIVE;
-		} else if (v === null) {
-			t_mode = TEST_PRIMITIVE;
-		} else if (v.constructor === ({}).constructor) {
-			t_mode = TEST_PLAIN;
-		} else { /* Other objects */
-			t_constr = v.constructor;
-			t_mode = TEST_OBJECT;
-		}
+		switch (typeof v) {
 
-		console.log("### v=",v,", t=",t_mode);
+			case 'number':
+				t_mode = TEST_NUMBER;
+				t_numtype = getNumType( v, v, ((v % 1) !== 0) );
+
+				if (DEBUG_THIS) debug_str = 'NUM';
+				break;
+
+			case 'string':
+			case 'boolean':
+			case 'undefined':
+				t_mode = TEST_PRIMITIVE;
+				if (DEBUG_THIS) debug_str = 'PRM';
+				break;
+
+			case 'object':
+				if (v === null) {
+					t_mode = TEST_PRIMITIVE;
+					if (DEBUG_THIS) debug_str = 'PRM';
+				} else if (v.constructor === ({}).constructor) {
+					t_mode = TEST_PLAIN;
+					if (DEBUG_THIS) debug_str = 'PLN';
+				} else { /* Other objects */
+					t_constr = v.constructor;
+					t_mode = TEST_OBJECT;
+					if (DEBUG_THIS) debug_str = 'OBJ';
+				}
+				break;
+
+		}
 
 		//
 		// [BLOCK #1] - Test for same value
 		//
 
-		if (b_rep===null) {
-			b_rep = [i, 1, v];
+		if (b_rep === null) {
+			b_rep = [i, 1, ARR_CHUNK.REPEAT, v];
+			if (DEBUG_THIS) debug_str += ', rep[new]';
 		} else {
-			if (v===b_rep[2]) {
+			if (v===b_rep[3]) {
 				b_rep[1]++;
+				if (DEBUG_THIS) debug_str += ', rep[++](ref)';
 			} else if (encoder.optimize.cfwa_object_byval
 				&& ((t_mode === TEST_OBJECT) || (t_mode === TEST_PLAIN))
-				&& deepEqual(b_rep[2], v)) {
+				&& deepEqual(b_rep[3], v)) {
 				b_rep[1]++;
+				if (DEBUG_THIS) debug_str += ', rep[++](val)';
 			} else {
 				if (b_rep[1]>1) {
 					blocks_rep.push(b_rep);
 				}
-				b_rep = [i, 1, v];
+				b_rep = [i, 1, ARR_CHUNK.REPEAT, v];
+				if (DEBUG_THIS) debug_str += ', rep[new]';
 			}
 		}
 
@@ -1531,44 +1645,50 @@ function analyzePrimitiveArray( encoder, array ) {
 		if (t_mode !== TEST_NUMBER) {
 			// Stopped being a number
 			if (b_num !== null) {
-				if (b_num[1]>1)
+				if (b_num[1]>1) {
 					blocks_num.push( b_num );
+				}
 				b_num = null;
 			} 
 		} else {
 
 			// Check for first encounter
 			if (b_num === null) {
-				b_num = [i, 1, t_numtype, v, v];
+				if (DEBUG_THIS) debug_str += ', num[new]';
+				b_num = [i, 1, ARR_CHUNK.NUMERIC, t_numtype, v, v];
 
 			} else {
 				handled = false;
 
 				// Check for numeric subclass
-				if (!isFloatMixing(b_num[2], t_numtype)) {
+				if (!isFloatMixing(b_num[3], t_numtype)) {
 
 					// Allow type upscale of numtype
-					if (isNumericSubclass(b_num[2], b_num[3], b_num[4], t_numtype)) {
-						// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[b_num[2]]+" to "+_NUMTYPE[t_numtype]).cyan);
-						b_num[2] = t_numtype;
+					if (isNumericSubclass(b_num[3], b_num[4], b_num[5], t_numtype)) {
+						// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[b_num[3]]+" to "+_NUMTYPE[t_numtype]).cyan);
+						b_num[3] = t_numtype;
+						if (DEBUG_THIS) debug_str += ', num[upscale]';
 					}
 
 					// Accept only numeric subclasses
-					if (isNumericSubclass(t_numtype, v, v, b_num[2])) {
+					if (isNumericSubclass(t_numtype, v, v, b_num[3])) {
 						handled = true;
 						b_num[1]++;
+						if (DEBUG_THIS) debug_str += ', num[++]';
 
 						// Update bounds (for subclass testing)
-						if (v < b_num[3]) b_num[3] = v;
-						if (v > b_num[4]) b_num[4] = v;
+						if (v < b_num[4]) b_num[4] = v;
+						if (v > b_num[5]) b_num[5] = v;
 					}
 				}
 
 				// Stopped being an acceptable number (but still a number)
 				if (!handled) {
-					if (b_num[1]>1)
+					if (DEBUG_THIS) debug_str += ', num[new]';
+					if (b_num[1]>1) {
 						blocks_num.push( b_num );
-					b_num = [i, 1, t_numtype, v, v];
+					}
+					b_num = [i, 1, ARR_CHUNK.NUMERIC, t_numtype, v, v];
 				}
 
 			}
@@ -1581,28 +1701,30 @@ function analyzePrimitiveArray( encoder, array ) {
 		if (t_mode !== TEST_PLAIN) {
 			// Stopped being a plain object
 			if (b_plain !== null) {
-				if (b_plain[1]>1)
+				if (b_plain[1]>1) {
 					blocks_plain.push( b_plain );
+				}
 				b_plain = null;
 			}
 		} else {
 
 			// Check for first encounter
 			if (b_plain===null) {
-				b_plain = [i, 1, Object.keys(v)];
+				if (DEBUG_THIS) debug_str += ', blk[new]';
+				b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v)];
 
 			} else {
 
 				// Calculate key differences
 				t_keys = Object.keys( v ).sort();
 				new_keys = 0; some_overlap = false;
-				old_keys = b_plain[2].length;
-				for (var ja=0, jb=0, jl=b_plain[2].length; (ja<jl) && (jb<jl) ;) {
-					if (t_keys[ja] < b_plain[2][jb]) {
+				old_keys = b_plain[3].length;
+				for (var ja=0, jb=0, jl=b_plain[3].length; (ja<jl) && (jb<jl) ;) {
+					if (t_keys[ja] < b_plain[3][jb]) {
 						jb++;
 						new_keys++;
-						b_plain[2].push( t_keys[ja] )
-					} else if (t_keys[ja] > b_plain[2][jb]) {
+						b_plain[3].push( t_keys[ja] )
+					} else if (t_keys[ja] > b_plain[3][jb]) {
 						ja++;
 					} else {
 						ja++;
@@ -1614,13 +1736,16 @@ function analyzePrimitiveArray( encoder, array ) {
 				// Allow up to 25% extension of the key set
 				if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
 					b_plain[1]++;
+					if (DEBUG_THIS) debug_str += ', blk[++]';
 				} else {
 
 					// Stopped being a compatible plain object number (but still a plain object)
 					if (!handled) {
-						if (b_plain[1]>1)
+						if (DEBUG_THIS) debug_str += ', blk[new]';
+						if (b_plain[1]>1) {
 							blocks_plain.push( b_plain );
-						b_plain = [i, 1, Object.keys(v)];
+						}
+						b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v)];
 					}
 
 				}
@@ -1635,8 +1760,9 @@ function analyzePrimitiveArray( encoder, array ) {
 		if (t_mode !== TEST_OBJECT) {
 			// Stopped being a known object
 			if (b_known !== null) {
-				if (b_known[1]>1)
+				if (b_known[1]>1) {
 					blocks_known.push( b_known );
+				}
 				b_known = null;
 			}
 		} else {
@@ -1646,7 +1772,7 @@ function analyzePrimitiveArray( encoder, array ) {
 
 				// Lookup constructor
 				id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
-					if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[i][0])) {
+					if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[j][0])) {
 						id = j;
 						break;
 					}
@@ -1654,7 +1780,8 @@ function analyzePrimitiveArray( encoder, array ) {
 
 				// Check if this is a known object
 				if (id > -1) {
-					b_known = [i, 1, id, v.constructor];
+					b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, id, v.constructor];
+					if (DEBUG_THIS) debug_str += ', obj[new]';
 				} else {
 					// Make this behave like a primitive
 					t_mode = TEST_PRIMITIVE;
@@ -1663,17 +1790,17 @@ function analyzePrimitiveArray( encoder, array ) {
 			} else {
 
 				// Check if we remain the same object
-				if (v.constructor === b_known[3]) {
-
+				if (v.constructor === b_known[4]) {
+					b_known[1]++;
+					if (DEBUG_THIS) debug_str += ', obj[++]';
 				} else {
 
 					// Stopped being a compatible known object number (but still a known object)
-					if (b_known[1]>1) 
-						blocks_known.push( b_known );
+					blocks_known.push( b_known );
 
 					// Lookup constructor
 					id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
-						if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[i][0])) {
+						if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[j][0])) {
 							id = j;
 							break;
 						}
@@ -1681,7 +1808,8 @@ function analyzePrimitiveArray( encoder, array ) {
 
 					// Check if we are indeed a known object
 					if (id > -1) {
-						b_known = [i, 1, id, v.constructor];
+						b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, id, v.constructor];
+						if (DEBUG_THIS) debug_str += ', obj[new]';
 					} else {
 						// Make this behave like a primitive
 						t_mode = TEST_PRIMITIVE;
@@ -1700,343 +1828,70 @@ function analyzePrimitiveArray( encoder, array ) {
 		if (t_mode !== TEST_PRIMITIVE) {
 			// Stopped being a known object
 			if (b_prim !== null) {
-				if (b_prim[1]>1)
-					blocks_prim.push( b_prim );
+				blocks_prim.push( b_prim );
 				b_prim = null;
 			}
 		} else {
+
+			// Collect block
 			if (b_prim === null) {
-				b_prim = [i, 1, null];
+				b_prim = [i, 1, ARR_CHUNK.PRIMITIVES, null];
+				if (DEBUG_THIS) debug_str += ', prm[new]';
 			} else {
 				b_prim[1]++;
+				if (DEBUG_THIS) debug_str += ', prm[++]';
 			}
 		}
 
+		if (DEBUG_THIS) console.log("### v=",v,":",debug_str);
+
 	}
 
-	// Close blocks
+	// Finalize blocks
 	if (b_rep && (b_rep[1]>1)) blocks_rep.push(b_rep);
+	if (b_plain && (b_plain[1]>1)) blocks_plain.push(b_plain);
+	if (b_known && (b_known[1]>1)) blocks_known.push(b_known);
 	if (b_num) blocks_num.push(b_num);
 	if (b_prim) blocks_prim.push(b_prim);
-	if (b_plain) blocks_plain.push(b_plain);
-	if (b_known) blocks_known.push(b_known);
 
 	// Perform bucket-fitting in order to use the smallest
-	// number of different blocks
-	console.log("-----------------------");
-	console.log("IN: ", array);
-	console.log("-----------------------");
-	console.log("B[REP]  :", blocks_rep);
-	console.log("B[NUM]  :", blocks_num);
-	console.log("B[PRIM] :", blocks_prim);
-	console.log("B[PLAIN]:", blocks_plain);
-	console.log("B[KNOWN]:", blocks_known);
-	console.log("-----------------------");
+	// number of different combinations, order in priority
+	ans = arrangeBlocks( 0, array.length, [
+		blocks_rep, blocks_num, blocks_prim, blocks_plain, blocks_known
+	] );
 
-	// Return blocks of [ length, type, subtype]
-	return [ [ array.length, ARR_CHUNK.PRIMITIVES, null ] ];
+	// Merge consecutive bocks of exact type
+	for (var i=1, l=ans.length; i<l; ++i) {
+		if ( (ans[i-1][2] === ans[i][2]) &&  // Same Type
+			 (ans[i-1][3] === ans[i][3]) ) { // Same Sub-Type
+			
+			// Left engulfs right
+			ans[i-1][1] += ans[i][1];
+			ans.splice(i,1);
+			i--; l--;
+
+		}
+	}
+
+	if (DEBUG_THIS) {
+		console.log("-----------------------");
+		console.log("IN: ", array);
+		console.log("-----------------------");
+		console.log("B[REP]  :", blocks_rep);
+		console.log("B[NUM]  :", blocks_num);
+		console.log("B[PRIM] :", blocks_prim);
+		console.log("B[PLAIN]:", blocks_plain);
+		console.log("B[KNOWN]:", blocks_known);
+		console.log("-----------------------");
+		console.log("PICK:", ans);
+		console.log("-----------------------");
+	}
+
+	// Return
+	return ans;
 
 }
 
-
-/**
- * Isolate the next chunk of interest in a primitive array
- *
- * Returns an array with the following items:
- * [
- *   ARR_CHUNK, 	// The Type of the chunk
- *   LENGTH,		// The lengh of relevant items
- *   NUM_TYPE,		// The numerical type of the repeated item
- * ]
- *
- * @param {BinaryEncoder} encoder - The encoder to use
- * @param {array} array - The source array to analyze
- * @param {int} start - The stating index of the analysis
- * @return {array} - Returns an array with [ CHUNK_TYPE, LENGTH ]
- *
- */
-function chunkForwardAnalysis( encoder, array, start ) {
-
-	const TEST_NUMBER = 0,
-		  TEST_PLAIN = 1,
-		  TEST_PRIMITIVE = 2;
-
-	var v, v_type, numtype, test_mode, break_candidate,	// Temporary variables
-		keys, is_positive, new_keys, old_keys, is_numeric, some_overlap,
-		have_optimised_items = false,
-		c_same = 0, c_numeric = 0, c_plain = 0,			// Counters of individually optimisied items
-		c_unoptimised = 0, c_sameconstr = 0, last_test_constr, test_constr,
-		last_test_mode, last_value, last_numtype, first_value, // Last state variables
-		last_keys = [], all_positive = false, type_oscilating = false,
-		min_num, max_num;
-
-	// Get test mode of first value
-	v = array[start];
-	v_type = typeof v;
-	last_numtype = NUMTYPE.NAN;
-	if (v_type === 'number') {
-		last_test_mode = TEST_NUMBER;
-		last_numtype = getNumType( v, v, ((v % 1) !== 0) );
-		all_positive = (v>0);
-		min_num = max_num = v;
-	} else if (v_type === 'string' ) {
-		last_test_mode = TEST_PRIMITIVE;
-	} else if (v_type === 'boolean' ) {
-		last_test_mode = TEST_PRIMITIVE;
-	} else if (v_type === 'undefined' ) {
-		last_test_mode = TEST_PRIMITIVE;
-	} else if (v === null) {
-		last_test_mode = TEST_PRIMITIVE;
-	} else if (v.constructor === ({}).constructor) {
-		last_test_mode = TEST_PLAIN;
-		last_keys = Object.keys( v ).sort();
-	} else { /* Other objects */
-		last_test_constr = v.constructor;
-		last_test_mode = TEST_PRIMITIVE;
-	}
-	last_value = v;
-
-	// First values
-	first_value = v;
-
-	// Scan items
-	for (var i=start+1, il=array.length; i<il; ++i) {
-
-		// Get test mode of the current value
-		v = array[i];
-		v_type = typeof v;
-		numtype = NUMTYPE.NAN;
-		is_positive = false;
-		is_numeric = false;
-		if (v_type === 'number') {
-			test_mode = TEST_NUMBER;
-			numtype = getNumType( v, v, ((v % 1) !== 0) );
-			is_positive = (v>0);
-			is_numeric = true;
-		} else if (v_type === 'string' ) {
-			test_mode = TEST_PRIMITIVE;
-		} else if (v_type === 'boolean' ) {
-			test_mode = TEST_PRIMITIVE;
-		} else if (v_type === 'undefined' ) {
-			test_mode = TEST_PRIMITIVE;
-		} else if (v === null) {
-			test_mode = TEST_PRIMITIVE;
-		} else if (v.constructor === ({}).constructor) {
-			test_mode = TEST_PLAIN;
-		} else { /* Other objects */
-			test_constr = v.constructor;
-			test_mode = TEST_PRIMITIVE;
-		}
-
-		// console.log("v=",v,"last_value=",last_value,"test_mode=",test_mode,"last_test_mode=",last_test_mode);
-
-		// If test mode is the same, check if values remain the same
-		if (test_mode === last_test_mode) {
-			break_candidate = true;
-
-			// If we have been oscilating on types that cannot be optimised
-			// but now we have at least 2 consecutive optimisable items,
-			// just break and let next call do the optimisation.
-			if (type_oscilating) {
-				// console.log(">> "+("Breaking due to type oscilating").yellow);
-				break;
-			}
-
-			// Check optimisations
-			switch (test_mode) {
-				case TEST_NUMBER:
-					if (last_value === v) {
-						if (first_value !== v) {
-							if (c_numeric) c_numeric--;
-							break_candidate = true;
-							break;
-						}
-						c_same++;
-						have_optimised_items = true;
-						break_candidate = false;
-					}
-
-					// Check for numeric subclass
-					if (!isFloatMixing(last_numtype, numtype)) {
-						// Allow type upscale
-						if (isNumericSubclass(last_numtype, min_num, max_num, numtype)) {
-							// console.log(">> " + ("Expanding numeric class from "+_NUMTYPE[last_numtype]+" to "+_NUMTYPE[numtype]).cyan);
-							last_numtype = numtype;
-						}
-						// Accept only numeric subclasses
-						if (isNumericSubclass(numtype, v, v, last_numtype)) {
-							c_numeric++;
-							have_optimised_items = true;
-							break_candidate = false;
-						// } else {
-							// console.log(">> " + ("No subclass "+_NUMTYPE[numtype]+" (" + ((v>0)?">0":"<0") + ") of "+_NUMTYPE[last_numtype]).red);
-						}
-					// } else {
-						// console.log(">> " + "Mixing floats".red);
-					}
-
-					break;
-
-				case TEST_PLAIN:
-					if ( encoder.optimize.cfwa_object_byval 
-							? deepEqual( v, last_value )
-							: (v === last_value) 
-						) {
-						if ( encoder.optimize.cfwa_object_byval 
-							? !deepEqual( v, first_value )
-							: (v !== first_value) ) {
-							if (c_plain) c_plain--;
-							console.log(">> "+("Candidate: Same plain objects").yellow);
-							break_candidate = true;
-							break;
-						}
-						c_same++;
-						have_optimised_items = true;
-						break_candidate = false;
-					}
-
-					// Calculate key differences
-					keys = Object.keys( v ).sort();
-					new_keys = 0; some_overlap = false;
-					old_keys = last_keys.length;
-					for (var ja=0, jb=0, jl=last_keys.length; (ja<jl) && (jb<jl) ;) {
-						if (keys[ja] < last_keys[jb]) {
-							jb++;
-							new_keys++;
-							last_keys.push( keys[ja] )
-						} else if (keys[ja] > last_keys[jb]) {
-							ja++;
-						} else {
-							ja++;
-							jb++;
-							some_overlap = true;
-						}
-					}
-
-					// Allow up to 25% extension of the key set
-					if (some_overlap && (new_keys === 0) /*|| (new_keys < old_keys * 0.25)*/) {
-						c_plain++;
-						have_optimised_items = true;
-						break_candidate = false;
-					}
-
-					break;
-
-				case TEST_PRIMITIVE:
-					if (last_value === v) {
-
-						if (first_value !== v) {
-							if (c_unoptimised) c_unoptimised--;
-							break_candidate = true;
-							break;
-						}
-
-						// If we have oscillating primitive values but sudently we have
-						// a stable, continuous stream, roll back the last optimised value
-						// and exit
-						if (c_unoptimised) {
-							c_unoptimised--;
-						} else {
-							c_same++;
-							have_optimised_items = true;
-							break_candidate = false;
-						}
-
-					} else {
-
-						// This is a break candidate only if there were no
-						// optimised items collected so far.
-						// console.log(">",last_value,"!=",v);
-						if (!have_optimised_items) {
-							c_unoptimised++;
-							break_candidate = false;
-						}
-
-					}
-
-					// Count conecutive objects of same type
-					if (test_constr === last_test_constr) {
-						c_sameconstr++;
-					}
-
-					break;
-			}
-
-			// If we couldn't optimise anything, break
-			if (break_candidate) {
-				console.log(">> "+("Breaking due to a break candidate").yellow);
-				break;
-			}
-
-		} else {
-
-			// If we didn't have any optimised item and we are
-			// oscilating between types, count them as primitive
-			// objects in order to chunk them together.
-			if (!have_optimised_items) {
-				c_unoptimised++;
-				type_oscilating = true;
-			} else {
-				// Otherwise break
-				console.log(">> "+("Breaking due to type oscilating towards unoptimised").yellow);
-				break;
-			}
-		}
-
-		// Keep current state as last
-		all_positive = all_positive && is_positive;
-		last_test_mode = test_mode;
-		last_value = v;
-
-		// Update min/max on numeric values
-		if (is_numeric) {
-			if (v < min_num)
-				min_num = v;
-			if (v > max_num)
-				max_num = v;
-		}
-
-	}
-
-	// Find maximum for best fit
-	console.log(">> same",c_same,", numeric", c_numeric, ", plain", c_plain,", unoptimised", c_unoptimised);
-	var max = Math.max( c_same, c_numeric, c_plain, c_unoptimised );
-
-	// [0] Nothing found? That's a single primitive
-	if (max === 0) {
-		return [ ARR_CHUNK.PRIMITIVES, 1, null ];
-
-	// [1] Prefer repeated values
-	} else if ( c_same === max ) {
-		return [ ARR_CHUNK.REPEAT, c_same+1, null ];
-
-	// [2] Then prefer numeric arrays
-	} else if ( c_numeric === max ) {
-		return [ ARR_CHUNK.NUMERIC, c_numeric+1, last_numtype ];
-
-	// [3] Then prefer plain objects with same (or simmilar) signature
-	} else if ( c_plain === max ) {
-		return [ ARR_CHUNK.BULK_PLAIN, c_plain+1, last_keys ];
-
-	// [4] Then prefer objects with same constructor
-	} else if ( c_sameconstr > 8 ) {
-
-		// Check if this constructor is part of a known entity
-		var ENTITIES = encoder.objectTable.ENTITIES;
-		for (var i=0, len=ENTITIES.length; i<len; ++i) {
-			if ((ENTITIES[i].length > 0) && (first_value instanceof ENTITIES[i][0])) {
-				// return [ ARR_CHUNK.BULK_KNOWN, c_sameconstr+1, i ];
-				break;
-			}
-		}
-
-	}
-
-	// [5] Finally, bulked, unoptimised primitives
-	return [ ARR_CHUNK.PRIMITIVES, c_unoptimised, null ];
-
-
-}
 
 /**
  * Pick a matching downscaling type
@@ -2442,7 +2297,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 		}
 
 		// Align values of same property for optimal encoding
-		console.log("ENCODE["+p+"]:",prop);
+		// console.log("ENCODE["+p+"]:",prop);
 		encodeArray( encoder, prop );
 
 	}
@@ -2705,8 +2560,8 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	// Encode individual chunks
 	for (var i=0, ofs=0, llen=chunks.length; i<llen; ++i) {
-		encodeArray_Chunk( encoder, data.slice(ofs, chunks[i][0]), chunks[i][1], chunks[i][2] );
-		ofs += chunks[i][0];
+		encodeArray_Chunk( encoder, data.slice(ofs, ofs+chunks[i][1]), chunks[i][2], chunks[i][3] );
+		ofs += chunks[i][1];
 	}
 
 	// Write chunk termination
@@ -2742,7 +2597,7 @@ function encodeArray_EMPTY( encoder ) {
 function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
 	var n_type, na;
 
-	console.log(">>> CFWA Chunk=", chunkType,":",data);
+	// console.log(">>> CFWA Chunk=", chunkType,":",data);
 
 	// Encode array component according to chunk type
 	switch (chunkType) {
@@ -2877,6 +2732,13 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				return;
 			}
 
+			// If we have more than <thresshold> items with the same
+			// value, break into chunked array
+			if (na.psame >= encoder.optimize.repeat_thresshold) {
+				encodeArray_Primitive( encoder, data );
+				return;
+			}
+
 			// Perform detailed analysis for downscaling and delta-encoding
 			var n_dws = getDownscaleType( n_type, na );
 			// console.log(">>[DWS]>> n_type="+_NUMTYPE[n_type]+", analysis=",na,":",_NUMTYPE[n_dws]);
@@ -2964,7 +2826,7 @@ function encodeArray_Primitive( encoder, data ) {
 	if (chunks.length === 1) {
 
 		// Just check
-		if (chunks[0][0] !== data.length) {
+		if (chunks[0][1] !== data.length) {
 			throw {
 				'name' 		: 'AssertError',
 				'message'	: 'Primitive array analysis reported single chunk but does not match array length!',
@@ -2973,7 +2835,7 @@ function encodeArray_Primitive( encoder, data ) {
 		}
 
 		// Just encode a single chunk as array component
-		encodeArray_Chunk( encoder, data, chunks[0][1], chunks[0][2] );
+		encodeArray_Chunk( encoder, data, chunks[0][2], chunks[0][3] );
 
 	} else {
 
@@ -3491,8 +3353,10 @@ var BinaryEncoder = function( filename, config ) {
 
 	// Optimisation flags
 	this.optimize = {
-		cfwa_object_byval: true,	// By-value de-duplication of objects in chunk forward analysis
-		float_int_downscale: false,	// Downscale floats to integers multiplied by scale
+		cfwa_object_byval: true,	 // By-value de-duplication of objects in chunk forward analysis
+		repeat_thresshold: 0.5,		 // How many consecutive same items are enough for an array in order
+									 // to break it as a chunked array.
+		float_int_downscale: false,	 // Downscale floats to integers multiplied by scale
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8

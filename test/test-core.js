@@ -49,16 +49,16 @@ const NUMTYPE = {
 const ARR_OP = {
 	NUM_DWS: 		 0x00, // Downscaled Numeric Type
 	NUM_DELTA_INT:	 0x20, // Delta-Encoded Integer Array
-	NUM_DELTA_FLOAT: 0x78, // Delta-Encoded Float Array
+	NUM_DELTA_FLOAT: 0x30, // Delta-Encoded Float Array
 	NUM_REPEATED: 	 0x40, // Repeated Numeric Value
 	NUM_RAW: 		 0x50, // Raw Numeric Value
 	NUM_SHORT: 		 0x60, // Short Numeric Value
 	PRIM_REPEATED: 	 0x68, // Repeated Primitive Value
 	PRIM_RAW: 		 0x6A, // Raw Primitive Array
 	PRIM_BULK_PLAIN: 0x6C, // Bulk Array of Plain Objects
-	PRIM_BULK_KNOWN: 0x6D, // Bulk Array of Known Objects
 	PRIM_SHORT: 	 0x6E, // Short Primitive Array
 	PRIM_CHUNK: 	 0x6F, // Chunked Primitive ARray
+	PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
 	EMPTY: 			 0x7E, // Empty Array
 	PRIM_CHUNK_END:  0x7F, // End of primary chunk
 };
@@ -115,7 +115,7 @@ describe('[Core Tests]', function() {
 			assert.equal( u32[2], 8,			'64-bit table size');
 			assert.equal( u32[3], 8,			'32-bit table size');
 			assert.equal( u32[4], 12,			'16-bit table size');
-			assert.equal( u32[5], 55,			'8-bit table size');
+			assert.equal( u32[5], 53,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -232,6 +232,11 @@ describe('[Core Tests]', function() {
 		it_should_return_array_rand('Int32Array',	255, -2147483648,	2147483648, [match_metaType('array.numeric.short')]);
 		it_should_return_array_rand('Float32Array',	255, 0,				2147483648, [match_metaType('array.numeric.short')]);
 		it_should_return_array_rand('Float64Array',	255, 0,				17179869184,[match_metaType('array.numeric.short')]);
+
+		// Short primitives
+		var values = [];
+		for (var i=0; i<255; ++i) values.push( [true,false,null,undefined][i%4] );
+		it_should_return(values, 'Array(255) = [ RANDOM(true, false, null, undefined) ] ' ,[match_metaType('array.primitive.short')]);
 
 	});
 
@@ -369,7 +374,7 @@ describe('[Core Tests]', function() {
 	describe('Object Bulks', function () {
 
 		// Compile some plain object arrays
-		var plain01 = [], plain02 = [], plain03 = [], f = new Float32Array(1);
+		var plain01 = [], plain02 = [], plain03 = [], plain04 = [], f = new Float32Array(1);
 		for (var i=0; i<1000; i++) {
 			f[0] = Math.random();
 
@@ -381,14 +386,19 @@ describe('[Core Tests]', function() {
 			});
 			plain03.push({
 				"unmergable": [
-					true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String"
-				][ Math.floor(Math.random()*9) ]
+					true, undefined, false, 148, null, 64473, 40.1927375793457, 12847612, "String"
+				][ i%9 ]
+			});
+			plain04.push({
+				"some_mergable": [
+					true, undefined, false, 148, null, 64473, 40.1927375793457, 12847612, "String"
+				][ i%9 ]
 			});
 		}
 
 		// Plain objects
-		// it_should_return( plain01, 'Plain Buk of [ 10,000 x { "a": num, "b": num, "c": false, "d": null, "e": undefined } ]' );
-		// it_should_return( plain02, 'Plain Buk of [ 10,000 x { "same": "everywhere" } ]' );
+		it_should_return( plain01, 'Plain Buk of [ 10,000 x { "a": num, "b": num, "c": false, "d": null, "e": undefined } ]' );
+		it_should_return( plain02, 'Plain Buk of [ 10,000 x { "same": "everywhere" } ]' );
 		it_should_return( plain03, 'Plain Buk of [ 10,000 x { "unmergable": [varies] } ]' );
 
 		// Compile some known objects
@@ -422,7 +432,6 @@ describe('[Core Tests]', function() {
 			gen_array_seq( 'Array', 100, 0, 1 ),
 			'Break'
 		);
-		// console.log(values);
 		it_should_return( values, '[ 100 x NUM, \'Break\', 100 x NUM, \'Break\', 100 x NUM, \'Break\' ]', 
 			[/*function(meta) { console.log(meta.meta.chunks); },*/ match_chunkTypes([
 				[ ARR_OP.NUM_SHORT, 0xF8 ],		// 100 numeric items
@@ -433,13 +442,38 @@ describe('[Core Tests]', function() {
 				[ ARR_OP.PRIM_SHORT, 0xFF ], 	// 'Break'
 			])] );
 
+		// Make sure analyzePrimitiveArray is preferring repeated arrays given the chance
+		values = [].concat(
+			false, // Make this array chunked
+			gen_array_rep( 'Array', 100, 104 ),
+			gen_array_seq( 'Array', 100, 0,1 )
+		);
+		it_should_return( values, '[ false, 100 x SAME, 100 x NUM ]', 
+			[match_chunkTypes([
+				[ ARR_OP.PRIM_SHORT, 0x6E ],	// 1 primitive
+				[ ARR_OP.NUM_REPEATED, 0xF0 ],	// Repeated numbers
+				[ ARR_OP.NUM_SHORT, 0xF8 ],		// Final numbers
+			])] );
+
+		// Items than 50% of same-value 
+		values = [].concat(
+			gen_array_rep( 'Array', 10000, 104 ),
+			gen_array_seq( 'Array', 10000, 0,1 )
+		);
+		it_should_return( values, '[ 10,000 SAME , 10,000 NUMERIC ]', 
+			[match_chunkTypes([
+				[ ARR_OP.NUM_REPEATED, 0xF0 ],	// Repeated numbers
+				[ ARR_OP.NUM_DELTA_INT, 0xF0 ],	// Final numbers
+			])] );
+
 		// Repeated composites (Ideally future-optimised)
-		values = []; matchTypes = [];
+		values = [];
 		var rep = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
-		var repTypes = [
+		var matchTypes = [
 			[ ARR_OP.PRIM_SHORT, 0xFF ],	// true, false, undefined
+		],	repTypes = [
 			[ ARR_OP.NUM_SHORT, 0xF8 ],		// 255, 128, 67, 65535, 32535, 4294967295
-			[ ARR_OP.PRIM_SHORT, 0xFF ],	// {'plain':'object'}
+			[ ARR_OP.PRIM_SHORT, 0xFF ],	// {'plain':'object'}, true, false, undefined
 		];
 		for (var i=0; i<100; i++) {
 			values = values.concat(rep);
