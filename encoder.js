@@ -25,6 +25,7 @@ var MockBrowser = require("mock-browser");
 var colors 		= require("colors");
 var mime 		= require("mime");
 var deepEqual 	= require('deep-equal');
+var BinaryStream = require("./lib/BinaryStream");
 
 const FLOAT32_POS 	= 3.40282347e+38; // largest positive number in float32
 const FLOAT32_NEG 	= -3.40282347e+38; // largest negative number in float32
@@ -90,11 +91,22 @@ var ScriptElement = document.createElement('script').constructor;
  */
 var BinarySearchTree = bst.BinarySearchTree,
 	objectBstComparison = function(a,b) {
-		for (var i=0; i<a.length; ++i) {
-			if (a[i] < b[i]) return -1;
-			if (a[i] > b[i]) return 1;
-			if (a[i] !== b[i]) return 1;
-		  /*if (a[i] == b[i]) continue;*/
+		var tA, tB, i;
+		for (i=0; i<a.length; ++i) {
+			tA = typeof a[i]; tB = typeof b[i];
+			if (tA === tB) {
+				if ((tA === 'number') || (tA === 'string') || (tA === 'boolean')) {
+					if (a[i] < b[i]) return -1;
+					if (a[i] > b[i]) return 1;
+					if (a[i] !== b[i]) return 1;
+				  /*if (a[i] == b[i]) continue;*/
+				} else {
+					if (a[i] === b[i]) continue;
+					return 1;
+				}
+			} else {
+				return 1;
+			}
 		}
 		return 0;
 	},
@@ -352,6 +364,15 @@ const ARR_CHUNK = {
 	BULK_KNOWN:  5, // A bulk of known objects
 };
 
+const _ARR_CHUNK = [
+	undefined,
+	'PRIMITIVES',
+	'REPEAT',
+	'NUMERIC',
+	'BULK_PLAIN',
+	'BULK_KNOWN'
+];
+
 /**
  * Simple primitives
  */
@@ -578,160 +599,7 @@ var packBuffer = new ArrayBuffer(8),
 		pack4f, pack8f
 	];
 
-//////////////////////////////////////////////////////////////////
-// Binary Stream
-//////////////////////////////////////////////////////////////////
 
-/**
- * Binary Stream
- */
-var BinaryStream = function( filename, alignSize, logWrites ) {
-
-	// Local properties
-	this.offset = 0;
-	this.blockSize = 1024 * 16;
-	this.logWrites = logWrites;
-
-	// Private properties
-	this.__writeChunks = [];
-	this.__syncOffset = 0;
-	this.__fd = null;
-	this.__alignSize = 0;
-
-	// Initialize
-	this.__alignSize = alignSize || 8;
-	this.__fd = fs.openSync( filename, 'w+' );
-
-}
-
-/**
- * Prototype constructor
- */
-BinaryStream.prototype = {
-
-	'constructor': BinaryStream,
-
-	/**
-	 * Finalise and close stream
-	 */
-	'close': function() {
-		// Close
-		fs.closeSync( this.__fd );
-	},
-
-	/**
-	 * Finalize the stream
-	 */
-	'finalize': function() {
-		// Write alignment padding
-		var alignOffset = this.offset % this.__alignSize;
-		if (alignOffset > 0) 
-			this.write( new Buffer(new Uint8Array( this.__alignSize - alignOffset )) );
-		// Synchronize
-		this.__sync( true );
-	},
-
-	/**
-	 * Write a buffer using the compile function
-	 */
-	'write': function( buffer ) {
-		if (this.logWrites) {
-			var bits = String(this.__alignSize*8);
-			if (bits.length === 1) bits=" "+bits;
-			console.log((bits+"b ").yellow+("@"+this.offset/this.__alignSize).bold.yellow+": "+util.inspect(buffer));
-		}
-		this.__writeChunks.push( buffer );
-		this.offset += buffer.length;
-		this.__sync();
-	},
-
-	/**
-	 * Write a buffer at a particular offset, bypassing counters
-	 */
-	'writeAt': function( offset, buffer ) {
-		if (this.logWrites) {
-			var bits = String(this.__alignSize*8);
-			if (bits.length === 1) bits=" "+bits;
-			console.log((bits+"b ").yellowBG+("@"+offset).bold.yellowBG+": "+util.inspect(buffer));
-		}
-
-		// Write at the specified offset
-		fs.writeSync( this.__fd, buffer, 0, buffer.length, offset );
-	},
-
-	/**
-	 * Merge that stream with the current stream
-	 */
-	'merge': function( otherStream ) {
-		var BLOCK_SIZE = this.blockSize,
-			buffer = new Buffer( BLOCK_SIZE ),
-			offset = 0, readBytes = 0;
-
-		// Sync
-		this.__sync( true );
-
-		// console.log("THIS".magenta+" "+this.offset+" == "+this.__syncOffset);
-
-		// Start iterating
-		while (offset < otherStream.offset) {
-
-			// Pick size of bytes to read
-			readBytes = Math.min( BLOCK_SIZE, otherStream.offset - offset );
-
-			// Read and write
-			// console.log("MERGE".magenta+" from["+otherStream.__fd+"]="+offset+", to["+this.__fd+"]="+this.offset+", range="+readBytes);
-			fs.readSync( otherStream.__fd, buffer, 0, readBytes, offset );
-			fs.writeSync( this.__fd, buffer, 0, readBytes, this.offset );
-
-			// Forward offsets
-			offset += readBytes;
-			this.offset += readBytes;
-			this.__syncOffset += readBytes;
-
-		}
-
-	},
-
-	/**
-	 * Synchronize write chunks to the file
-	 */
-	'__sync': function( flush ) {
-		var BLOCK_SIZE = this.blockSize;
-		
-		// Write chunks
-		while (true) {
-			// Proceeed only with enough data
-			var dataLength = this.offset - this.__syncOffset;
-			if (dataLength < BLOCK_SIZE) break;
-		
-			// Concat buffers
-			var buf = Buffer.concat( this.__writeChunks );
-
-			// Put buffer tail back so we always flush up to BLOCK_SIZE bytes
-			this.__writeChunks = [];
-			if (dataLength > BLOCK_SIZE) this.__writeChunks.push(buf.slice(BLOCK_SIZE));
-
-			// Write buffer
-			fs.writeSync( this.__fd, buf, 0, BLOCK_SIZE, this.__syncOffset );
-			this.__syncOffset += BLOCK_SIZE;
-
-			// Check if done
-			if (this.__syncOffset >= this.offset) break;
-		}
-
-		// Flush remaining bytes if requested
-		if (flush && (this.offset > this.__syncOffset)) {
-			var buf = Buffer.concat( this.__writeChunks );
-			this.__writeChunks = [];
-
-			// Write whatever remains
-			fs.writeSync( this.__fd, buf, 0, buf.length, this.__syncOffset );
-			this.__syncOffset += buf.length;
-		}
-
-	},
-
-}
 
 //////////////////////////////////////////////////////////////////
 // Analysis and Encoding helper functions
@@ -1449,7 +1317,7 @@ function analyzeNumericArray( v, include_costly ) {
 		'integer' 	: is_int && !is_float,
 		'float' 	: is_float && !is_int,
 		'mixed' 	: is_float && is_int,
-		'same'		: is_same,
+		'same'		: is_same && (v.length > 1),
 
 	};
 
@@ -1564,7 +1432,7 @@ function analyzePrimitiveArray( encoder, array ) {
 		
 		t_mode, t_numtype, t_constr, t_keys,
 
-		new_keys, old_keys, some_overlap,
+		new_keys, old_keys, some_overlap, n_repeat=0,
 
 		ENTITIES = encoder.objectTable.ENTITIES,
 
@@ -1627,11 +1495,12 @@ function analyzePrimitiveArray( encoder, array ) {
 				if (DEBUG_THIS) debug_str += ', rep[++](ref)';
 			} else if (encoder.optimize.cfwa_object_byval
 				&& ((t_mode === TEST_OBJECT) || (t_mode === TEST_PLAIN))
-				&& deepEqual(b_rep[3], v)) {
+				&& deepEqual(b_rep[3], v, {strict:true})) {
 				b_rep[1]++;
 				if (DEBUG_THIS) debug_str += ', rep[++](val)';
 			} else {
 				if (b_rep[1]>1) {
+					n_repeat += b_rep[1];
 					blocks_rep.push(b_rep);
 				}
 				b_rep = [i, 1, ARR_CHUNK.REPEAT, v];
@@ -1711,7 +1580,7 @@ function analyzePrimitiveArray( encoder, array ) {
 			// Check for first encounter
 			if (b_plain===null) {
 				if (DEBUG_THIS) debug_str += ', blk[new]';
-				b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v)];
+				b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v).sort()];
 
 			} else {
 
@@ -1745,7 +1614,7 @@ function analyzePrimitiveArray( encoder, array ) {
 						if (b_plain[1]>1) {
 							blocks_plain.push( b_plain );
 						}
-						b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v)];
+						b_plain = [i, 1, ARR_CHUNK.BULK_PLAIN, Object.keys(v).sort()];
 					}
 
 				}
@@ -1848,14 +1717,44 @@ function analyzePrimitiveArray( encoder, array ) {
 	}
 
 	// Finalize blocks
-	if (b_rep && (b_rep[1]>1)) blocks_rep.push(b_rep);
+	if (b_rep && (b_rep[1]>1)) {
+		n_repeat += b_rep[1];
+		blocks_rep.push(b_rep);
+	}
 	if (b_plain && (b_plain[1]>1)) blocks_plain.push(b_plain);
 	if (b_known && (b_known[1]>1)) blocks_known.push(b_known);
 	if (b_num) blocks_num.push(b_num);
 	if (b_prim) blocks_prim.push(b_prim);
 
+	// Calculate repeat ratio
+	var rep_ratio = n_repeat / array.length;
+	// console.log("==== Percent:", rep_ratio*100)
+
+	// Check if we have a complete block
+	if ((blocks_plain.length === 1) && (blocks_plain[0][1] === array.length)) {
+		// If repeat isn't going to help us, dont increase complexity
+		if ( rep_ratio < encoder.optimize.repeat_thresshold ) {
+			return blocks_plain;
+		}
+	} else if ((blocks_known.length === 1) && (blocks_known[0][1] === array.length)) {
+		// If repeat isn't going to help us, dont increase complexity
+		if ( rep_ratio < encoder.optimize.repeat_thresshold ) {
+			return blocks_known;
+		}
+	} else if ((blocks_num.length === 1) && (blocks_num[0][1] === array.length)) {
+		// If repeat isn't going to help us, dont increase complexity
+		if ( rep_ratio < encoder.optimize.repeat_thresshold ) {
+			return blocks_num;
+		}
+	} else if ((blocks_prim.length === 1) && (blocks_prim[0][1] === array.length)) {
+		// If repeat isn't going to help us, dont increase complexity
+		if ( rep_ratio < encoder.optimize.repeat_thresshold ) {
+			return blocks_prim;
+		}
+	}
+
 	// Perform bucket-fitting in order to use the smallest
-	// number of different combinations, order in priority
+	// number of different combinations, ordered by priority
 	ans = arrangeBlocks( 0, array.length, [
 		blocks_rep, blocks_num, blocks_prim, blocks_plain, blocks_known
 	] );
@@ -1874,8 +1773,8 @@ function analyzePrimitiveArray( encoder, array ) {
 	}
 
 	if (DEBUG_THIS) {
-		console.log("-----------------------");
-		console.log("IN: ", array);
+		// console.log("-----------------------");
+		// console.log("IN: ", array);
 		console.log("-----------------------");
 		console.log("B[REP]  :", blocks_rep);
 		console.log("B[NUM]  :", blocks_num);
@@ -2050,6 +1949,10 @@ function encodeArray_NUM_DWS( encoder, data, n_from, n_to ) {
 	var n_dws_type = downscaleType( n_from, n_to );
 	// console.log(">>>",data.constructor,":",_NUMTYPE[n_from],"->",_NUMTYPE[n_to],":",n_dws_type);
 
+	encoder.log(LOG.ARR, "array.numeric.downscaled, len="+data.length+
+		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
+		", type="+_NUMTYPE_DOWNSCALE_DWS[n_dws_type]+" ("+n_dws_type+")");
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.NUM_DWS | NUMTYPE_LN.UINT16 | (n_dws_type << 1) ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2059,10 +1962,6 @@ function encodeArray_NUM_DWS( encoder, data, n_from, n_to ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	encoder.log(LOG.ARR, "array.numeric.downscaled, len="+data.length+
-		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
-		", type="+_NUMTYPE_DOWNSCALE_DWS[n_dws_type]+" ("+n_dws_type+")");
 
 	// Encode value
 	pickStream( encoder, n_to )
@@ -2092,6 +1991,11 @@ function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to, pivot, f_scal
 		};
 	}
 
+	encoder.log(LOG.ARR, "array.numeric.delta.float, len="+data.length+
+		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
+		", type="+_NUMTYPE_DOWNSCALE_DELTA_FLOAT[n_delta_type]+" ("+n_delta_type+")"+
+		", pivot="+pivot+", scale="+f_scale);
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.NUM_DELTA_FLOAT | NUMTYPE_LN.UINT16 | (n_delta_type << 1) ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2115,11 +2019,6 @@ function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to, pivot, f_scal
 		pivot_array[i] = (data[i] - pivot) / f_scale;
 		// console.log(">>>", data[i],"->", pivot_array[i]);
 	}
-
-	encoder.log(LOG.ARR, "array.numeric.delta.float, len="+data.length+
-		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
-		", type="+_NUMTYPE_DOWNSCALE_DELTA_FLOAT[n_delta_type]+" ("+n_delta_type+")"+
-		", pivot="+pivot+", scale="+f_scale);
 
 	// Envode pivot array
 	pickStream( encoder, n_to)
@@ -2149,6 +2048,11 @@ function encodeArray_NUM_DELTA_INT( encoder, data, n_from, n_to ) {
 		};
 	}
 
+	encoder.log(LOG.ARR, "array.numeric.delta.int, len="+data.length+
+		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
+		", type="+_NUMTYPE_DOWNSCALE_DELTA_INT[n_delta_type]+" ("+n_delta_type+")");
+
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.NUM_DELTA_INT | NUMTYPE_LN.UINT16 | (n_delta_type << 1) ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2158,10 +2062,6 @@ function encodeArray_NUM_DELTA_INT( encoder, data, n_from, n_to ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	encoder.log(LOG.ARR, "array.numeric.delta.int, len="+data.length+
-		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
-		", type="+_NUMTYPE_DOWNSCALE_DELTA_INT[n_delta_type]+" ("+n_delta_type+")");
 
 	// Write initial value
 	pickStream( encoder, n_from )
@@ -2185,6 +2085,9 @@ function encodeArray_NUM_REPEATED( encoder, data, n_type ) {
 	// 0100 [TYPE] [LN]    [16bit/32bit]
 	//
 
+	encoder.log(LOG.ARR, "array.numeric.repeated, len="+data.length+
+		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.NUM_REPEATED | NUMTYPE_LN.UINT16 | (n_type << 1) ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2194,9 +2097,6 @@ function encodeArray_NUM_REPEATED( encoder, data, n_type ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	encoder.log(LOG.ARR, "array.numeric.repeated, len="+data.length+
-		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
 	// Write initial value
 	pickStream( encoder, n_type )
@@ -2216,6 +2116,9 @@ function encodeArray_NUM_RAW( encoder, data, n_type ) {
 	// 0101 [TYPE] [LN]    [16bit/32bit]
 	//
 
+	encoder.log(LOG.ARR, "array.numeric.raw, len="+data.length+
+		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.NUM_RAW | NUMTYPE_LN.UINT16 | (n_type << 1) ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2225,9 +2128,6 @@ function encodeArray_NUM_RAW( encoder, data, n_type ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	encoder.log(LOG.ARR, "array.numeric.raw, len="+data.length+
-		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
 	// Encode the short array
 	pickStream( encoder, n_type )
@@ -2247,13 +2147,13 @@ function encodeArray_NUM_SHORT( encoder, data, n_type ) {
 	// 01110 [TYPE]
 	//
 
+	encoder.log(LOG.ARR, "array.numeric.short, len="+data.length+
+		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
+
 	// Encode primitives one after the other
 	encoder.stream8.write( pack1b( ARR_OP.NUM_SHORT | n_type ) );
 	encoder.stream8.write( pack1b( data.length, false ) );
 	encoder.counters.arr_hdr+=2;
-
-	encoder.log(LOG.ARR, "array.numeric.short, len="+data.length+
-		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
 	// Encode the short array
 	pickStream( encoder, n_type )
@@ -2316,8 +2216,8 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 	//
 	// Bulk Array for Known Object (PRIM_BULK_KNOWN)
 	//
-	// .......  .   +   Data Length  +  Entity ID
-	// 0111110 [LN]    [16bit/32bit]     [16bit]
+	// .......  .   +   Data Length  +  Entity ID + Bulk Op-Codes
+	// 0111110 [LN]    [16bit/32bit]     [16bit]     (IRef Meta)
 	//
 
 	// Lookup signature
@@ -2339,13 +2239,12 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 		encoder.counters.arr_hdr+=5;
 	}
 
-	// Write header
+	// Write EID
 	encoder.stream16.write( pack2b( eid, false ) );
 	encoder.counters.arr_hdr+=2;
 
 	// Prepare Tables
 	for (i=0; i<plen; ++i) {
-		propertyTable.push( null );
 		waveTable.push( [] );
 	}
 
@@ -2359,11 +2258,13 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
 				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				encoder.counters.arr_hdr+=1;
 				c_export = 0;
 			}
 			// console.log(">>[iref="+id+" (ref)]>>");
 			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.IREF | ((id << 16) & 0x0F) ) );
 			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			encoder.counters.arr_hdr+=3;
 			continue;
 		}
 
@@ -2373,15 +2274,18 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
 				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				encoder.counters.arr_hdr+=1;
 				c_export = 0;
 			}
 			// console.log(">>[xref="+id+"]>>");
 			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.XREF ) );
 			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			encoder.counters.arr_hdr+=3;
 			continue;
 		}
 
 		// Populate property table (for byval lookup)
+		propertyTable = new Array(plen);
 		for (i=0; i<plen; ++i) {
 			propertyTable[i] = object[ PROPERTIES[i] ];
 		}
@@ -2392,11 +2296,13 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
 				encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+				encoder.counters.arr_hdr+=1;
 				c_export = 0;
 			}
 			// console.log(">>[iref="+id+" (val)]>>");
 			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.IREF | ((id << 16) & 0x0F) ) );
 			encoder.stream16.write( pack2b( id & 0xFFFF ) );
+			encoder.counters.arr_hdr+=3;
 			continue;
 		}
 
@@ -2416,6 +2322,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 		if (c_export > 62) {
 			// console.log(">>[known="+c_export+" (bulk)]>>");
 			encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+			encoder.counters.arr_hdr+=1;
 			c_export = 0;
 		}
 
@@ -2425,6 +2332,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 	if (c_export > 0) {
 		// console.log(">>[known="+c_export+" (end)]>>");
 		encoder.stream8.write( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | c_export ) );
+		encoder.counters.arr_hdr+=1;
 	}
 
 	// Write weaved properties
@@ -2450,15 +2358,15 @@ function encodeArray_PRIM_SHORT( encoder, data ) {
 	// 01111100
 	//
 
-	// Encode primitives one after the other
-	encoder.stream8.write( pack1b( ARR_OP.PRIM_SHORT ) );
-	encoder.stream8.write( pack1b( data.length, false ) );
-	encoder.counters.arr_hdr+=2;
-
 	// Open log group
 	encoder.log(LOG.ARR, "array.prim.short, len="+data.length+
 		", peek="+data[0]+" [");
 	encoder.logIndent(1);
+
+	// Encode primitives one after the other
+	encoder.stream8.write( pack1b( ARR_OP.PRIM_SHORT ) );
+	encoder.stream8.write( pack1b( data.length, false ) );
+	encoder.counters.arr_hdr+=2;
 
 	// Encode each primitive individually
 	for (var i=0, llen=data.length; i<llen; ++i) {
@@ -2483,6 +2391,9 @@ function encodeArray_PRIM_REPEATED( encoder, data ) {
 	// 0111100 [LN]     [16-bit]
 	//
 
+	encoder.log(LOG.ARR, "array.prim.repeated, len="+data.length+
+		", peek="+data[0]);
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.PRIM_REPEATED | NUMTYPE_LN.UINT16 ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2492,9 +2403,6 @@ function encodeArray_PRIM_REPEATED( encoder, data ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	encoder.log(LOG.ARR, "array.prim.repeated, len="+data.length+
-		", peek="+data[0]);
 
 	// Encode the short array
 	encodePrimitive( encoder, data[0] );
@@ -2513,6 +2421,11 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 	// 0110101 [LN]     [16-bit]
 	//
 
+	// Write chunk header
+	encoder.log(LOG.ARR, "array.prim.raw, len="+data.length+
+		", peek="+data[0]+" [");
+	encoder.logIndent(1);
+
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
 		encoder.stream8.write( pack1b( ARR_OP.PRIM_RAW | NUMTYPE_LN.UINT16 ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
@@ -2522,11 +2435,6 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
-
-	// Write chunk header
-	encoder.log(LOG.ARR, "array.prim.raw, len="+data.length+
-		", peek="+data[0]+" [");
-	encoder.logIndent(1);
 
 	// Write primitives
 	for (var i=0, l=data.length; i<l; ++i)
@@ -2554,6 +2462,7 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	// Write chunk header
 	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
+	encoder.counters.arr_hdr+=1;
 	encoder.log(LOG.ARR, "array.prim.chunk, len="+data.length+
 		", chunks="+chunks.length+", peek="+data[0]+" [");
 	encoder.logIndent(1);
@@ -2566,6 +2475,7 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	// Write chunk termination
 	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK_END ) );
+	encoder.counters.arr_hdr+=1;
 
 	encoder.logIndent(-1);
 	encoder.log(LOG.ARR, "]");
@@ -2597,7 +2507,8 @@ function encodeArray_EMPTY( encoder ) {
 function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
 	var n_type, na;
 
-	// console.log(">>> CFWA Chunk=", chunkType,":",data);
+	// console.log(">>> CFWA Chunk=", _ARR_CHUNK[chunkType]);
+	// console.log(">>> =",data);
 
 	// Encode array component according to chunk type
 	switch (chunkType) {
@@ -2709,6 +2620,11 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				encodeArray_NUM_SHORT( encoder, data, n_type );
 			}
 
+		} else {
+
+			// Pass it to primitive encoder
+			encodeArray_Primitive( encoder, data );
+
 		}
 
 	} else {
@@ -2770,6 +2686,11 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				}
 			}
 
+		} else {
+
+			// Pass it to primitive encoder
+			encodeArray_Primitive( encoder, data );
+
 		}
 
 	}
@@ -2782,15 +2703,17 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 function encodeArray_Primitive( encoder, data ) {
 
 	// Check for small primitive array
-	if (data.ength < 256) {
+	if (data.length < 256) {
 
 		// Test if these 255 values are the same
-		var v, lv=data[0], same=true;
-		for (var i=0, len=data.length; i<l; ++i) {
-			if ( encoder.optimize.cfwa_object_byval 
-					? !deepEqual( v, lv )
-					: (v !== lv) 
-				) {
+		var v, lv=data[0], same=(data.length>1);
+		for (var i=1, len=data.length; i<len; ++i) {
+			v = data[i];
+			if ( v !== lv ) {
+				if ((typeof lv === 'object') && encoder.optimize.cfwa_object_byval
+					&& deepEqual( v, lv, {strict:true} )) {
+					continue;
+				}
 				same = false;
 				break;
 			}
@@ -2805,23 +2728,9 @@ function encodeArray_Primitive( encoder, data ) {
 		return;
 	}
 
-	// Perform a chunk forward analysis to classify the whole
-	// or part of the current array
-	// var chunk = chunkForwardAnalysis( encoder, data, 0 );
-
-	// // Check if this is the whole array
-	// if (chunk[1] === data.length) {
-
-	// 	// Just encode a single chunk as array component
-	// 	encodeArray_Chunk( encoder, data, chunk );
-
-	// } else {
-
-	// 	// We have more than one chunk, start encoding chunked array
-	// 	encodeArray_PRIM_CHUNK( encoder, data, chunk );
-
-	// }
-
+	// Analyze primitive array and return clusters of values
+	// that can be efficiently merged (such as numbers, repeated values,
+	// primitives etc.)
 	var chunks = analyzePrimitiveArray( encoder, data );
 	if (chunks.length === 1) {
 
@@ -2850,6 +2759,7 @@ function encodeArray_Primitive( encoder, data ) {
  * Encode the specified array
  */
 function encodeArray( encoder, data ) {
+	encoder.log(LOG.PRM, "array, len="+data.length+", peek="+data[0]);
 	
 	// Check for empty array
 	if (data.length === 0) {
@@ -3037,7 +2947,7 @@ function encodeObject( encoder, object ) {
 
 	// If no such entity exists, raise exception
 	if (eid < 0) {
-		console.error("Unknown object:", object);
+		// console.error("Unknown object:", object);
 		throw {
 			'name' 		: 'EncodingError',
 			'message'	: 'An object trying to encode was not declared in the object table!',
@@ -3231,7 +3141,6 @@ function encodePrimitive( encoder, data ) {
 				(data instanceof Array)) {
 
 		// Write array
-		encoder.log(LOG.PRM, "array, len="+data.length+", peek="+data[0]);
 		encodeArray( encoder, data );
 
 	// ===============================
@@ -3354,7 +3263,7 @@ var BinaryEncoder = function( filename, config ) {
 	// Optimisation flags
 	this.optimize = {
 		cfwa_object_byval: true,	 // By-value de-duplication of objects in chunk forward analysis
-		repeat_thresshold: 0.5,		 // How many consecutive same items are enough for an array in order
+		repeat_thresshold: 0.25,	 // How many consecutive same items are enough for an array in order
 									 // to break it as a chunked array.
 		float_int_downscale: false,	 // Downscale floats to integers multiplied by scale
 	};
@@ -3633,7 +3542,8 @@ BinaryEncoder.prototype = {
 			});
 
 		// Keep object references
-		this.indexVal[eid].insert( propertyTable, this.indexRef.length );
+		var nid = this.indexRef.length;
+		this.indexVal[eid].insert( propertyTable, nid );
 		this.indexRef.push( object );
 
 		// Keep ID on the object itself so we have a faster lookup,
@@ -3641,7 +3551,7 @@ BinaryEncoder.prototype = {
 		Object.defineProperty(
 			object, "__iref__", {
 				enumerable: false,
-				value: this.indexRef.length-1,
+				value: nid,
 			}
 		);
 

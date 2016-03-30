@@ -226,6 +226,15 @@ var JBBBinaryLoader =
 	};
 
 	/**
+	 * BULK_KNOWN Array encoding operator codes
+	 */
+	const PRIM_BULK_KNOWN_OP = {
+		DEFINE 	: 0x00,		// Define a new object for IREF
+		IREF 	: 0x40,		// Refer to an IREF object
+		XREF 	: 0x80,		// Refer to an XREF object
+	};
+
+	/**
 	 * Simple primitive translation
 	 */
 	const PRIM_SIMPLE = [ undefined, null, false, true ],
@@ -291,7 +300,7 @@ var JBBBinaryLoader =
 	 */
 	function decodeBlobURL( bundle, length ) {
 		var mimeType = bundle.readStringLT(),
-			blob = new Blob([ bundle.readTypedArray[NUMTYPE.UINT8]( length ) ], { type: mimeType });
+			blob = new Blob([ bundle.readTypedArray(NUMTYPE.UINT8, length ) ], { type: mimeType });
 		return  false
 			? __debugMeta( URL.createObjectURL(blob), 'buffer', { 'mime': mimeType, 'size': length } )
 			: URL.createObjectURL(blob);
@@ -302,17 +311,17 @@ var JBBBinaryLoader =
 	 */
 	function decodeBuffer( bundle, len, buf_type ) {
 		var lnType = [ NUMTYPE.UINT8, NUMTYPE.UINT16, NUMTYPE.UINT32, NUMTYPE.FLOAT64 ][ len ],
-			length = bundle.readTypedNum[ lnType ](), ans;
+			length = bundle.readTypedNum( lnType ), ans;
 
 		// Process buffer according to type
 		if (buf_type === 0) { // STRING_LATIN
-			ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT8 ]( length ) );
+			ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT8 , length ) );
 			return  false
 				? __debugMeta( ans, 'string.latin', {} )
 				: ans;
 
 		} else if (buf_type === 1) { // STRING_UTF8
-			ans = String.fromCharCode.apply(null, bundle.readTypedArray[ NUMTYPE.UINT16 ]( length ) );
+			ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT16 , length ) );
 			return  false
 				? __debugMeta( ans, 'string.utf8', {} )
 				: ans;
@@ -346,7 +355,7 @@ var JBBBinaryLoader =
 	function decodeObject( bundle, database, op ) {
 		if ( !(op & 0x20) || ((op & 0x30) === 0x20) ) { // Predefined objects
 			var eid = op;
-			if (op & 0x20) eid = bundle.readTypedNum[ NUMTYPE.UINT8 ]() | ((op & 0x0F) << 8);
+			if (op & 0x20) eid = bundle.readTypedNum( NUMTYPE.UINT8 ) | ((op & 0x0F) << 8);
 
 			// Fetch object class
 			var ENTITY = bundle.ot.ENTITIES[eid];
@@ -377,8 +386,8 @@ var JBBBinaryLoader =
 			var poid = (op & 0x03);
 			switch (poid) {
 				case 0:
-					var date = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
-						tzOffset = bundle.readTypedNum[ NUMTYPE.INT8 ]() * 10;
+					var date = bundle.readTypedNum( NUMTYPE.FLOAT64 ),
+						tzOffset = bundle.readTypedNum( NUMTYPE.INT8 ) * 10;
 
 					// Return date
 					return  false 
@@ -394,7 +403,7 @@ var JBBBinaryLoader =
 			}
 
 		} else if ((op & 0x38) === 0x30) { // Simple object with known signature
-			var eid = ((op & 0x07) << 8) | bundle.readTypedNum[ NUMTYPE.UINT8 ](),
+			var eid = ((op & 0x07) << 8) | bundle.readTypedNum( NUMTYPE.UINT8 ),
 				factory = bundle.factory_plain[ eid ];
 			if (factory === undefined) {
 				throw {
@@ -413,7 +422,7 @@ var JBBBinaryLoader =
 		} else {
 			throw {
 				'name' 		: 'AssertError',
-				'message'	: 'Unexpected object opcode #'+op+'!',
+				'message'	: 'Unexpected object opcode 0x'+op.toString(16)+'!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			}
 		}
@@ -426,16 +435,16 @@ var JBBBinaryLoader =
 	function decodePivotArrayFloat( bundle, database, len, num_type ) {
 		var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
 			num_type_to = NUMTYPE_DELTA_FLOAT.TO[ num_type ],
-			pivot = bundle.readTypedNum[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ](),
-			scale = bundle.readTypedNum[ NUMTYPE.FLOAT64 ](),
-			values = bundle.readTypedArray[ num_type_to ]( len );
+			pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ),
+			scale = bundle.readTypedNum( NUMTYPE.FLOAT64 ),
+			values = bundle.readTypedArray( num_type_to , len );
 
 		// console.log(">> DELTA_FLOAT len=",len,"type=",num_type,"scale=",scale,"pivot=",pivot);
 
 		// Decode
-		for (var i=0; i<len; i++) {
+		for (var i=0; i<len; ++i) {
 			ans[i] = pivot + (values[i] * scale);
-			// console.log("<<<", values[i],"->", ans[i]);
+			console.log("<<<", values[i],"->", ans[i]);
 		}
 
 		return  false
@@ -448,12 +457,12 @@ var JBBBinaryLoader =
 	 */
 	function decodeDeltaArrayInt( bundle, database, len, num_type ) {
 		var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_INT.FROM[ num_type ] ]( len ),
-			v = bundle.readTypedNum[ NUMTYPE_DELTA_INT.FROM[ num_type ] ](),
-			values = bundle.readTypedArray[ NUMTYPE_DELTA_INT.TO[ num_type ] ]( len - 1 );
+			v = bundle.readTypedNum( NUMTYPE_DELTA_INT.FROM[ num_type ] ),
+			values = bundle.readTypedArray( NUMTYPE_DELTA_INT.TO[ num_type ] , len - 1 );
 
 		// Decode array
 		ans[0] = v;
-		for (var i=0, llen=values.length; i<llen; i++) {
+		for (var i=0, llen=values.length; i<llen; ++i) {
 			v += values[i];
 			ans[i+1] = v;
 		}
@@ -470,7 +479,7 @@ var JBBBinaryLoader =
 	function decodePlainBulkArray( bundle, database ) {
 
 		// Get signature ID
-		var sid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
+		var sid = bundle.readTypedNum( NUMTYPE.UINT16 ),
 			properties = bundle.signature_table[sid],
 			objectFactory = bundle.factory_plain_bulk[sid];
 		if (!properties) {
@@ -483,24 +492,14 @@ var JBBBinaryLoader =
 
 		// Read property arrays
 		var values = [];
-		for (var i=0, l=properties.length; i<l; i++)
+		for (var i=0, l=properties.length; i<l; ++i)
 			values.push(decodePrimitive( bundle, database ));
 
-		// Read weaved property array
-		// var values = decodePrimitive( bundle, database ),
-		// 	len = values.length / properties.length;
-		// console.log("<<WAVE<<", values);
-
-		// // Create factory function
-		// var makeObject = Function("props","i", factoryFn);
-
 		// Create objects
-		var ans = [], len = values[0].length;
-		for (var i=0; i<len; i++)
+		var ans = [], len=values[0].length;
+		for (var i=0; i<len; ++i)
 			ans.push( objectFactory(values, i) );
 			// ans.push( objectFactory(values, values.length / properties.length, i) );
-
-		// console.log("decodePlainBulkArray() =",ans.length);
 
 		return  false
 			? __debugMeta( ans, 'array.primitive.bulk_plain', { 'sid': sid } )
@@ -511,34 +510,108 @@ var JBBBinaryLoader =
 	/**
 	 * Decode bulk array of entities
 	 */
-	function decodeBulkArray( bundle, database, len ) {
-		var eid = bundle.readTypedNum[ NUMTYPE.UINT16 ](),
-			PROPERTIES = bundle.ot.PROPERTIES[ eid ],
-			ENTITY = bundle.ot.ENTITIES[ eid ];
+	function decodeKnownBulkArray( bundle, database, len ) {
+		var eid = bundle.readTypedNum( NUMTYPE.UINT16 );
+		var PROPERTIES = bundle.ot.PROPERTIES[ eid ],
+			ENTITY = bundle.ot.ENTITIES[ eid ],
+			plen = PROPERTIES.length, popTable = [], 
+			refTable = Array( len ), ans = Array( len ),
+			obj, id, name, op, dat, i=0, j=0, k=0, ops=[],
+			localObjs = [], obji=0,
+			propFactory = "", getProperties;
 
-		// Fabricate all objects
-		var ans = [], prop_tables=[];
-		for (var i=0; i<len; i++) {
-			// Call entity factory
-			ans.push( ENTITY[1]( ENTITY[0] ) );
-			prop_tables.push( [] );
+		// Get bulk operators
+		i=0; while (i < len) {
+			op = bundle.readTypedNum( NUMTYPE.UINT8 );
+			dat = op & 0x3F;
+			// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
+			switch (op & 0xC0) {
+				case PRIM_BULK_KNOWN_OP.DEFINE:
+					for (j=0; j<dat; j++) {
+						// Create entity & Keep it in the iref table
+						obj = ENTITY[1]( ENTITY[0] );
+						bundle.iref_table.push(obj);
+						localObjs.push(obj);
+					}
+					i += dat; ops.push([ op & 0xC0, dat ]);
+					break;
+				case PRIM_BULK_KNOWN_OP.IREF:
+				case PRIM_BULK_KNOWN_OP.XREF:
+					i += 1; ops.push([ op & 0xC0, dat ]);
+					break;
+				default:
+					throw {
+						'name' 		: 'AssertError',
+						'message'	: 'Unknown bulk array op-code 0x'+op.toString(16)+'!',
+						toString 	: function(){return this.name + ": " + this.message;}
+					}
+			}
 		}
 
-		// Weave-create property tables
-		for (var j=0, pl=PROPERTIES.length; j<pl; j++) {
-			var props = decodePrimitive( bundle, database );
-			for (var i=0; i<len; i++)
-				prop_tables[i].push( props[i] );
+		// Get property arrays
+		for (i=0; i<plen; ++i) {
+			popTable.push( decodePrimitive( bundle, database ) );
+			if (propFactory) propFactory += ",";
+			propFactory += "p["+i+"][i]";
 		}
 
-		// Run initializers
-		for (var i=0; i<len; i++) {
-			// Run initializers
-			ENTITY[2]( ans[i], PROPERTIES, prop_tables[i] );
+		// Create de-weaving collector function
+		getProperties = new Function( "p", "i", "return ["+propFactory+"]" );
+
+		// console.log("------");
+		// console.log(" Ofs:", bundle.i8-bundle.ofs8);
+		// console.log(" Eid:", eid);
+		// console.log(" Len:", len);
+		// console.log(" Properties:", PROPERTIES.toString());
+		// console.log(" PropTable:", popTable);
+		// console.log(" Factory: return [", propFactory,"]");
+		// console.log("------");
+
+		// Start processing operators
+		i=0; for (k=0; k<ops.length; k++) {
+			op = ops[k][0]; dat = ops[k][1];
+			switch (op) {
+				case PRIM_BULK_KNOWN_OP.DEFINE:
+					// Construct & Export to IREF table
+					for (j=0; j<dat; j++) {
+
+						// Initialize object properties and keep it on the answer array 
+						obj = localObjs[obji];
+						ENTITY[2]( obj, PROPERTIES, getProperties(popTable, obji) );
+						ans[i++] = obj;
+
+						// Forward object index
+						obji++;
+
+					}
+					break;
+
+				case PRIM_BULK_KNOWN_OP.IREF:
+					// Import from IREF
+					id = bundle.readTypedNum( NUMTYPE.UINT16 );
+					if (id >= bundle.iref_table.length) throw {
+						'name' 		: 'IrefError',
+						'message'	: 'Invalid IREF #'+id+'!',
+						toString 	: function(){return this.name + ": " + this.message;}
+					}
+					ans[i++] = bundle.iref_table[ (dat << 16) | id ];
+					break;
+
+				case PRIM_BULK_KNOWN_OP.XREF:
+					// Import from XREF
+					name = bundle.readStringLT();
+					if (database[name] === undefined) throw {
+						'name' 		: 'ImportError',
+						'message'	: 'Cannot import undefined external reference '+name+'!',
+						toString 	: function(){return this.name + ": " + this.message;}
+					};
+					ans[i++] = database[name];
+					break;
+
+			}
 		}
 
 		// Free proprty tables and return objects
-		prop_tables = [];
 		return  false
 			? __debugMeta( ans, 'array.bulk', { 'eid': eid } )
 			: ans;
@@ -549,18 +622,21 @@ var JBBBinaryLoader =
 	 * Read an array from the bundle
 	 */
 	function decodeChunkedArray( bundle, database ) {
-		var op = bundle.readTypedNum[ NUMTYPE.UINT8 ](),
-			ans =[], chunk, chunk_meta = [];
+		var op = bundle.readTypedNum( NUMTYPE.UINT8 ),
+			chunk, chunk_meta = [],	ans =[], first = true;
 
 		// Process chunks till PRIM_CHUNK_END
 		while (op !== 0x7F) {
 
 			// Collect chunk ops
 			chunk = decodeArray( bundle, database, op );
-			chunk_meta.push({
-				type: op,
-				len: chunk.length
-			});
+			if (false) {
+				chunk_meta.push({
+					type: op,
+					len: chunk.length
+				});
+			}
+			// console.log("<<< =",chunk);
 
 			// Test for non-arrays
 			if (chunk.length === undefined)
@@ -570,12 +646,15 @@ var JBBBinaryLoader =
 					toString 	: function(){return this.name + ": " + this.message;}
 				};
 
-			// Merge
-			ans = ans.concat( Array.prototype.slice.call(chunk) );
+			// Collect
+			ans.push.apply( ans, chunk );
 
 			// Get next op-code
-			op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+			op = bundle.readTypedNum( NUMTYPE.UINT8 );
 		}
+
+		// console.log("-----------");
+		// console.log(ans);
 
 		// Return chunked array
 		return  false
@@ -586,31 +665,21 @@ var JBBBinaryLoader =
 	/**
 	 * Read an array from the bundle
 	 */
-	// var lt = 0;
 	function decodeArray( bundle, database, op ) {
 		var i, type, ln, len, vArr, nArr = [];
 
 		if (op === 0x6C) { // PRIM_BULK_PLAIN
 
 			// Decode and return plain bulk array
-			// var t = Date.now();
-			// var r = decodePlainBulkArray( bundle, database );
-			// t = Date.now() - t;
-			// lt += t;
-			// console.log("t=",lt);
-			// return r;
-
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Plain Bulk Plain");
 			return decodePlainBulkArray( bundle, database );
-
-		} else if (op === 0x6D) { // PRIM_BULK_KNOWN
-
-			// NOT USED
 
 		} else if (op === 0x6E) { // PRIM_SHORT
 
 			// Collect up to 255 primitives
-			len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
-			for (i=0; i<len; i++)
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Short");
+			len = bundle.readTypedNum( NUMTYPE.UINT8 );
+			for (i=0; i<len; ++i)
 				nArr.push( decodePrimitive( bundle, database ) );
 
 			// Return
@@ -621,11 +690,13 @@ var JBBBinaryLoader =
 		} else if (op === 0x6F) { // PRIM_CHUNK
 
 			// Return chunked array
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Chunk");
 			return decodeChunkedArray( bundle, database );
 
 		} else if (op === 0x7E) { // EMPTY
 
 			// Return empty array
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Empty");
 			return  false
 				? __debugMeta( [], 'array.empty', {} )
 				: [];
@@ -639,13 +710,14 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xE0) === 0x00) { // NUM_DWS
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric DWS");
 			ln = op & 0x01;
 			type = (op >> 1) & 0x0F;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Read from and encode to
 			// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-			vArr = bundle.readTypedArray[ NUMTYPE_DOWNSCALE.TO[type] ]( len );
+			vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
 			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 			// Return
@@ -655,33 +727,36 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xF0) === 0x20) { // NUM_DELTA_INT
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Delta Int");
 			ln = op & 0x01;
 			type = (op >> 1) & 0x07;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Return delta-encoded integers
 			return decodeDeltaArrayInt( bundle, database, len, type );
 
 		} else if ((op & 0xF0) === 0x30) { // NUM_DELTA_FLOAT
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Delta Float");
 			ln = op & 0x01;
 			type = (op >> 1) & 0x07;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Return pivot-encoded floats
 			return decodePivotArrayFloat( bundle, database, len, type );
 
 		} else if ((op & 0xF0) === 0x40) { // NUM_REPEATED
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Repeated");
 			ln = op & 0x01;
 			type = (op >> 1) & 0x07;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Repeat value
-			vArr = bundle.readTypedNum[ type ]();
+			vArr = bundle.readTypedNum( type );
 			nArr = new NUMTYPE_CLASS[ type ]( len );
 			nArr.fill(vArr);
-			// for (i=0; i<len; i++) nArr[i]=vArr;
+			// for (i=0; i<len; ++i) nArr[i]=vArr;
 
 			// Return
 			return  false
@@ -690,13 +765,14 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xF0) === 0x50) { // NUM_RAW
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Raw");
 			ln = op & 0x01;
 			type = (op >> 1) & 0x07;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Read raw array
 			// console.log("Reading NUM_RAW len="+len+", ln="+ln);
-			nArr = bundle.readTypedArray[ type ]( len );
+			nArr = bundle.readTypedArray( type , len );
 
 			// Return
 			return  false
@@ -705,12 +781,13 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xF8) === 0x60) { // NUM_SHORT
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Short");
 			type = op & 0x07;
-			len = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+			len = bundle.readTypedNum( NUMTYPE.UINT8 );
 
 			// Read raw array
 			// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-	  		nArr = bundle.readTypedArray[ type ]( len );
+	  		nArr = bundle.readTypedArray( type , len );
 
 			// Return
 			return  false
@@ -719,8 +796,9 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xFE) === 0x68) { // PRIM_REPEATED
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Repeated");
 			ln = op & 0x01;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Repeat value
 			vArr = decodePrimitive( bundle, database );
@@ -736,11 +814,12 @@ var JBBBinaryLoader =
 
 		} else if ((op & 0xFE) === 0x6A) { // PRIM_RAW
 
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Raw");
 			ln = op & 0x01;
-			len = bundle.readTypedNum[ ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 ]();
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Compile primitives
-			for (i=0; i<len; i++)
+			for (i=0; i<len; ++i)
 				nArr.push( decodePrimitive( bundle, database ) );
 
 			// Return
@@ -748,10 +827,19 @@ var JBBBinaryLoader =
 				? __debugMeta( nArr, 'array.primitive.raw', {} )
 				: nArr;
 
+		} else if ((op & 0xFE) === 0x7C) { // PRIM_BULK_KNOWN
+
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Bulk Known");
+			ln = op & 0x01;
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
+
+			// Decode and return primitive bulk array
+			return decodeKnownBulkArray( bundle, database, len );
+
 		} else {
 			throw {
 				'name' 		: 'AssertError',
-				'message'	: 'Unknown array op-code #'+op+'!',
+				'message'	: 'Unknown array op-code 0x'+op.toString(16)+' at offset @'+(bundle.i8 - bundle.ofs8)+'!',
 				toString 	: function(){return this.name + ": " + this.message;}
 			}
 
@@ -762,7 +850,7 @@ var JBBBinaryLoader =
 	 * Read a primitive from the bundle
 	 */
 	function decodePrimitive( bundle, database ) {
-		var op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+		var op = bundle.readTypedNum( NUMTYPE.UINT8 );
 		if ((op & 0x80) === 0x00) { // Array
 			return decodeArray(bundle, database,
 				(op & 0x7F) );
@@ -777,7 +865,7 @@ var JBBBinaryLoader =
 				(op & 0x07) );
 
 		} else if ((op & 0xF0) === 0xE0) { // I-Ref
-			var id = ((op & 0x0F) << 16) | bundle.readTypedNum[ NUMTYPE.UINT16 ]();
+			var id = ((op & 0x0F) << 16) | bundle.readTypedNum( NUMTYPE.UINT16 );
 			if (id >= bundle.iref_table.length) throw {
 				'name' 		: 'IrefError',
 				'message'	: 'Invalid IREF #'+id+'!',
@@ -788,7 +876,7 @@ var JBBBinaryLoader =
 				: bundle.iref_table[id];
 
 		} else if ((op & 0xF8) === 0xF0) { // Number
-			return bundle.readTypedNum[ op & 0x07 ]();
+			return bundle.readTypedNum( op & 0x07 );
 
 		} else if ((op & 0xFC) === 0xF8) { // Simple
 			return PRIM_SIMPLE[ op & 0x03 ];
@@ -822,7 +910,7 @@ var JBBBinaryLoader =
 	 */
 	function parseBundle( bundle, database ) {
 		while (!bundle.eof()) {
-			var op = bundle.readTypedNum[ NUMTYPE.UINT8 ]();
+			var op = bundle.readTypedNum( NUMTYPE.UINT8 );
 			switch (op) {
 				case 0xF8: // Export
 					var export_name = bundle.prefix + bundle.readStringLT();
@@ -832,7 +920,7 @@ var JBBBinaryLoader =
 				default:
 					throw {
 						'name' 		: 'AssertError',
-						'message'	: 'Unknown control operator #'+op+' at @'+bundle.i8+'!',
+						'message'	: 'Unknown control operator 0x'+op.toString(16)+' at @'+bundle.i8+'!',
 						toString 	: function(){return this.name + ": " + this.message;}
 					}
 			}
@@ -1004,7 +1092,7 @@ var JBBBinaryLoader =
 
 			// First make sure that there are no bundles pending loading
 			var pendingLoading = false;
-			for (var i=0; i<this.queuedRequests.length; i++) {
+			for (var i=0; i<this.queuedRequests.length; ++i) {
 				if (this.queuedRequests[i].status === PBUND_REQUESTED) {
 					pendingLoading = true;
 					break;
@@ -1029,7 +1117,7 @@ var JBBBinaryLoader =
 
 				// Place all requests in parallel
 				var triggeredError = false;
-				for (var i=0; i<this.queuedRequests.length; i++) {
+				for (var i=0; i<this.queuedRequests.length; ++i) {
 					var req = this.queuedRequests[i];
 					if (req.status === PBUND_REQUESTED) {
 
@@ -1070,7 +1158,7 @@ var JBBBinaryLoader =
 			// Parse all loaded bundles (synchronous)
 			////////////////////////////////////////////////////////
 
-			for (var i=0; i<this.queuedRequests.length; i++) {
+			for (var i=0; i<this.queuedRequests.length; ++i) {
 				var req = this.queuedRequests[i];
 				if (req.status === PBUND_LOADED) {
 					// try {
@@ -1149,11 +1237,10 @@ var JBBBinaryLoader =
 	 * @author Ioannis Charalampidis / https://github.com/wavesoft
 	 */
 
-
 	/**
 	 * Numerical types
 	 */
-	var NUMTYPE = {
+	const NUMTYPE = {
 		UINT8: 	 0, INT8:    1,
 		UINT16:  2, INT16:   3,
 		UINT32:  4, INT32:   5,
@@ -1167,7 +1254,7 @@ var JBBBinaryLoader =
 	/**
 	 * Representation of the binary bundle from buffer
 	 */
-	var BinaryBundle = function( buffer, objectTable ) {
+	var BinaryBundle = function( b, objectTable ) {
 
 		// The object table to use
 		this.ot = objectTable;
@@ -1178,45 +1265,45 @@ var JBBBinaryLoader =
 		// If we are given an array as buffer, it means
 		// that we loaded separate chunks rather than a 
 		// single, unifide buffer.
-		this.sparse = (buffer instanceof Array);
+		this.sparse = (b instanceof Array);
 		var hv16, hv32, primBufLen, header_size = 32;
 		if (this.sparse) {
 
 			// Setup views to the buffer
-			this.u8  = new Uint8Array(buffer[0]);
-			this.s8  = new Int8Array(buffer[0]);
-			this.u16 = new Uint16Array(buffer[1]);
-			this.s16 = new Int16Array(buffer[1]);
-			this.u32 = new Uint32Array(buffer[2]);
-			this.s32 = new Int32Array(buffer[2]);
-			this.f32 = new Float32Array(buffer[2]);
-			this.f64 = new Float64Array(buffer[3]);
+			this.u8  = new Uint8Array(b[0]);
+			this.s8  = new Int8Array(b[0]);
+			this.u16 = new Uint16Array(b[1]);
+			this.s16 = new Int16Array(b[1]);
+			this.u32 = new Uint32Array(b[2]);
+			this.s32 = new Int32Array(b[2]);
+			this.f32 = new Float32Array(b[2]);
+			this.f64 = new Float64Array(b[3]);
 
 			// Header views
-			hv16 = new Uint16Array(buffer[0], 0, header_size/2);
-			hv32 = new Uint32Array(buffer[0], 0, header_size/4);
+			hv16 = new Uint16Array(b[0], 0, header_size/2);
+			hv32 = new Uint32Array(b[0], 0, header_size/4);
 
 			// Length of the primary buffer
-			primBufLen = buffer[0].byteLength;
+			primBufLen = b[0].byteLength;
 
 		} else {
 
 			// Setup views to the buffer
-			this.u8  = new Uint8Array(buffer);
-			this.s8  = new Int8Array(buffer);
-			this.u16 = new Uint16Array(buffer);
-			this.s16 = new Int16Array(buffer);
-			this.u32 = new Uint32Array(buffer);
-			this.s32 = new Int32Array(buffer);
-			this.f32 = new Float32Array(buffer);
-			this.f64 = new Float64Array(buffer);
+			this.u8  = new Uint8Array(b);
+			this.s8  = new Int8Array(b);
+			this.u16 = new Uint16Array(b);
+			this.s16 = new Int16Array(b);
+			this.u32 = new Uint32Array(b);
+			this.s32 = new Int32Array(b);
+			this.f32 = new Float32Array(b);
+			this.f64 = new Float64Array(b);
 
 			// Header views
-			hv16 = new Uint16Array(buffer);
-			hv32 = new Uint32Array(buffer);
+			hv16 = new Uint16Array(b);
+			hv32 = new Uint32Array(b);
 
 			// Length of the primary buffer
-			primBufLen = buffer.byteLength;
+			primBufLen = b.byteLength;
 
 		}
 
@@ -1314,7 +1401,7 @@ var JBBBinaryLoader =
 		var str = "", parsing = false;
 		this.string_table = [];
 		if (this.lenST > 0) {
-			for (var l=this.i8+this.max8, i=l-this.lenST; i<l; i++) {
+			for (var l=this.i8+this.max8, i=l-this.lenST; i<l; ++i) {
 				var c = this.u8[i];
 				if (c === 0) {
 					this.string_table.push(str);
@@ -1345,63 +1432,63 @@ var JBBBinaryLoader =
 			if (active) this.signature_table.push(obj);
 		}
 
+
+		// NOTE: The follwing functions *MUST* have a body smaller than 600
+		//       bytes in order to be inlined by the compiler.
+
 		// Create fast numerical read functions
 		var scope = this;
-		this.readTypedNum = [
-			function() { return scope.u8[scope.i8++]; },
-			function() { return scope.s8[scope.i8++]; },
-			function() { return scope.u16[scope.i16++]; },
-			function() { return scope.s16[scope.i16++]; },
-			function() { return scope.u32[scope.i32++]; },
-			function() { return scope.s32[scope.i32++]; },
-			function() { return scope.f32[scope.i32++]; },
-			function() { return scope.f64[scope.i64++]; },
-		];
-		// this.readTypedNum = [
-		// 	function() { var v = scope.u8[scope.i8++];   console.log("8U@",scope.i8-1 -scope.ofs8/1,"=",  v,"[0x"+v.toString(16)+"]");  return v; },
-		// 	function() { var v = scope.s8[scope.i8++];   console.log("8S@",scope.i8-1 -scope.ofs8/1,"=",  v,"[0x"+v.toString(16)+"]");  return v; },
-		// 	function() { var v = scope.u16[scope.i16++]; console.log("16U@",scope.i16-1-scope.ofs16/2,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// 	function() { var v = scope.s16[scope.i16++]; console.log("16S@",scope.i16-1-scope.ofs16/2,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// 	function() { var v = scope.u32[scope.i32++]; console.log("32U@",scope.i32-1-scope.ofs32/4,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// 	function() { var v = scope.s32[scope.i32++]; console.log("32S@",scope.i32-1-scope.ofs32/4,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// 	function() { var v = scope.f32[scope.i32++]; console.log("32F@",scope.i32-1-scope.ofs32/4,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// 	function() { var v = scope.f64[scope.i64++]; console.log("64F@",scope.i64-1-scope.ofs64/8,"=",v,"[0x"+v.toString(16)+"]"); return v; },
-		// ];
+		this.readTypedNum = function( t ) {
+			switch (t) {
+				case 0: return this.u8[this.i8++];
+				case 1: return this.s8[this.i8++];
+				case 2: return this.u16[this.i16++];
+				case 3: return this.s16[this.i16++];
+				case 4: return this.u32[this.i32++];
+				case 5: return this.s32[this.i32++];
+				case 6: return this.f32[this.i32++];
+				case 7: return this.f64[this.i64++];
+			}
+		}
 
 		// Create fast typed array read function
 		if (this.sparse) {
-			this.readTypedArray = [
-				function (l) { var o = scope.i8;  	scope.i8  += l; return new Uint8Array(buffer[0], o, l); },
-				function (l) { var o = scope.i8;  	scope.i8  += l; return new Int8Array(buffer[0], o, l); },
-				function (l) { var o = 2*scope.i16; scope.i16 += l; return new Uint16Array(buffer[1], o, l); },
-				function (l) { var o = 2*scope.i16; scope.i16 += l; return new Int16Array(buffer[1], o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Uint32Array(buffer[2], o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Int32Array(buffer[2], o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Float32Array(buffer[2], o, l); },
-				function (l) { var o = 8*scope.i64; scope.i64 += l; return new Float64Array(buffer[3], o, l); },
-			];
+			this.readTypedArray = function( t, l ) 
+			{ var o; switch (t) {
+					case 0:o=this.i8;this.i8+=l;return new Uint8Array(b[0],o,l);
+					case 1:o=this.i8;this.i8+=l;return new Int8Array(b[0],o,l);
+					case 2:o=2*this.i16;this.i16+=l;return new Uint16Array(b[1],o,l);
+					case 3:o=2*this.i16;this.i16+=l;return new Int16Array(b[1],o,l);
+					case 4:o=4*this.i32;this.i32+=l;return new Uint32Array(b[2],o,l);
+					case 5:o=4*this.i32;this.i32+=l;return new Int32Array(b[2],o,l);
+					case 6:o=4*this.i32;this.i32+=l;return new Float32Array(b[2],o,l);
+					case 7:o=8*this.i64;this.i64+=l;return new Float64Array(b[3],o,l);
+				}
+			}
 		} else {
-			this.readTypedArray = [
-				function (l) { var o = scope.i8;  	scope.i8  += l; return new Uint8Array(buffer, o, l); },
-				function (l) { var o = scope.i8;  	scope.i8  += l; return new Int8Array(buffer, o, l); },
-				function (l) { var o = 2*scope.i16; scope.i16 += l; return new Uint16Array(buffer, o, l); },
-				function (l) { var o = 2*scope.i16; scope.i16 += l; return new Int16Array(buffer, o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Uint32Array(buffer, o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Int32Array(buffer, o, l); },
-				function (l) { var o = 4*scope.i32; scope.i32 += l; return new Float32Array(buffer, o, l); },
-				function (l) { var o = 8*scope.i64; scope.i64 += l; return new Float64Array(buffer, o, l); },
-			];
+			this.readTypedArray = function( t, l )
+			{ var o; switch (t) {
+					case 0:o=this.i8;this.i8+=l;return new Uint8Array(b,o,l);
+					case 1:o=this.i8;this.i8+=l;return new Int8Array(b,o,l);
+					case 2:o=2*this.i16;this.i16+=l;return new Uint16Array(b,o,l);
+					case 3:o=2*this.i16;this.i16+=l;return new Int16Array(b,o,l);
+					case 4:o=4*this.i32;this.i32+=l;return new Uint32Array(b,o,l);
+					case 5:o=4*this.i32;this.i32+=l;return new Int32Array(b,o,l);
+					case 6:o=4*this.i32;this.i32+=l;return new Float32Array(b,o,l);
+					case 7:o=8*this.i64;this.i64+=l;return new Float64Array(b,o,l);
+				}
+			}
 		}
 
 		// Create simple object factories from the object table
 		this.factory_plain = [];
 		this.factory_plain_bulk = [];
-		for (var i=0; i<this.signature_table.length; i++) {
+		for (var i=0; i<this.signature_table.length; ++i) {
 
 			// Build factory funtion
-			var props = this.signature_table[i], llen = props.length,
-				factoryPlain = "return {", factoryBulk = factoryPlain;
-			for (var j=0; j<llen; j++) {
+			var factoryPlain = "return {", factoryBulk = factoryPlain,
+				props = this.signature_table[i], llen = props.length;
+			for (var j=0; j<llen; ++j) {
 				factoryPlain += "'"+props[j]+"': values["+j+"],";
 				factoryBulk +=  "'"+props[j]+"': values["+j+"][i],";
 				// factoryBulk +=  "'"+props[j]+"': values[("+j+"*len)+i],";
@@ -1422,7 +1509,7 @@ var JBBBinaryLoader =
 	 * Read a 16-bit string lookup table ID and translate to it's string
 	 */
 	BinaryBundle.prototype.readStringLT = function() {
-		var id = this.readTypedNum[ NUMTYPE.UINT16 ]();
+		var id = this.readTypedNum( NUMTYPE.UINT16 );
 		if (id >= this.string_table.length) throw {
 			'name' 		: 'RangeError',
 			'message'	: 'String ID is outside than the range of the string lookup table!',

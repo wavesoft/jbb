@@ -178,6 +178,15 @@ const DELTASCALE = {
 };
 
 /**
+ * BULK_KNOWN Array encoding operator codes
+ */
+const PRIM_BULK_KNOWN_OP = {
+	DEFINE 	: 0x00,		// Define a new object for IREF
+	IREF 	: 0x40,		// Refer to an IREF object
+	XREF 	: 0x80,		// Refer to an XREF object
+};
+
+/**
  * Simple primitive translation
  */
 const PRIM_SIMPLE = [ undefined, null, false, true ],
@@ -365,7 +374,7 @@ function decodeObject( bundle, database, op ) {
 	} else {
 		throw {
 			'name' 		: 'AssertError',
-			'message'	: 'Unexpected object opcode #'+op+'!',
+			'message'	: 'Unexpected object opcode 0x'+op.toString(16)+'!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		}
 	}
@@ -387,7 +396,7 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
 	// Decode
 	for (var i=0; i<len; ++i) {
 		ans[i] = pivot + (values[i] * scale);
-		// console.log("<<<", values[i],"->", ans[i]);
+		console.log("<<<", values[i],"->", ans[i]);
 	}
 
 	return DEBUG
@@ -453,46 +462,83 @@ function decodePlainBulkArray( bundle, database ) {
 /**
  * Decode bulk array of entities
  */
-function decodeBulkArray( bundle, database, len ) {
-	var eid = bundle.readTypedNum( NUMTYPE.UINT16 ),
-		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
+function decodeKnownBulkArray( bundle, database, len ) {
+	var eid = bundle.readTypedNum( NUMTYPE.UINT16 );
+	var PROPERTIES = bundle.ot.PROPERTIES[ eid ],
 		ENTITY = bundle.ot.ENTITIES[ eid ],
 		plen = PROPERTIES.length, popTable = [], 
 		refTable = Array( len ), ans = Array( len ),
-		obj, id, name, op, dat, i=0, propi=0, j=0,
+		obj, id, name, op, dat, i=0, j=0, k=0, ops=[],
+		localObjs = [], obji=0,
 		propFactory = "", getProperties;
+
+	// Get bulk operators
+	i=0; while (i < len) {
+		op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		dat = op & 0x3F;
+		// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
+		switch (op & 0xC0) {
+			case PRIM_BULK_KNOWN_OP.DEFINE:
+				for (j=0; j<dat; j++) {
+					// Create entity & Keep it in the iref table
+					obj = ENTITY[1]( ENTITY[0] );
+					bundle.iref_table.push(obj);
+					localObjs.push(obj);
+				}
+				i += dat; ops.push([ op & 0xC0, dat ]);
+				break;
+			case PRIM_BULK_KNOWN_OP.IREF:
+			case PRIM_BULK_KNOWN_OP.XREF:
+				i += 1; ops.push([ op & 0xC0, dat ]);
+				break;
+			default:
+				throw {
+					'name' 		: 'AssertError',
+					'message'	: 'Unknown bulk array op-code 0x'+op.toString(16)+'!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				}
+		}
+	}
 
 	// Get property arrays
 	for (i=0; i<plen; ++i) {
 		popTable.push( decodePrimitive( bundle, database ) );
 		if (propFactory) propFactory += ",";
-		propFactory += "wavedProps["+i+"][i]";
+		propFactory += "p["+i+"][i]";
 	}
 
 	// Create de-weaving collector function
-	getProperties = new Function( "wavedProps", "i", "return ["+propFactory+"]" );
+	getProperties = new Function( "p", "i", "return ["+propFactory+"]" );
 
-	// Start processing commands
-	i=0; while (i < len) {
-		op = bundle.readTypedNum( NUMTYPE.UINT8 );
-		dat = op & 0x3F;
-		switch (op & 0xC0) {
+	// console.log("------");
+	// console.log(" Ofs:", bundle.i8-bundle.ofs8);
+	// console.log(" Eid:", eid);
+	// console.log(" Len:", len);
+	// console.log(" Properties:", PROPERTIES.toString());
+	// console.log(" PropTable:", popTable);
+	// console.log(" Factory: return [", propFactory,"]");
+	// console.log("------");
 
-			case 0x00:
+	// Start processing operators
+	i=0; for (k=0; k<ops.length; k++) {
+		op = ops[k][0]; dat = ops[k][1];
+		switch (op) {
+			case PRIM_BULK_KNOWN_OP.DEFINE:
 				// Construct & Export to IREF table
 				for (j=0; j<dat; j++) {
 
-					// Create object from waved property table
-					obj = ENTITY[1]( ENTITY[0] );
-					ENTITY[2]( obj, PROPERTIES, getProperties(popTable, propi++) );
-
-					// Keep on IRef and return
-					bundle.iref_table.push(obj);
+					// Initialize object properties and keep it on the answer array 
+					obj = localObjs[obji];
+					ENTITY[2]( obj, PROPERTIES, getProperties(popTable, obji) );
 					ans[i++] = obj;
+
+					// Forward object index
+					obji++;
+
 				}
 				break;
 
-			case 0x40:
+			case PRIM_BULK_KNOWN_OP.IREF:
 				// Import from IREF
 				id = bundle.readTypedNum( NUMTYPE.UINT16 );
 				if (id >= bundle.iref_table.length) throw {
@@ -503,7 +549,7 @@ function decodeBulkArray( bundle, database, len ) {
 				ans[i++] = bundle.iref_table[ (dat << 16) | id ];
 				break;
 
-			case 0x80:
+			case PRIM_BULK_KNOWN_OP.XREF:
 				// Import from XREF
 				name = bundle.readStringLT();
 				if (database[name] === undefined) throw {
@@ -513,13 +559,6 @@ function decodeBulkArray( bundle, database, len ) {
 				};
 				ans[i++] = database[name];
 				break;
-
-			default:
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'Unknown bulk array op-code #'+op+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
 
 		}
 	}
@@ -549,6 +588,7 @@ function decodeChunkedArray( bundle, database ) {
 				len: chunk.length
 			});
 		}
+		// console.log("<<< =",chunk);
 
 		// Test for non-arrays
 		if (chunk.length === undefined)
@@ -565,6 +605,9 @@ function decodeChunkedArray( bundle, database ) {
 		op = bundle.readTypedNum( NUMTYPE.UINT8 );
 	}
 
+	// console.log("-----------");
+	// console.log(ans);
+
 	// Return chunked array
 	return DEBUG
 		? __debugMeta( ans, 'array.primitive.chunked', { 'chunks': chunk_meta } )
@@ -580,11 +623,13 @@ function decodeArray( bundle, database, op ) {
 	if (op === 0x6C) { // PRIM_BULK_PLAIN
 
 		// Decode and return plain bulk array
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Plain Bulk Plain");
 		return decodePlainBulkArray( bundle, database );
 
 	} else if (op === 0x6E) { // PRIM_SHORT
 
 		// Collect up to 255 primitives
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Short");
 		len = bundle.readTypedNum( NUMTYPE.UINT8 );
 		for (i=0; i<len; ++i)
 			nArr.push( decodePrimitive( bundle, database ) );
@@ -597,11 +642,13 @@ function decodeArray( bundle, database, op ) {
 	} else if (op === 0x6F) { // PRIM_CHUNK
 
 		// Return chunked array
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Chunk");
 		return decodeChunkedArray( bundle, database );
 
 	} else if (op === 0x7E) { // EMPTY
 
 		// Return empty array
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Empty");
 		return DEBUG
 			? __debugMeta( [], 'array.empty', {} )
 			: [];
@@ -615,6 +662,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xE0) === 0x00) { // NUM_DWS
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric DWS");
 		ln = op & 0x01;
 		type = (op >> 1) & 0x0F;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
@@ -631,6 +679,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xF0) === 0x20) { // NUM_DELTA_INT
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Delta Int");
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
@@ -640,6 +689,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xF0) === 0x30) { // NUM_DELTA_FLOAT
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Delta Float");
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
@@ -649,6 +699,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xF0) === 0x40) { // NUM_REPEATED
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Repeated");
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
@@ -666,6 +717,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xF0) === 0x50) { // NUM_RAW
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Raw");
 		ln = op & 0x01;
 		type = (op >> 1) & 0x07;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
@@ -681,6 +733,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xF8) === 0x60) { // NUM_SHORT
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Short");
 		type = op & 0x07;
 		len = bundle.readTypedNum( NUMTYPE.UINT8 );
 
@@ -695,6 +748,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xFE) === 0x68) { // PRIM_REPEATED
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Repeated");
 		ln = op & 0x01;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
@@ -712,6 +766,7 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xFE) === 0x6A) { // PRIM_RAW
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Raw");
 		ln = op & 0x01;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
@@ -726,16 +781,17 @@ function decodeArray( bundle, database, op ) {
 
 	} else if ((op & 0xFE) === 0x7C) { // PRIM_BULK_KNOWN
 
+		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Bulk Known");
 		ln = op & 0x01;
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Decode and return primitive bulk array
-		return decodeBulkArray( bundle, database, len );
+		return decodeKnownBulkArray( bundle, database, len );
 
 	} else {
 		throw {
 			'name' 		: 'AssertError',
-			'message'	: 'Unknown array op-code #'+op+'!',
+			'message'	: 'Unknown array op-code 0x'+op.toString(16)+' at offset @'+(bundle.i8 - bundle.ofs8)+'!',
 			toString 	: function(){return this.name + ": " + this.message;}
 		}
 
@@ -816,7 +872,7 @@ function parseBundle( bundle, database ) {
 			default:
 				throw {
 					'name' 		: 'AssertError',
-					'message'	: 'Unknown control operator #'+op+' at @'+bundle.i8+'!',
+					'message'	: 'Unknown control operator 0x'+op.toString(16)+' at @'+bundle.i8+'!',
 					toString 	: function(){return this.name + ": " + this.message;}
 				}
 		}

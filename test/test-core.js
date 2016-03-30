@@ -22,6 +22,8 @@
 var util = require('util');
 var assert = require('assert');
 var BinaryBundle = require("../lib/BinaryBundle");
+var seed = require('seed-random');
+var random = seed('jbbtests');
 
 // Static import of utility functions
 require('./utils/common').static(global);
@@ -113,9 +115,9 @@ describe('[Core Tests]', function() {
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
-			assert.equal( u32[3], 8,			'32-bit table size');
+			assert.equal( u32[3], 4,			'32-bit table size');
 			assert.equal( u32[4], 12,			'16-bit table size');
-			assert.equal( u32[5], 53,			'8-bit table size');
+			assert.equal( u32[5], 52,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
 
@@ -374,9 +376,10 @@ describe('[Core Tests]', function() {
 	describe('Object Bulks', function () {
 
 		// Compile some plain object arrays
+		const variants = [ true, undefined, false, 148, null, 64473, 40.1927375793457, 12847612, "String" ];
 		var plain01 = [], plain02 = [], plain03 = [], plain04 = [], f = new Float32Array(1);
 		for (var i=0; i<1000; i++) {
-			f[0] = Math.random();
+			f[0] = random();
 
 			plain01.push({
 				"a": f[0], "b": i, "c": false, "d": null, "e": undefined
@@ -385,14 +388,10 @@ describe('[Core Tests]', function() {
 				"same": "everywhere"
 			});
 			plain03.push({
-				"unmergable": [
-					true, undefined, false, 148, null, 64473, 40.1927375793457, 12847612, "String"
-				][ i%9 ]
+				"unmergable": variants[ i%9 ]
 			});
 			plain04.push({
-				"some_mergable": [
-					true, undefined, false, 148, null, 64473, 40.1927375793457, 12847612, "String"
-				][ i%9 ]
+				"some_mergable": variants[ Math.floor(random()*9) ]
 			});
 		}
 
@@ -400,6 +399,23 @@ describe('[Core Tests]', function() {
 		it_should_return( plain01, 'Plain Buk of [ 10,000 x { "a": num, "b": num, "c": false, "d": null, "e": undefined } ]' );
 		it_should_return( plain02, 'Plain Buk of [ 10,000 x { "same": "everywhere" } ]' );
 		it_should_return( plain03, 'Plain Buk of [ 10,000 x { "unmergable": [varies] } ]' );
+		it_should_return( plain04, 'Plain Buk of [ 10,000 x { "some_mergable": [varies] } ]' );
+
+		// Random with interception of continuous
+		// var with_repeated = [];
+		// for (var i=0; i<100; i++) with_repeated.push({ "unmergable": variants[ i%9 ] });
+		// for (var i=0; i<2; i++) with_repeated.push({ "unmergable": null });
+		// for (var i=0; i<4; i++) with_repeated.push({ "unmergable": variants[i%9] });
+		// for (var i=0; i<10; i++) with_repeated.push({ "unmergable": 'String' });
+		// for (var i=0; i<5; i++) with_repeated.push({ "unmergable": variants[i%9] });
+		// for (var i=0; i<5; i++) with_repeated.push({ "unmergable": undefined });
+		// for (var i=0; i<20; i++) with_repeated.push({ "unmergable": variants[i%9] });
+		// for (var i=0; i<100; i++) {
+		// 	with_repeated.push({
+		// 		"unmergable": variants[ i%9 ]
+		// 	});
+		// }
+		// it_should_return( with_repeated, 'Plain Buk of [ 100 x {}, 60 x SAME, 100 x {} ]' );
 
 		// Compile some known objects
 		var known01 = [], known02 = [], known03 = [],
@@ -408,7 +424,7 @@ describe('[Core Tests]', function() {
 				new ObjectB("fourth",4), new ObjectB("fifth", 5), new ObjectB("sixth", 6),
 			];
 		for (var i=0; i<100; i++) {
-			known01.push( inst_set[Math.floor(Math.random() * inst_set.length)] ); // IREF In first occurance
+			known01.push( inst_set[Math.floor(random() * inst_set.length)] ); // IREF In first occurance
 			known02.push( new ObjectA() ); // All IREF by value
 			known03.push( new ObjectB(i, "object-"+i) ); // All different
 		}
@@ -422,6 +438,18 @@ describe('[Core Tests]', function() {
 
 	describe('Chunked Arrays', function () {
 		var values, matchTypes;
+		var CHUNK_COMPOSITE = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
+		var SEQ_PRIM = [ true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String" ];
+
+		// Short is prioritized against chunked
+		values = [].concat(
+			false,
+			gen_array_rep( 'Array', 100, 104 ),
+			true,
+			gen_array_seq( 'Array', 100, 0,1 ),
+			null
+		);
+		it_should_return( values, '[ false, 100 x NUM, true, 100 x NUM, null ]', [match_metaType('array.primitive.short')]);
 
 		// Simple composite case
 		values = [].concat(
@@ -445,10 +473,10 @@ describe('[Core Tests]', function() {
 		// Make sure analyzePrimitiveArray is preferring repeated arrays given the chance
 		values = [].concat(
 			false, // Make this array chunked
-			gen_array_rep( 'Array', 100, 104 ),
-			gen_array_seq( 'Array', 100, 0,1 )
+			gen_array_rep( 'Array', 200, 104 ),
+			gen_array_seq( 'Array', 200, 0,1 )
 		);
-		it_should_return( values, '[ false, 100 x SAME, 100 x NUM ]', 
+		it_should_return( values, '[ false, 200 x SAME, 200 x NUM ]', 
 			[match_chunkTypes([
 				[ ARR_OP.PRIM_SHORT, 0x6E ],	// 1 primitive
 				[ ARR_OP.NUM_REPEATED, 0xF0 ],	// Repeated numbers
@@ -468,7 +496,6 @@ describe('[Core Tests]', function() {
 
 		// Repeated composites (Ideally future-optimised)
 		values = [];
-		var rep = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
 		var matchTypes = [
 			[ ARR_OP.PRIM_SHORT, 0xFF ],	// true, false, undefined
 		],	repTypes = [
@@ -476,7 +503,7 @@ describe('[Core Tests]', function() {
 			[ ARR_OP.PRIM_SHORT, 0xFF ],	// {'plain':'object'}, true, false, undefined
 		];
 		for (var i=0; i<100; i++) {
-			values = values.concat(rep);
+			values = values.concat(CHUNK_COMPOSITE);
 			matchTypes = matchTypes.concat(repTypes);
 		}
 		it_should_return( values, '[ (true, false, undefined, 255, 65535, 4294967295, {\'plain\':\'object\'} ) x 100 ]', 
@@ -519,37 +546,111 @@ describe('[Core Tests]', function() {
 		it_should_return( bulkrep, '[ 65,535 x { value: [variable] } ]', [match_metaType('array.primitive.bulk_plain')] );
 
 		// Corner-case of repeated objects
-		it_should_return( [2000, 20, 20, 30, 30, 30, undefined, undefined ], [match_metaType('array.primitive.chunked')] );
-		it_should_return( [20, 20, 30, 30, 20, 20, 30, 30, 20, 30, 20, 30, undefined ], [match_metaType('array.primitive.chunked')] );
-		it_should_return( [10, 20, 20, 20, 30, 40, 40, 40, undefined ], [match_metaType('array.primitive.chunked')] );
+		values = [].concat(
+			[2000],
+			gen_array_rep( 'Array', 100, 20 ),
+			gen_array_rep( 'Array', 100, 30 ),
+			gen_array_rep( 'Array', 100, undefined )
+		);
+		it_should_return( values, '[ 2000, 20 x 100, 30 x 100, undefined x 100 ]', [match_metaType('array.primitive.chunked')] );
+		values = [].concat(
+			gen_array_rep( 'Array', 100, 20 ),
+			gen_array_rep( 'Array', 100, 30 ),
+			gen_array_rep( 'Array', 100, 20 ),
+			gen_array_rep( 'Array', 100, 30 ),
+			gen_array_rep( 'Array', 100, 20 ),
+			gen_array_rep( 'Array', 100, 30 ),
+			[undefined]
+		);
+		it_should_return( values, '[20 x 100, 30 x 100, 20 x 100, 30 x 100, 20 x 100, 30 x 100, undefined x 100 ]', [match_metaType('array.primitive.chunked')] );
 
 		// Adoption of incremental/decremental numeric type in chunks
 		var two_chunks = [
 			[ ARR_OP.NUM_SHORT, 0xF8 ],
 			[ ARR_OP.PRIM_SHORT, 0xFF ]
 		];
-		it_should_return( [ 5, 34, 546, 57890, 451106, 5693986, 72802850, 1146544674, null ], [match_chunkTypes(two_chunks)] );
-		it_should_return( [ 1146544674, 72802850, 5693986, 451106, 57890, 546, 34, 5, null ], [match_chunkTypes(two_chunks)] );
+		values = [].concat(
+			gen_array_seq( 'Array', 32, 0, 1 ),
+			gen_array_seq( 'Array', 32, 80, 1 ),
+			gen_array_seq( 'Array', 32, 564, 1 ),
+			gen_array_seq( 'Array', 32, 57890, 1 ),
+			gen_array_seq( 'Array', 32, 451106, 1 ),
+			gen_array_seq( 'Array', 32, 5693986, 1 ),
+			gen_array_seq( 'Array', 32, 72802850, 1 ),
+			gen_array_seq( 'Array', 31, 1146544674, 1 ),
+			[ null ]
+		);
+		it_should_return( values, '[ 5, 34, 546, 57890, 451106, 5693986, 72802850, 1146544674, null ]', [match_chunkTypes(two_chunks)] );
+		values = [].concat(
+			gen_array_seq( 'Array', 32, 1146544674, 1 ),
+			gen_array_seq( 'Array', 32, 72802850, 1 ),
+			gen_array_seq( 'Array', 32, 5693986, 1 ),
+			gen_array_seq( 'Array', 32, 451106, 1 ),
+			gen_array_seq( 'Array', 32, 57890, 1 ),
+			gen_array_seq( 'Array', 32, 564, 1 ),
+			gen_array_seq( 'Array', 32, 80, 1 ),
+			gen_array_seq( 'Array', 31, 0, 1 ),
+			[ null ]
+		);
+		it_should_return( values, '[ 1146544674, 72802850, 5693986, 451106, 57890, 546, 34, 5, null ]', [match_chunkTypes(two_chunks)] );
+
+		// Bulk of known objects
+		var PICK_KO = [ new ObjectA(), new ObjectB(null, "test"), new ObjectB(false, true),
+						new ObjectB(4.1230998039245605, 412.4100036621094), new ObjectB(undefined, false), 
+						new ObjectC(51,44), new ObjectB(-41, -491826382) ];
+		var bko1 = [];
+		for (var i=0; i<2000; i++) {
+			bko1.push(PICK_KO[Math.floor(random()*PICK_KO.length)]);
+		}
+		// it_should_return( bko1, '[ 2,000 x Known Objects ]' );
+
+		// Bulk of known objects
+		var PICK_KO = [ new ObjectA(), new ObjectB(null, "test"), new ObjectB(false, true),
+						new ObjectB(4.1230998039245605, 412.4100036621094), new ObjectB(undefined, false), 
+						new ObjectC(51,44), new ObjectB(-41, -491826382) ];
+		var bko2 = [], f = new Float32Array(1);
+		for (var i=0; i<200; i++) { bko2.push(PICK_KO[Math.floor(random()*PICK_KO.length)]); }
+		for (var i=0; i<50; i++)  {
+			f[0] = random(); // Make sure number fits on Float32
+			bko2.push({ 'key1': 'same', 'key2': f[0] }); 
+		}
+		for (var i=0; i<200; i++) { bko2.push(PICK_KO[Math.floor(random()*PICK_KO.length)]); }
+		it_should_return( bko2, '[ 100 x KO, 50 x PO, 100 x KO ]' );
 
 		// Difficulty with non-continuous items
-		var difficult = [];
-		for (var i=0; i<2000; i++) {
-			difficult.push(
-				[ true, false, undefined, 148, 64473, 12847612, 40.1927375793457, "String",
-				  { 'some': 'object', 'a': 1, 'b': 2 }, new ObjectA(), new ObjectB( null, "test" )
-				][Math.floor(Math.random()*12)]
-			);
-		}
-		it_should_return( difficult, '[ 2,000 x [varying] ]' );
+		// var difficult = [];
+		// for (var i=0; i<2000; i++) {
+		// 	difficult.push(
+		// 		[ true, false, undefined, 148, 64473, 12847612, 40.1927375793457, "String",
+		// 		  { 'some': 'object', 'a': 1, 'b': 2 }, new ObjectA(), new ObjectB( null, "test" )
+		// 		][Math.floor(random()*12)]
+		// 	);
+		// }
+		// it_should_return( difficult, '[ 2,000 x [varying] ]' );
 
 		// Error case encountered before
-		var err = [];
+		var err1 = [];
 		for (var i=0; i<100; i++) {
-			err.push([
-					true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String"
-				][ Math.floor(Math.random()*9) ]);
+			err1.push(SEQ_PRIM[ i % SEQ_PRIM.length ]);
 		}
-		it_should_return( err, '[ 100 x [varying] ]' );
+		it_should_return( err1, '[ 100 x [varying] ]' );
+
+		// Error case encountered before
+		var err2 = [ 
+			{ some_mergable: true },
+			{ some_mergable: 'String' },
+			{ some_mergable: 40.1927375793457 },
+			{ some_mergable: null },
+			{ some_mergable: 12847612 },
+			{ some_mergable: 40.1927375793457 },
+			{ some_mergable: null },
+			{ some_mergable: 'String' },
+			{ some_mergable: 40.1927375793457 },
+			{ some_mergable: 148 },
+			{ some_mergable: undefined },
+			{ some_mergable: 40.1927375793457 },
+			{ some_mergable: true } ];
+		it_should_return( err2, '[ 100 x [varying] ]' );
 
 	});
 
@@ -598,6 +699,13 @@ describe('[Core Tests]', function() {
 			obj16 = new ObjectB( [obj11, obj12, obj13], "another-turn" ),
 			obj17 = new ObjectC( [obj13, obj15, obj16], "complex" );
 		it_should_return( obj17, '[ Complicated nested objects ]', [match_metaType('object.known')] );
+
+		// Byval de-duplication
+		var obj20 = [];
+		for (var i=0; i<256; ++i) {
+			obj20.push(new ObjectB( 5123, "good" ));
+		}
+		it_should_return( obj20, '[ 256 x new ObjectB(5123, "good") ]', [match_metaType('array.primitive.repeated')] );
 
 	});
 

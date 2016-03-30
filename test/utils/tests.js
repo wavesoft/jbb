@@ -21,10 +21,13 @@
 
 var util   	= require('util');
 var assert 	= require('assert');
+var seed	= require('seed-random');
 var compare = require('./compare');
 
 require('./common').static(global);
 require('./ot').static(global);
+
+var random = seed('jbbtests');
 
 ////////////////////////////////////////////////////////////////
 // Generator helpers
@@ -52,7 +55,7 @@ function gen_array_rand( typeName, length, min, max ) {
 	var integers = (min % 1 === 0) && (max %1 === 0);
 	// console.log(">> smallest ("+min+","+max+")=",smallest);
 	for (var i=0; i<length; i++) {
-		v = min + (Math.random() * range);
+		v = min + (random() * range);
 		if (integers) v = Math.round(v);
 		if (Math.abs(v % 1) < smallest) {
 			// console.log("!!",v," < smallest");

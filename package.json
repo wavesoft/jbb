@@ -27,6 +27,7 @@
     "mocha": "^2.3.4",
     "mute": "^2.0.6",
     "node-getopt": "^0.2.3",
+    "seed-random": "^2.2.0",
     "webpack-stream": "^3.1.0"
   },
   "dependencies": {
