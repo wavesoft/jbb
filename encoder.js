@@ -26,6 +26,7 @@ var colors 		= require("colors");
 var mime 		= require("mime");
 var deepEqual 	= require('deep-equal');
 var BinaryStream = require("./lib/BinaryStream");
+var Errors 		= require("./lib/Errors");
 
 const FLOAT32_POS 	= 3.40282347e+38; // largest positive number in float32
 const FLOAT32_NEG 	= -3.40282347e+38; // largest negative number in float32
@@ -473,27 +474,14 @@ var packBuffer = new ArrayBuffer(8),
 	pack1b = function( num, signed ) {
 		var n = new Buffer(1);
 		if (SAFE) { if (signed) {
-			if (num < INT8_MIN) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > INT8_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < INT8_MIN) 
+				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
+			else if (num > INT8_MAX) 
+				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
 		} else {
-			if (num < 0) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing negative number on unsigned 8-bit ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > UINT8_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing number bigger than 8-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < 0) throw  new Errors.PackError('Packing negative number on unsigned 8-bit ('+num+')!');
+			else if (num > UINT8_MAX) 
+				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
 		} }
 		if (signed) packViewI8[0] = num;
 		else packViewU8[0] = num;
@@ -503,27 +491,15 @@ var packBuffer = new ArrayBuffer(8),
 	pack2b = function( num, signed ) {
 		var n = new Buffer(2);
 		if (SAFE) { if (signed) {
-			if (num < INT16_MIN) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > INT16_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < INT16_MIN) 
+				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
+			else if (num > INT16_MAX) 
+				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
 		} else {
-			if (num < 0) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing negative integer on unsigned 16-bit ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > UINT16_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 16-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < 0) 
+				throw new Errors.PackError('Packing negative integer on unsigned 16-bit ('+num+')!');
+			else if (num > UINT16_MAX) 
+				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
 		} }
 		if (signed) packViewI16[0] = num;
 		else packViewU16[0] = num;
@@ -533,27 +509,15 @@ var packBuffer = new ArrayBuffer(8),
 	pack4b = function( num, signed ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (signed) {
-			if (num < INT32_MIN) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > INT32_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < INT32_MIN) 
+				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
+			else if (num > INT32_MAX) 
+				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
 		} else {
-			if (num < 0) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing negative integer on unsigned 32-bit ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
-			else if (num > UINT32_MAX) throw {
-				'name' 		: 'PackError',
-				'message'	: 'Packing integer bigger than 32-bits ('+num+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			if (num < 0) 
+				throw new Errors.PackError('Packing negative integer on unsigned 32-bit ('+num+')!');
+			else if (num > UINT32_MAX) 
+				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
 		} }
 		if (signed) packViewI32[0] = num;
 		else packViewU32[0] = num;
@@ -563,11 +527,9 @@ var packBuffer = new ArrayBuffer(8),
 	pack4f = function( num ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (num == 0.0) { }
-		else if ((Math.abs(num) < FLOAT32_SMALL) || (num < FLOAT32_NEG) || (num > FLOAT32_POS)) throw {
-			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 32-bits ('+num+')!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		} };
+		else if ((Math.abs(num) < FLOAT32_SMALL) || (num < FLOAT32_NEG) || (num > FLOAT32_POS)) 
+			throw new Errors.PackError('Packing float bigger than 32-bits ('+num+')!');
+		}
 		packViewF32[0] = num;
 		for (var i=0; i<4; ++i) n[i]=packViewU8[i];
 		return n;
@@ -575,16 +537,11 @@ var packBuffer = new ArrayBuffer(8),
 	pack8f = function( num ) {
 		var n = new Buffer(8);
 		if (SAFE) { if (num == 0.0) { }
-		else if (Math.abs(num) < 1.7E-108) throw {
-			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 64-bits ('+num+')!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
-		else if (Math.abs(num) > 1.7E+108) throw {
-			'name' 		: 'PackError',
-			'message'	: 'Packing float bigger than 64-bits ('+num+')!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		} };
+		else if (Math.abs(num) < 1.7E-108) 
+			throw new Errors.PackError('Packing float bigger than 64-bits ('+num+')!');
+		else if (Math.abs(num) > 1.7E+108) 
+			throw new Errors.PackError('Packing float bigger than 64-bits ('+num+')!');
+		}
 		packViewF64[0] = num;
 		for (var i=0; i<8; ++i) n[i]=packViewU8[i];
 		return n;
@@ -1984,11 +1941,7 @@ function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to, pivot, f_scal
 	// Get downscale type
 	var n_delta_type = deltaEncTypeFloat( n_from, n_to );
 	if (n_delta_type === undefined) {
-		throw {
-			'name' 		: 'EncodeError',
-			'message'	: 'Non-viable float delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
+		throw new Errors.EncodeError('Non-viable float delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!');
 	}
 
 	encoder.log(LOG.ARR, "array.numeric.delta.float, len="+data.length+
@@ -2041,11 +1994,7 @@ function encodeArray_NUM_DELTA_INT( encoder, data, n_from, n_to ) {
 	// Get downscale type
 	var n_delta_type = deltaEncTypeInt( n_from, n_to );
 	if (n_delta_type === undefined) {
-		throw {
-			'name' 		: 'EncodeError',
-			'message'	: 'Non-viable integer delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
+		throw new Errors.EncodeError('Non-viable integer delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!');
 	}
 
 	encoder.log(LOG.ARR, "array.numeric.delta.int, len="+data.length+
@@ -2561,11 +2510,7 @@ function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
 
 		// Just precaution
 		default:
-			throw {
-				'name' 		: 'EncodeError',
-				'message'	: 'Trying to encode an unknown chunk (type='+chunkType+')!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			throw new Errors.EncodeError('Trying to encode an unknown chunk (type='+chunkType+')!');
 
 	}
 }
@@ -2736,11 +2681,7 @@ function encodeArray_Primitive( encoder, data ) {
 
 		// Just check
 		if (chunks[0][1] !== data.length) {
-			throw {
-				'name' 		: 'AssertError',
-				'message'	: 'Primitive array analysis reported single chunk but does not match array length!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			}
+			throw new Errors.AssertError('Primitive array analysis reported single chunk but does not match array length!');
 		}
 
 		// Just encode a single chunk as array component
@@ -2799,11 +2740,7 @@ function encodeBuffer( encoder, buffer_type, mime_type, buffer ) {
 		encoder.counters.dat_hdr+=5;
 	} else {
 		// 4 Gigs? Are you serious? Of course we can fit it in a Float64, but WHY?
-		throw {
-			'name' 		: 'RangeError',
-			'message'	: 'The buffer you are trying to encode is bigger than the supported size!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
+		throw new Errors.RangeError('The buffer you are trying to encode is bigger than the supported size!');
 	}
 
 	// Write MIME Type (from string lookup table)
@@ -2948,11 +2885,7 @@ function encodeObject( encoder, object ) {
 	// If no such entity exists, raise exception
 	if (eid < 0) {
 		// console.error("Unknown object:", object);
-		throw {
-			'name' 		: 'EncodingError',
-			'message'	: 'An object trying to encode was not declared in the object table!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
+		throw new Errors.XRefError('An object trying to encode was not declared in the object table!');
 	}
 
 	// Populate property table
@@ -3112,11 +3045,7 @@ function encodePrimitive( encoder, data ) {
 			// Get type
 			var numType = getNumType( data, data, (data % 1) !== 0 );
 			if (numType > NUMTYPE.FLOAT64) {
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'A primitive was identified as number but getNumType failed!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
+				throw new Errors.AssertError('A primitive was identified as number but getNumType failed!');
 			}
 
 			// Write header

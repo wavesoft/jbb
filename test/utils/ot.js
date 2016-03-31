@@ -28,7 +28,7 @@ var ObjectA = function() {
 var ObjectB = function( propA, propB ) {
 	this.objBpropA = propA;
 	this.objBpropB = propB;
-	this.objBpropC = new Uint8Array([ 1, 4, 120, 4123 ]);
+	this.objBpropC = new Uint16Array([ 1, 4, 120, 4123 ]);
 };
 var ObjectC = function( propA, propB ) {
 	this.objCpropA = propA;

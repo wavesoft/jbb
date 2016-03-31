@@ -20,6 +20,7 @@
 
 /* Imports */
 var BinaryBundle = require("./lib/BinaryBundle");
+var Errors = require('./lib/Errors');
 
 /* Production optimisations and debug metadata flags */
 if (typeof PROD === 'undefined') var PROD = false;
@@ -292,11 +293,7 @@ function decodeBuffer( bundle, len, buf_type ) {
 		return decodeBlobURL( bundle, length );
 
 	} else {
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Unknown buffer type #'+buf_type+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Unknown buffer type #'+buf_type+'!');
 	}
 
 }
@@ -312,11 +309,7 @@ function decodeObject( bundle, database, op ) {
 		// Fetch object class
 		var ENTITY = bundle.ot.ENTITIES[eid];
 		if (ENTITY === undefined) {
-			throw {
-				'name' 		: 'AssertError',
-				'message'	: 'Could not found known object entity #'+eid+'!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			}
+			throw new Errors.AssertError('Could not found known object entity #'+eid+'!');
 		}
 
 		// Call entity factory
@@ -347,22 +340,14 @@ function decodeObject( bundle, database, op ) {
 						: new Date( date );
 
 			default:
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'Unknown primitive object with POID #'+poid+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
+				throw new Errors.AssertError('Unknown primitive object with POID #'+poid+'!');
 		}
 
 	} else if ((op & 0x38) === 0x30) { // Simple object with known signature
 		var eid = ((op & 0x07) << 8) | bundle.readTypedNum( NUMTYPE.UINT8 ),
 			factory = bundle.factory_plain[ eid ];
 		if (factory === undefined) {
-			throw {
-				'name' 		: 'AssertError',
-				'message'	: 'Could not found simple object signature with id #'+eid+'!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			}
+			throw new Errors.AssertError('Could not found simple object signature with id #'+eid+'!');
 		}
 
 		// Create object
@@ -372,11 +357,7 @@ function decodeObject( bundle, database, op ) {
 			: factory( values );
 
 	} else {
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Unexpected object opcode 0x'+op.toString(16)+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Unexpected object opcode 0x'+op.toString(16)+'!');
 	}
 
 }
@@ -435,11 +416,7 @@ function decodePlainBulkArray( bundle, database ) {
 		properties = bundle.signature_table[sid],
 		objectFactory = bundle.factory_plain_bulk[sid];
 	if (!properties) {
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Unknown plain object with signature #'+sid+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Unknown plain object with signature #'+sid+'!');
 	}
 
 	// Read property arrays
@@ -469,34 +446,38 @@ function decodeKnownBulkArray( bundle, database, len ) {
 		plen = PROPERTIES.length, popTable = [], 
 		refTable = Array( len ), ans = Array( len ),
 		obj, id, name, op, dat, i=0, j=0, k=0, ops=[],
-		localObjs = [], obji=0,
+		locals = [], obji=0,
 		propFactory = "", getProperties;
 
 	// Get bulk operators
 	i=0; while (i < len) {
 		op = bundle.readTypedNum( NUMTYPE.UINT8 );
 		dat = op & 0x3F;
+		op = op & 0xC0;
 		// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
-		switch (op & 0xC0) {
+		switch (op) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
 				for (j=0; j<dat; j++) {
 					// Create entity & Keep it in the iref table
 					obj = ENTITY[1]( ENTITY[0] );
 					bundle.iref_table.push(obj);
-					localObjs.push(obj);
+					locals.push(obj);
 				}
-				i += dat; ops.push([ op & 0xC0, dat ]);
+				i += dat; ops.push([ op, dat ]);
 				break;
+
 			case PRIM_BULK_KNOWN_OP.IREF:
+				id = bundle.readTypedNum( NUMTYPE.UINT16 );
+				dat = (dat << 16) | id;
+				i += 1; ops.push([ op, dat ]);
+				break;
+
 			case PRIM_BULK_KNOWN_OP.XREF:
-				i += 1; ops.push([ op & 0xC0, dat ]);
+				dat = bundle.readStringLT();
+				i += 1; ops.push([ op, dat ]);
 				break;
 			default:
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'Unknown bulk array op-code 0x'+op.toString(16)+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
+				throw new Errors.AssertError('Unknown bulk array op-code 0x'+op.toString(16)+'!');
 		}
 	}
 
@@ -526,38 +507,27 @@ function decodeKnownBulkArray( bundle, database, len ) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
 				// Construct & Export to IREF table
 				for (j=0; j<dat; j++) {
-
 					// Initialize object properties and keep it on the answer array 
-					obj = localObjs[obji];
+					obj = locals[obji];
 					ENTITY[2]( obj, PROPERTIES, getProperties(popTable, obji) );
 					ans[i++] = obj;
-
 					// Forward object index
 					obji++;
-
 				}
 				break;
 
 			case PRIM_BULK_KNOWN_OP.IREF:
 				// Import from IREF
-				id = bundle.readTypedNum( NUMTYPE.UINT16 );
-				if (id >= bundle.iref_table.length) throw {
-					'name' 		: 'IrefError',
-					'message'	: 'Invalid IREF #'+id+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
-				ans[i++] = bundle.iref_table[ (dat << 16) | id ];
+				if (dat >= bundle.iref_table.length)
+					throw new Errors.IRefError('Invalid IREF #'+dat+'!');
+				ans[i++] = bundle.iref_table[ dat ];
 				break;
 
 			case PRIM_BULK_KNOWN_OP.XREF:
 				// Import from XREF
-				name = bundle.readStringLT();
-				if (database[name] === undefined) throw {
-					'name' 		: 'ImportError',
-					'message'	: 'Cannot import undefined external reference '+name+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				};
-				ans[i++] = database[name];
+				if (database[dat] === undefined) 
+					throw new Errors.XRefError('Cannot import undefined external reference '+dat+'!');
+				ans[i++] = database[dat];
 				break;
 
 		}
@@ -592,11 +562,7 @@ function decodeChunkedArray( bundle, database ) {
 
 		// Test for non-arrays
 		if (chunk.length === undefined)
-			throw {
-				'name' 		: 'AssertError',
-				'message'	: 'Encountered non-array chunk as part of chunked array!',
-				toString 	: function(){return this.name + ": " + this.message;}
-			};
+			throw new Errors.AssertError('Encountered non-array chunk as part of chunked array!');
 
 		// Collect
 		ans.push.apply( ans, chunk );
@@ -654,11 +620,7 @@ function decodeArray( bundle, database, op ) {
 			: [];
 
 	} else if (op === 0x7F) { // PRIM_CHUNK_END
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Encountered PRIM_CHUNK_END outside of chunked array!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Encountered PRIM_CHUNK_END outside of chunked array!');
 
 	} else if ((op & 0xE0) === 0x00) { // NUM_DWS
 
@@ -755,8 +717,7 @@ function decodeArray( bundle, database, op ) {
 		// Repeat value
 		vArr = decodePrimitive( bundle, database );
 		nArr = new Array( len );
-		nArr.fill(vArr);
-		// for (i=0; i<len; i++) nArr[i]=vArr;
+		for (i=0; i<len; i++) nArr[i]=vArr;
 
 		// Return
 		return DEBUG
@@ -789,11 +750,7 @@ function decodeArray( bundle, database, op ) {
 		return decodeKnownBulkArray( bundle, database, len );
 
 	} else {
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Unknown array op-code 0x'+op.toString(16)+' at offset @'+(bundle.i8 - bundle.ofs8)+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Unknown array op-code 0x'+op.toString(16)+' at offset @'+(bundle.i8 - bundle.ofs8)+'!');
 
 	}
 }
@@ -818,11 +775,8 @@ function decodePrimitive( bundle, database ) {
 
 	} else if ((op & 0xF0) === 0xE0) { // I-Ref
 		var id = ((op & 0x0F) << 16) | bundle.readTypedNum( NUMTYPE.UINT16 );
-		if (id >= bundle.iref_table.length) throw {
-			'name' 		: 'IrefError',
-			'message'	: 'Invalid IREF #'+id+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		if (id >= bundle.iref_table.length)
+			throw new Errors.IRefError('Invalid IREF #'+id+'!');
 		return DEBUG
 			? __debugMeta( bundle.iref_table[id], 'object.iref', { 'id': id } )
 			: bundle.iref_table[id];
@@ -838,21 +792,14 @@ function decodePrimitive( bundle, database ) {
 
 	} else if ((op & 0xFF) === 0xFE) { // Import
 		var name = bundle.readStringLT();
-		if (database[name] === undefined) throw {
-			'name' 		: 'ImportError',
-			'message'	: 'Cannot import undefined external reference '+name+'!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		};
+		if (database[name] === undefined) 
+			throw new Errors.XRefError('Cannot import undefined external reference '+name+'!');
 		return DEBUG
 			? __debugMeta( database[name], 'object.string', { 'key': name } )
 			: database[name];
 
 	} else if ((op & 0xFF) === 0xFF) { // Extended
-		throw {
-			'name' 		: 'AssertError',
-			'message'	: 'Encountered RESERVED primitive operator!',
-			toString 	: function(){return this.name + ": " + this.message;}
-		}
+		throw new Errors.AssertError('Encountered RESERVED primitive operator!');
 
 	}
 }
@@ -870,11 +817,7 @@ function parseBundle( bundle, database ) {
 				break;
 
 			default:
-				throw {
-					'name' 		: 'AssertError',
-					'message'	: 'Unknown control operator 0x'+op.toString(16)+' at @'+bundle.i8+'!',
-					toString 	: function(){return this.name + ": " + this.message;}
-				}
+				throw new Errors.AssertError('Unknown control operator 0x'+op.toString(16)+' at @'+bundle.i8+'!');
 		}
 	}
 }

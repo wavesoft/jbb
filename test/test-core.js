@@ -21,9 +21,10 @@
 
 var util = require('util');
 var assert = require('assert');
-var BinaryBundle = require("../lib/BinaryBundle");
 var seed = require('seed-random');
 var random = seed('jbbtests');
+var BinaryBundle = require("../lib/BinaryBundle");
+var Errors = require("../lib/Errors");
 
 // Static import of utility functions
 require('./utils/common').static(global);
@@ -594,7 +595,29 @@ describe('[Core Tests]', function() {
 		);
 		it_should_return( values, '[ 1146544674, 72802850, 5693986, 451106, 57890, 546, 34, 5, null ]', [match_chunkTypes(two_chunks)] );
 
-		// Bulk of known objects
+		// Difficulty with non-continuous items
+		var difficult = [];
+		for (var i=0; i<2000; i++) {
+			difficult.push(
+				[ true, false, undefined, 148, 64473, 12847612, 40.1927375793457, "String",
+				  { 'some': 'object', 'a': 1, 'b': 2 }, new ObjectA(), new ObjectB( null, "test" )
+				][Math.floor(random()*12)]
+			);
+		}
+		it_should_return( difficult, '[ 2,000 x [varying] ]' );
+
+		// Error case encountered before
+		var err1 = [];
+		for (var i=0; i<100; i++) {
+			err1.push(SEQ_PRIM[ i % SEQ_PRIM.length ]);
+		}
+		it_should_return( err1, '[ 100 x [varying] ]' );
+
+	});
+
+	describe('Bulks of Known Objects', function () {
+
+		// Simple case: 1-chunked array with known objects
 		var PICK_KO = [ new ObjectA(), new ObjectB(null, "test"), new ObjectB(false, true),
 						new ObjectB(4.1230998039245605, 412.4100036621094), new ObjectB(undefined, false), 
 						new ObjectC(51,44), new ObjectB(-41, -491826382) ];
@@ -602,9 +625,9 @@ describe('[Core Tests]', function() {
 		for (var i=0; i<2000; i++) {
 			bko1.push(PICK_KO[Math.floor(random()*PICK_KO.length)]);
 		}
-		// it_should_return( bko1, '[ 2,000 x Known Objects ]' );
+		it_should_return( bko1, '[ 2,000 x Known Objects ]' );
 
-		// Bulk of known objects
+		// Chunked case: 2 Chunks of known objects interrupted by another chunk
 		var PICK_KO = [ new ObjectA(), new ObjectB(null, "test"), new ObjectB(false, true),
 						new ObjectB(4.1230998039245605, 412.4100036621094), new ObjectB(undefined, false), 
 						new ObjectC(51,44), new ObjectB(-41, -491826382) ];
@@ -615,42 +638,14 @@ describe('[Core Tests]', function() {
 			bko2.push({ 'key1': 'same', 'key2': f[0] }); 
 		}
 		for (var i=0; i<200; i++) { bko2.push(PICK_KO[Math.floor(random()*PICK_KO.length)]); }
-		it_should_return( bko2, '[ 100 x KO, 50 x PO, 100 x KO ]' );
+		it_should_return( bko2, '[ 100 x Known Object, 50 x Plain, 100 x Known Object ]' );
 
-		// Difficulty with non-continuous items
-		// var difficult = [];
-		// for (var i=0; i<2000; i++) {
-		// 	difficult.push(
-		// 		[ true, false, undefined, 148, 64473, 12847612, 40.1927375793457, "String",
-		// 		  { 'some': 'object', 'a': 1, 'b': 2 }, new ObjectA(), new ObjectB( null, "test" )
-		// 		][Math.floor(random()*12)]
-		// 	);
-		// }
-		// it_should_return( difficult, '[ 2,000 x [varying] ]' );
-
-		// Error case encountered before
-		var err1 = [];
-		for (var i=0; i<100; i++) {
-			err1.push(SEQ_PRIM[ i % SEQ_PRIM.length ]);
+		// Order of IRef : Referencing to an object created inside the array
+		var bko3 = [], bko3_ref = new ObjectA();
+		for (var i=0; i<256; i++) {
+			bko3.push( new ObjectB( bko3_ref, new ObjectA() ) );
 		}
-		it_should_return( err1, '[ 100 x [varying] ]' );
-
-		// Error case encountered before
-		var err2 = [ 
-			{ some_mergable: true },
-			{ some_mergable: 'String' },
-			{ some_mergable: 40.1927375793457 },
-			{ some_mergable: null },
-			{ some_mergable: 12847612 },
-			{ some_mergable: 40.1927375793457 },
-			{ some_mergable: null },
-			{ some_mergable: 'String' },
-			{ some_mergable: 40.1927375793457 },
-			{ some_mergable: 148 },
-			{ some_mergable: undefined },
-			{ some_mergable: 40.1927375793457 },
-			{ some_mergable: true } ];
-		it_should_return( err2, '[ 100 x [varying] ]' );
+		it_should_return( bko3, '[ 256 x ObjectB( ObjectA(), ObjectA() ) ]' );
 
 	});
 
@@ -679,7 +674,7 @@ describe('[Core Tests]', function() {
 		it_should_return( obj6, '[ObjectB] (UnconstructedFactory, DefaultInit)', [match_metaType('object.known')] );
 		it_should_return( obj7, '[ObjectC] (UnconstructedFactory, CustomInit)', [match_metaType('object.known')] );
 		it_should_throw ( obj8, '[ObjectD] (Not part of OT)', function(err) {
-			return (err.name == 'EncodingError');
+			return (err instanceof Errors.XRefError);
 		});
 
 		// Simple nested object case
@@ -734,7 +729,7 @@ describe('[Core Tests]', function() {
 			assert.throws(function() {
 				var openBundle = open_decoder( encoder, SimpleOT );
 			}, function(err) {
-				return (err.name == 'ImportError');
+				return (err instanceof Errors.XRefError);
 			}, 'bundle decoder did not thorw an ImportError while loading');
 
 			// Cleanup
