@@ -440,77 +440,75 @@ function decodePlainBulkArray( bundle, database ) {
  * Decode bulk array of entities
  */
 function decodeKnownBulkArray( bundle, database, len ) {
-	var eid = bundle.readTypedNum( NUMTYPE.UINT16 );
-	var PROPERTIES = bundle.ot.PROPERTIES[ eid ],
+	var eid = bundle.readTypedNum( NUMTYPE.UINT16 ),
+		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
 		ENTITY = bundle.ot.ENTITIES[ eid ],
-		plen = PROPERTIES.length, popTable = [], 
-		refTable = Array( len ), ans = Array( len ),
-		obj, id, name, op, dat, i=0, j=0, k=0, ops=[],
-		locals = [], obji=0,
-		propFactory = "", getProperties;
+		plen = PROPERTIES.length, 
+		getProperties = bundle.getWeavePropertyFunction( plen );
 
 	// Get bulk operators
-	i=0; while (i < len) {
-		op = bundle.readTypedNum( NUMTYPE.UINT8 );
-		dat = op & 0x3F;
+	var ops = [], locals = [];
+	for (let i =0; i<len;) {
+		let op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		let dat = op & 0x3F;
 		op = op & 0xC0;
+
 		// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
 		switch (op) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
-				for (j=0; j<dat; j++) {
+				for (let j=0; j<dat; j++) {
 					// Create entity & Keep it in the iref table
-					obj = ENTITY[1]( ENTITY[0] );
+					let obj = ENTITY[1]( ENTITY[0] );
 					bundle.iref_table.push(obj);
 					locals.push(obj);
 				}
-				i += dat; ops.push([ op, dat ]);
+				ops.push([ op, dat ]);
+				i += dat; 
 				break;
 
 			case PRIM_BULK_KNOWN_OP.IREF:
-				id = bundle.readTypedNum( NUMTYPE.UINT16 );
-				dat = (dat << 16) | id;
-				i += 1; ops.push([ op, dat ]);
+				ops.push([ op, (dat << 16) | bundle.readTypedNum( NUMTYPE.UINT16 ) ]);
+				i += 1; 
 				break;
 
 			case PRIM_BULK_KNOWN_OP.XREF:
-				dat = bundle.readStringLT();
-				i += 1; ops.push([ op, dat ]);
+				ops.push([ op, bundle.readStringLT() ]);
+				i += 1; 
 				break;
+
 			default:
 				throw new Errors.AssertError('Unknown bulk array op-code 0x'+op.toString(16)+'!');
 		}
 	}
 
 	// Get property arrays
-	for (i=0; i<plen; ++i) {
-		popTable.push( decodePrimitive( bundle, database ) );
-		if (propFactory) propFactory += ",";
-		propFactory += "p["+i+"][i]";
+	var propTable = [];
+	for (let i=0; i<plen; ++i) {
+		propTable.push( decodePrimitive( bundle, database ) );
 	}
-
-	// Create de-weaving collector function
-	getProperties = new Function( "p", "i", "return ["+propFactory+"]" );
 
 	// console.log("------");
 	// console.log(" Ofs:", bundle.i8-bundle.ofs8);
 	// console.log(" Eid:", eid);
 	// console.log(" Len:", len);
 	// console.log(" Properties:", PROPERTIES.toString());
-	// console.log(" PropTable:", popTable);
-	// console.log(" Factory: return [", propFactory,"]");
+	// console.log(" PropTable:", propTable);
 	// console.log("------");
 
 	// Start processing operators
-	i=0; for (k=0; k<ops.length; k++) {
-		op = ops[k][0]; dat = ops[k][1];
+	var ans = [], obji = 0;
+	for (let i=0, k=0; k<ops.length; k++) {
+		let op = ops[k][0];
+		let dat = ops[k][1];
 		switch (op) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
 				// Construct & Export to IREF table
-				for (j=0; j<dat; j++) {
+				for (let j=0; j<dat; j++) {
 					// Initialize object properties and keep it on the answer array 
-					obj = locals[obji];
-					ENTITY[2]( obj, PROPERTIES, getProperties(popTable, obji) );
-					ans[i++] = obj;
+					let obj = locals[obji];
+					ENTITY[2]( obj, PROPERTIES, getProperties(propTable, obji) );
+					// ans[i++] = obj;
+					ans.push(obj);
 					// Forward object index
 					obji++;
 				}
@@ -520,14 +518,16 @@ function decodeKnownBulkArray( bundle, database, len ) {
 				// Import from IREF
 				if (dat >= bundle.iref_table.length)
 					throw new Errors.IRefError('Invalid IREF #'+dat+'!');
-				ans[i++] = bundle.iref_table[ dat ];
+				ans.push(bundle.iref_table[ dat ]);
+				// ans[i++] = bundle.iref_table[ dat ];
 				break;
 
 			case PRIM_BULK_KNOWN_OP.XREF:
 				// Import from XREF
 				if (database[dat] === undefined) 
 					throw new Errors.XRefError('Cannot import undefined external reference '+dat+'!');
-				ans[i++] = database[dat];
+				ans.push(database[dat]);
+				// ans[i++] = database[dat];
 				break;
 
 		}
@@ -584,7 +584,8 @@ function decodeChunkedArray( bundle, database ) {
  * Read an array from the bundle
  */
 function decodeArray( bundle, database, op ) {
-	var i, type, ln, len, vArr, nArr = [];
+	var i=0, type=0, ln=0, len=0, nArr = [];
+	op = op & 0xFF;
 
 	if (op === 0x6C) { // PRIM_BULK_PLAIN
 
@@ -631,7 +632,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Read from and encode to
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-		vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
+		let vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
 		nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 		// Return
@@ -667,7 +668,7 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
-		vArr = bundle.readTypedNum( type );
+		let vArr = bundle.readTypedNum( type );
 		nArr = new NUMTYPE_CLASS[ type ]( len );
 		nArr.fill(vArr);
 		// for (i=0; i<len; ++i) nArr[i]=vArr;
@@ -697,7 +698,7 @@ function decodeArray( bundle, database, op ) {
 
 		// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Numeric Short");
 		type = op & 0x07;
-		len = bundle.readTypedNum( NUMTYPE.UINT8 );
+		len = bundle.readTypedNum( NUMTYPE.UINT8 ) | 0;
 
 		// Read raw array
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
@@ -715,9 +716,10 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
-		vArr = decodePrimitive( bundle, database );
+		let vArr = decodePrimitive( bundle, database );
 		nArr = new Array( len );
-		for (i=0; i<len; i++) nArr[i]=vArr;
+		nArr.fill( vArr );
+		// for (i=0; i<len; i++) nArr[i]=vArr;
 
 		// Return
 		return DEBUG
@@ -774,7 +776,8 @@ function decodePrimitive( bundle, database ) {
 			(op & 0x07) );
 
 	} else if ((op & 0xF0) === 0xE0) { // I-Ref
-		var id = ((op & 0x0F) << 16) | bundle.readTypedNum( NUMTYPE.UINT16 );
+		var id = bundle.readTypedNum( NUMTYPE.UINT16 ) | 0;
+		id = ((op & 0x0F) << 16) | id;
 		if (id >= bundle.iref_table.length)
 			throw new Errors.IRefError('Invalid IREF #'+id+'!');
 		return DEBUG
