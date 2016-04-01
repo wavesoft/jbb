@@ -444,21 +444,22 @@ function decodeKnownBulkArray( bundle, database, len ) {
 		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
 		ENTITY = bundle.ot.ENTITIES[ eid ],
 		plen = PROPERTIES.length, 
-		getProperties = bundle.getWeavePropertyFunction( plen );
+		getProperties = bundle.getWeavePropertyFunction( plen ),
+		ops = [], locals = [], i = 0, op = 0, dat = 0,
+		obj = null, j = 0, k = 0, propTable = [];
 
 	// Get bulk operators
-	var ops = [], locals = [];
-	for (let i =0; i<len;) {
-		let op = bundle.readTypedNum( NUMTYPE.UINT8 );
-		let dat = op & 0x3F;
+	for (i=0; i<len;) {
+		op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		dat = op & 0x3F;
 		op = op & 0xC0;
 
 		// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
 		switch (op) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
-				for (let j=0; j<dat; j++) {
+				for (j=0; j<dat; j++) {
 					// Create entity & Keep it in the iref table
-					let obj = ENTITY[1]( ENTITY[0] );
+					obj = ENTITY[1]( ENTITY[0] );
 					bundle.iref_table.push(obj);
 					locals.push(obj);
 				}
@@ -482,8 +483,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 	}
 
 	// Get property arrays
-	var propTable = [];
-	for (let i=0; i<plen; ++i) {
+	for (i=0; i<plen; ++i) {
 		propTable.push( decodePrimitive( bundle, database ) );
 	}
 
@@ -497,15 +497,15 @@ function decodeKnownBulkArray( bundle, database, len ) {
 
 	// Start processing operators
 	var ans = [], obji = 0;
-	for (let i=0, k=0; k<ops.length; k++) {
-		let op = ops[k][0];
-		let dat = ops[k][1];
+	for (i=0, k=0; k<ops.length; k++) {
+		op = ops[k][0];
+		dat = ops[k][1];
 		switch (op) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
 				// Construct & Export to IREF table
-				for (let j=0; j<dat; j++) {
+				for (j=0; j<dat; j++) {
 					// Initialize object properties and keep it on the answer array 
-					let obj = locals[obji];
+					obj = locals[obji];
 					ENTITY[2]( obj, PROPERTIES, getProperties(propTable, obji) );
 					// ans[i++] = obj;
 					ans.push(obj);
@@ -584,7 +584,7 @@ function decodeChunkedArray( bundle, database ) {
  * Read an array from the bundle
  */
 function decodeArray( bundle, database, op ) {
-	var i=0, type=0, ln=0, len=0, nArr = [];
+	var i=0, type=0, ln=0, len=0, nArr = [], vArr;
 	op = op & 0xFF;
 
 	if (op === 0x6C) { // PRIM_BULK_PLAIN
@@ -632,7 +632,7 @@ function decodeArray( bundle, database, op ) {
 
 		// Read from and encode to
 		// console.log("Reading NUM_DWS len="+len+", ln="+ln);
-		let vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
+		vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
 		nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 		// Return
@@ -668,7 +668,7 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
-		let vArr = bundle.readTypedNum( type );
+		vArr = bundle.readTypedNum( type );
 		nArr = new NUMTYPE_CLASS[ type ]( len );
 		nArr.fill(vArr);
 		// for (i=0; i<len; ++i) nArr[i]=vArr;
@@ -716,7 +716,7 @@ function decodeArray( bundle, database, op ) {
 		len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 		// Repeat value
-		let vArr = decodePrimitive( bundle, database );
+		vArr = decodePrimitive( bundle, database );
 		nArr = new Array( len );
 		nArr.fill( vArr );
 		// for (i=0; i<len; i++) nArr[i]=vArr;
