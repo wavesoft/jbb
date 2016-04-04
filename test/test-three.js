@@ -28,8 +28,9 @@ var common = require('./utils/common');
 var compare = require('./utils/compare');
 var JBBSourceLoader = require('../loader');
 var JBBBinaryLoader = require('../decoder');
-var JBBProfileThreeLoader = require('jbb-profile-three/loader');
-var JBBProfileThree = require('jbb-profile-three');
+var JBBProfileThreeLoader = require('jbb-profile-three/profile-loader');
+var THREEEncodeProfile = require('jbb-profile-three/profile-encode');
+var THREEDecodeProfile = require('jbb-profile-three/profile-decode');
 var BinaryCompiler = require('../compiler');
 require('./utils/common').static(global);
 require('./utils/tests').static(global);
@@ -102,7 +103,7 @@ function describe_clojure( bundleName, testFn ) {
 			BinaryCompiler.compileFile( path.join(mediaDir, bundleName+'.jbbsrc'), tmpFile, {
 					'path'			: mediaDir,
 					'log'			: 0x00,
-					'profileTable'	: JBBProfileThree,
+					'profile'		: THREEEncodeProfile,
 					'profileLoader'	: JBBProfileThreeLoader,
 					'sparse'		: false
 				}, function( err ) {
@@ -123,7 +124,7 @@ function describe_clojure( bundleName, testFn ) {
 
 			/* Load the source bundle */
 			var unmute = mute();
-			var binaryLoader = new JBBBinaryLoader( JBBProfileThree, path.dirname(tmpFile) );
+			var binaryLoader = new JBBBinaryLoader( THREEDecodeProfile, path.dirname(tmpFile) );
 			binaryLoadingTime = Date.now();
 			binaryLoader.addByBuffer( common.readChunk(tmpFile) );
 			binaryLoader.load(function( err ) {
@@ -132,7 +133,7 @@ function describe_clojure( bundleName, testFn ) {
 				binaryLoadingTime = Date.now() - binaryLoadingTime;
 
 				/* Delete bundle */
-				fs.unlink( tmpFile );
+				// fs.unlink( tmpFile );
 
 				/* Keep the database for the next test */
 				binDB = binaryLoader.database;
@@ -172,7 +173,17 @@ function describe_clojure( bundleName, testFn ) {
 describe('[THREE.js Profile Tests]', function() {
 
 	var commonIgnoredKeys = [
-		'uuid', 'parent', 'onChangeCallback', 'solid', 'constructor', 'set', 'image'
+		// Functions
+		'onChangeCallback',
+		'constructor',
+		'set',
+		 // OK To change
+		'uuid',
+		'parent',
+		// Pointless to compare
+		'solid',
+		'image',
+		'version',
 	];
 
 	describe('animated.jbbsrc', describe_clojure( 'animated', function( original, encoded ) {

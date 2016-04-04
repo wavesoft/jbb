@@ -42,50 +42,12 @@ var ObjectD = function() {
 	this.objDpropC = "Not part of ObjectTable";
 };
 
-// Default & Unconstructed factories
-var DefaultFactory = function(ClassName) {
-	return new ClassName();
-}
-var UnconstructedFactory = function(ClassName) {
-	return Object.create(ClassName.prototype);
-}
-
-// Default init
-var DefaultInit = function( instance, properties, values ) {
-	for (var i=0; i<properties.length; i++) {
-		instance[properties[i]] = values[i];
-	}
-}
-var ObjectCInit = function( instance, properties, values ) {
-	DefaultInit( instance, properties, values );
-	instance.constructor.call(
-			instance, instance.objCpropA,
-					  instance.objCpropB
-		);
-}
-
-// Local object table for tests
-var SimpleOT = {
-	'ID' 		: 0x1E51,
-	'ENTITIES' 	: [
-		[ ObjectA, DefaultFactory, DefaultInit ],
-		[ ObjectB, UnconstructedFactory, DefaultInit ],
-		[ ObjectC, UnconstructedFactory, ObjectCInit ]
-	],
-	'PROPERTIES': [
-		[ 'objApropA', 'objApropB', 'objApropC' ],
-		[ 'objBpropA', 'objBpropB', 'objBpropC' ],
-		[ 'objCpropA', 'objCpropB', 'objCpropC' ]
-	],
-};
-
-// Export modules
+// Export objects
 var exports = module.exports = {
 	'ObjectA': ObjectA,
 	'ObjectB': ObjectB,
 	'ObjectC': ObjectC,
 	'ObjectD': ObjectD,
-	'SimpleOT': SimpleOT,
 };
 module.exports.static = function(scope) {
 	Object.keys(exports).forEach(function(key,index) {

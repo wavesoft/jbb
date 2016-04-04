@@ -1,7 +1,18 @@
 var gulp 		= require('gulp');
 var header 		= require('gulp-header');
+var jbb_profile	= require('gulp-jbb-profile');
 var webpack 	= require('webpack-stream');
 var PROD 		= JSON.parse(process.env.PROD_DEV || "0");
+
+//
+// Compile test files
+//
+gulp.task('test/simple-profile', function() {
+    return gulp
+        .src([ 'test/simple-profile/specs.yaml' ])
+        .pipe(jbb_profile())
+        .pipe(gulp.dest('test/simple-profile'));
+});
 
 //
 // Compile the binary loader 

@@ -25,7 +25,10 @@ var seed	= require('seed-random');
 var compare = require('./compare');
 
 require('./common').static(global);
-require('./ot').static(global);
+require('../simple-profile/objects').static(global);
+
+var EncodeProfile = require('../simple-profile/specs-encode');
+var DecodeProfile = require('../simple-profile/specs-decode');
 
 var random = seed('jbbtests');
 
@@ -139,7 +142,7 @@ function it_should_throw(primitive, repr, isCorrectException) {
 	var text = repr || util.inspect(primitive,{'depth':0});
 	it('should except when encoding `'+text+'`', function () {
 		assert.throws(function() {
-			var ans = encode_decode( primitive, SimpleOT );
+			var ans = encode_decode( primitive, EncodeProfile, DecodeProfile );
 			assert(isNaN(ans) || (ans == undefined), 'encoder return an error after exception');
 		}, isCorrectException)
 	});
@@ -155,7 +158,7 @@ function it_should_return(primitive, repr, metaMatchFn) {
 	}
 	var text = repr || util.inspect(primitive,{'depth':0});
 	it('should return `'+text+'`, as encoded', function () {
-		var ans = encode_decode( primitive, SimpleOT );
+		var ans = encode_decode( primitive, EncodeProfile, DecodeProfile );
 		if (typeof primitive == 'number') {
 			if (isNaN(ans) && isNaN(primitive)) return;
 			assert.equal( ans, primitive, 'encoded and decoded numbers to not match' );
@@ -178,7 +181,7 @@ function it_should_return(primitive, repr, metaMatchFn) {
 function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) {
 	var array = gen_array_seq(typeName, length, min, step);
 	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[array.length-1]+'/'+step+']`, as encoded', function () {
-		var ans = encode_decode( array, SimpleOT );
+		var ans = encode_decode( array, EncodeProfile, DecodeProfile );
 		// Perform strong type checks on typed arrays
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
@@ -204,7 +207,7 @@ function it_should_return_array_seq_almost( typeName, length, min, step, tollera
 	};
 
 	it('should return `'+typeName+'('+length+') = ['+array[0]+'..'+array[array.length-1]+'/'+step+'±'+tollerance+']`, as encoded', function () {
-		var ans = encode_decode( array, SimpleOT );
+		var ans = encode_decode( array, EncodeProfile, DecodeProfile );
 		// Perform strong type checks on typed arrays
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
@@ -228,7 +231,7 @@ function it_should_return_array_seq_almost( typeName, length, min, step, tollera
 function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) {
 	var array = gen_array_rand(typeName, length, min, max);
 	it('should return `'+typeName+'('+length+') = [rand('+min+'..'+max+')]`, as encoded', function () {
-		var ans = encode_decode( array, SimpleOT );
+		var ans = encode_decode( array, EncodeProfile, DecodeProfile );
 		// Perform strong type checks on typed arrays
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
@@ -248,7 +251,7 @@ function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) 
 function it_should_return_array_rep( typeName, length, value, metaMatchFn ) {
 	var array = gen_array_rep(typeName, length, value);
 	it('should return `'+typeName+'('+length+') = [... ('+util.inspect(value,{'depth':1})+' x '+length+') ...]`, as encoded', function () {
-		var ans = encode_decode( array, SimpleOT );
+		var ans = encode_decode( array, EncodeProfile, DecodeProfile );
 		// Perform strong type checks on typed arrays
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );

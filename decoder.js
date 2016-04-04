@@ -307,13 +307,13 @@ function decodeObject( bundle, database, op ) {
 		if (op & 0x20) eid = bundle.readTypedNum( NUMTYPE.UINT8 ) | ((op & 0x0F) << 8);
 
 		// Fetch object class
-		var ENTITY = bundle.ot.ENTITIES[eid];
-		if (ENTITY === undefined) {
+		var FACTORY = bundle.profile.decode(eid);
+		if (FACTORY === undefined) {
 			throw new Errors.AssertError('Could not found known object entity #'+eid+'!');
 		}
 
 		// Call entity factory
-		var instance = ENTITY[1]( ENTITY[0] );
+		var instance = FACTORY.create();
 		// Keep on irefs
 		bundle.iref_table.push( instance );
 		// Fetch property table
@@ -321,7 +321,7 @@ function decodeObject( bundle, database, op ) {
 		var prop_table = decodePrimitive( bundle, database );
 
 		// Run initializer
-		ENTITY[2]( instance, bundle.ot.PROPERTIES[eid], prop_table );
+		FACTORY.init( instance, prop_table );
 
 		// Append debug metadata
 		DEBUG && __debugMeta( instance, 'object.known', { 'eid': eid } );
@@ -441,12 +441,10 @@ function decodePlainBulkArray( bundle, database ) {
  */
 function decodeKnownBulkArray( bundle, database, len ) {
 	var eid = bundle.readTypedNum( NUMTYPE.UINT16 ),
-		PROPERTIES = bundle.ot.PROPERTIES[ eid ],
-		ENTITY = bundle.ot.ENTITIES[ eid ],
-		plen = PROPERTIES.length, 
-		getProperties = bundle.getWeavePropertyFunction( plen ),
+		FACTORY = bundle.profile.decode( eid ), 
+		getProperties = bundle.getWeavePropertyFunction( FACTORY.props ),
 		ops = [], locals = [], i = 0, op = 0, dat = 0,
-		obj = null, j = 0, k = 0, propTable = [];
+		obj = null, j = 0, k = 0, propTable = [], hasValues = false;
 
 	// Get bulk operators
 	for (i=0; i<len;) {
@@ -459,10 +457,11 @@ function decodeKnownBulkArray( bundle, database, len ) {
 			case PRIM_BULK_KNOWN_OP.DEFINE:
 				for (j=0; j<dat; j++) {
 					// Create entity & Keep it in the iref table
-					obj = ENTITY[1]( ENTITY[0] );
+					obj = FACTORY.create();
 					bundle.iref_table.push(obj);
 					locals.push(obj);
 				}
+				hasValues = true;
 				ops.push([ op, dat ]);
 				i += dat; 
 				break;
@@ -483,8 +482,10 @@ function decodeKnownBulkArray( bundle, database, len ) {
 	}
 
 	// Get property arrays
-	for (i=0; i<plen; ++i) {
-		propTable.push( decodePrimitive( bundle, database ) );
+	if (hasValues) {
+		for (i=0; i<FACTORY.props; ++i) {
+			propTable.push( decodePrimitive( bundle, database ) );
+		}
 	}
 
 	// console.log("------");
@@ -506,7 +507,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 				for (j=0; j<dat; j++) {
 					// Initialize object properties and keep it on the answer array 
 					obj = locals[obji];
-					ENTITY[2]( obj, PROPERTIES, getProperties(propTable, obji) );
+					FACTORY.init( obj, getProperties(propTable, obji) );
 					// ans[i++] = obj;
 					ans.push(obj);
 					// Forward object index
@@ -872,7 +873,7 @@ function downloadArrayBuffers( urls, callback ) {
 /**
  * Binary bundle loader
  */
-var BinaryLoader = function( objectTable, baseDir, database ) {
+var BinaryLoader = function( profile, baseDir, database ) {
 
 	// Check for missing baseDir
 	if (typeof(baseDir) === "object") {
@@ -890,7 +891,7 @@ var BinaryLoader = function( objectTable, baseDir, database ) {
 	this.queuedRequests = [];
 
 	// Keep object table
-	this.objectTable = objectTable;
+	this.profile = profile;
 
 	// References for delayed GC
 	this.__delayGC = [];
@@ -1064,9 +1065,9 @@ BinaryLoader.prototype = {
 				// Create bundle from sparse or compact format
 				var bundle;
 				if (req.buffer.length === 1) {
-					bundle = new BinaryBundle( req.buffer[0], self.objectTable );
+					bundle = new BinaryBundle( req.buffer[0], self.profile );
 				} else {
-					bundle = new BinaryBundle( req.buffer, self.objectTable );
+					bundle = new BinaryBundle( req.buffer, self.profile );
 				}
 
 				// Parse bundle

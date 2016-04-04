@@ -1,0 +1,27 @@
+
+# Meta
+
+@uuid: 0x1E51
+@require:
+    OT: ./objects
+
+# Simple objects
+
+OT.ObjectA:
+    properties:
+        - objApropA
+        - objApropB
+        - objApropC
+
+OT.ObjectB:
+    properties:
+        - objBpropA
+        - objBpropB
+        - objBpropC
+
+OT.ObjectC:
+    init: [ objCpropA, objCpropB ]
+    properties:
+        - objCpropA
+        - objCpropB
+        - objCpropC

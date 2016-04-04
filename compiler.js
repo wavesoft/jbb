@@ -54,7 +54,7 @@ function compileFile( sourceBundle, bundleFile, config, callback ) {
  */
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
-	var encoder, profileTable, profileLoader, bundleLoader;
+	var encoder, profileEncoder, profileLoader, bundleLoader;
 
 	// Compile stages
 	var openBundle = function( cb ) {
@@ -66,7 +66,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 					{
 						'name' 			: bundleData['name'],
 						'base_dir' 		: baseDir,
-						'object_table' 	: profileTable,
+						'profile'	 	: profileEncoder,
 						'log'			: config['log'] || 0x00,
 						'sparse'		: config['sparse'],
 					}
@@ -115,20 +115,20 @@ function compile( bundleData, bundleFile, config, callback ) {
 	}
 
 	// Check for profileTable/profileLoader
-	if (config['profileTable'] || config['profileLoader']) {
+	if (config['profileEncoder'] || config['profileLoader']) {
 
 		// Check for missing arguments
-		if (!config['profileTable']) {
-			callback( "No got 'profileLoader' but missing 'profileTable' in the arguments" );
+		if (!config['profileEncoder']) {
+			callback( "Got 'profileLoader' but missing 'profileEncoder' in the arguments" );
 			return;
 		}
 		if (!config['profileLoader']) {
-			callback( "No got 'profileTable' but missing 'profileLoader' in the arguments" );
+			callback( "Got 'profileEncoder' but missing 'profileLoader' in the arguments" );
 			return;
 		}
 
 		// Fetch
-		profileTable = config['profileTable'];
+		profileEncoder = config['profileEncoder'];
 		profileLoader = config['profileLoader'];
 
 	} else {
@@ -141,8 +141,8 @@ function compile( bundleData, bundleFile, config, callback ) {
 		}
 
 		// Fetch
-		profileTable = require('jbb-profile-'+profile);
-		profileLoader = require('jbb-profile-'+profile+"/loader");
+		profileEncoder = require('jbb-profile-'+profile+'/profile-encode');
+		profileLoader = require('jbb-profile-'+profile+"/profile-loader");
 
 	}
 

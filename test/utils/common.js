@@ -38,7 +38,7 @@ function readChunk( filename ) {
 /**
  * Create a binary encoder pointing to a random file
  */
-function open_encoder( ot, sparse ) {
+function open_encoder( profile, sparse ) {
 	// Create a temporary file
 	var tempName = temp.path({suffix: '.tmp'});
 
@@ -46,7 +46,7 @@ function open_encoder( ot, sparse ) {
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
 		'log'			: 0,
-		'object_table' 	: ot,
+		'profile' 		: profile,
 		'sparse'		: sparse || false
 	});
 
@@ -57,14 +57,14 @@ function open_encoder( ot, sparse ) {
 /**
  * Create a binary decoder to read something created with open_encoder
  */
-function open_decoder( encoder, ot, db ) {
+function open_decoder( encoder, profile, db ) {
 	// Read into buffer
 	var file = fs.readFileSync(encoder.filename),
 		u8 = new Uint8Array(file),
 		buf = u8.buffer;
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( ot, db );
+	var decoder = new BinaryLoader( profile, db );
 	decoder.addByBuffer(buf);
 	decoder.load();
 
@@ -75,7 +75,7 @@ function open_decoder( encoder, ot, db ) {
 /**
  * Create a binary decoder to read something created with open_encoder
  */
-function open_decoder_sparse( encoder, ot, db ) {
+function open_decoder_sparse( encoder, profile, db ) {
 
 	// Load chunk buffers
 	var chunks = [
@@ -86,7 +86,7 @@ function open_decoder_sparse( encoder, ot, db ) {
 	];
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( ot, db );
+	var decoder = new BinaryLoader( profile, db );
 	decoder.addByBuffer( chunks );
 	decoder.load();
 
@@ -141,7 +141,7 @@ function open_encoder_buffer( encoder ) {
 /**
  * Perform encoding and decoding of the specified structure
  */
-function encode_decode( structure, ot ) {
+function encode_decode( structure, encodeProfile, decodeProfile ) {
 
 	// Disable logging
 	var c_log = console.log,
@@ -158,7 +158,7 @@ function encode_decode( structure, ot ) {
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
 		'log'			: 0,
-		'object_table' 	: ot
+		'profile'	 	: encodeProfile
 	});
 
 	// Encode object
@@ -180,7 +180,7 @@ function encode_decode( structure, ot ) {
 	// ===[ DECODE ]=====================
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( ot );
+	var decoder = new BinaryLoader( decodeProfile );
 	decoder.addByBuffer(buf);
 	decoder.load();
 

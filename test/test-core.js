@@ -28,8 +28,11 @@ var Errors = require("../lib/Errors");
 
 // Static import of utility functions
 require('./utils/common').static(global);
-require('./utils/ot').static(global);
 require('./utils/tests').static(global);
+require('./simple-profile/objects').static(global);
+
+var EncodeProfile = require('./simple-profile/specs-encode');
+var DecodeProfile = require('./simple-profile/specs-decode');
 
 const FLOAT32_POS = 3.40282346e+38; // largest positive number in float32
 const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
@@ -81,7 +84,7 @@ describe('[Core Tests]', function() {
 		var encode_stream = function( sparse ) {
 
 			// Encode object
-			var encoder = open_encoder( SimpleOT, sparse );
+			var encoder = open_encoder( EncodeProfile, sparse );
 			encoder.encode({
 				'plain'	: 152,
 				'32bit'	: 545406996,
@@ -110,7 +113,7 @@ describe('[Core Tests]', function() {
 
 			// Header field
 			assert.equal( u16[0], 0x4231, 		'Magic number should be 0x4231');
-			assert.equal( u16[1], SimpleOT.ID, 	'Object table should be 0x'+SimpleOT.ID.toString(16));
+			assert.equal( u16[1], EncodeProfile.id, 'Object table should be 0x'+EncodeProfile.id.toString(16));
 			assert.equal( u16[2], 0x0102,		'Protocol version should be v1.2');
 			assert.equal( u16[3], 0,			'Reserved header field should be 0');
 
@@ -133,7 +136,7 @@ describe('[Core Tests]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, SimpleOT );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, DecodeProfile );
 
 			// Validate string table
 			assert.deepEqual( bundle.string_table, 
@@ -151,7 +154,7 @@ describe('[Core Tests]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, SimpleOT );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, DecodeProfile );
 
 			// Validate string table
 			var plain_values = [ 1, 2, 3, 4 ];
@@ -715,7 +718,7 @@ describe('[Core Tests]', function() {
 				obj4 = new ObjectC( obj2, "part-object-2" );
 
 			// Create an encoder with 2 objects
-			var encoder = open_encoder( SimpleOT );
+			var encoder = open_encoder( EncodeProfile );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2
@@ -727,7 +730,7 @@ describe('[Core Tests]', function() {
 
 			// Try to load a bundle with xrefs
 			assert.throws(function() {
-				var openBundle = open_decoder( encoder, SimpleOT );
+				var openBundle = open_decoder( encoder, DecodeProfile );
 			}, function(err) {
 				return (err instanceof Errors.XRefError);
 			}, 'bundle decoder did not thorw an ImportError while loading');
@@ -746,7 +749,7 @@ describe('[Core Tests]', function() {
 				obj4 = new ObjectC( obj2, "part-object-2" );
 
 			// Create an encoder with 2 objects
-			var encoder = open_encoder( SimpleOT );
+			var encoder = open_encoder( EncodeProfile );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2
@@ -757,7 +760,7 @@ describe('[Core Tests]', function() {
 			encoder.close();
 
 			// Open bundle with xref table
-			var openBundle = open_decoder( encoder, SimpleOT, {
+			var openBundle = open_decoder( encoder, DecodeProfile, {
 				'x/obj1': "yes-imported-1",
 				"x/obj2": "yes-imported-2"
 			});
@@ -782,7 +785,7 @@ describe('[Core Tests]', function() {
 				obj6 = new ObjectC( obj5, "part-object-3" );
 
 			// Create an encoder with 2 objects with nested depencencies
-			var encoder = open_encoder( SimpleOT );
+			var encoder = open_encoder( EncodeProfile );
 			var db = {
 				'x/obj1': obj1,
 				'x/obj2': obj2,
@@ -796,7 +799,7 @@ describe('[Core Tests]', function() {
 
 			// Open bundle with xref table
 			delete db['test/obj3']; delete db['test/obj6'];
-			var openBundle = open_decoder( encoder, SimpleOT, db);
+			var openBundle = open_decoder( encoder, DecodeProfile, db);
 
 			// Make sure xrefs are correct
 			assert( openBundle.database['test/obj3'].objCpropA.objApropA == obj1.objApropA );
@@ -818,7 +821,7 @@ describe('[Core Tests]', function() {
 			obj4 = new ObjectC( 31247123, 0.6764000058174133 );
 
 		// Create a sparse encoder with few objects
-		var encoder1 = open_encoder( SimpleOT, true );
+		var encoder1 = open_encoder( EncodeProfile, true );
 		encoder1.encode( obj1, 'obj1' );
 		encoder1.encode( obj2, 'obj2' );
 		encoder1.encode( obj3, 'obj3' );
@@ -826,7 +829,7 @@ describe('[Core Tests]', function() {
 		encoder1.close();
 
 		// Load the sparse file
-		var decoder1 = open_decoder_sparse( encoder1, SimpleOT );
+		var decoder1 = open_decoder_sparse( encoder1, DecodeProfile );
 		it_should_match( obj1, decoder1.database['test/obj1'], '[ObjectA]' );
 		it_should_match( obj2, decoder1.database['test/obj2'], '[ObjectB( 128, "some-string" )]');
 		it_should_match( obj3, decoder1.database['test/obj3'], '[ObjectC( 1024, 4.212E+40 )]');

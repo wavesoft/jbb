@@ -1385,13 +1385,11 @@ function analyzePrimitiveArray( encoder, array ) {
 		  BF_PLAIN 	= 0x08,	
 		  BF_KNOWN  = 0x10;
 
-	var v, v_type, handled, id, ans, debug_str,
+	var v, v_type, handled, id, ans, debug_str, enc,
 		
 		t_mode, t_numtype, t_constr, t_keys,
 
 		new_keys, old_keys, some_overlap, n_repeat=0,
-
-		ENTITIES = encoder.objectTable.ENTITIES,
 
 		b_prim = null, 	blocks_prim = [],
 		b_rep = null,	blocks_rep = [],
@@ -1597,16 +1595,15 @@ function analyzePrimitiveArray( encoder, array ) {
 			if (b_known===null) {
 
 				// Lookup constructor
-				id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
-					if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[j][0])) {
-						id = j;
-						break;
-					}
+				id = -1;
+				enc = encoder.profile.encode(v);
+				if (enc) {
+					id = enc[0];
 				}
 
 				// Check if this is a known object
 				if (id > -1) {
-					b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, id, v.constructor];
+					b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, enc, v.constructor];
 					if (DEBUG_THIS) debug_str += ', obj[new]';
 				} else {
 					// Make this behave like a primitive
@@ -1625,16 +1622,15 @@ function analyzePrimitiveArray( encoder, array ) {
 					blocks_known.push( b_known );
 
 					// Lookup constructor
-					id = -1; for (var j=0, len=ENTITIES.length; j<len; ++j) {
-						if ((ENTITIES[j].length > 0) && (v instanceof ENTITIES[j][0])) {
-							id = j;
-							break;
-						}
+					id = -1;
+					enc = encoder.profile.encode(v);
+					if (enc) {
+						id = enc[0];
 					}
 
 					// Check if we are indeed a known object
 					if (id > -1) {
-						b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, id, v.constructor];
+						b_known = [i, 1, ARR_CHUNK.BULK_KNOWN, enc, v.constructor];
 						if (DEBUG_THIS) debug_str += ', obj[new]';
 					} else {
 						// Make this behave like a primitive
@@ -2160,7 +2156,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 /**
  * Encode array data as bulk of known objects
  */
-function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
+function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 
 	//
 	// Bulk Array for Known Object (PRIM_BULK_KNOWN)
@@ -2170,11 +2166,10 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 	//
 
 	// Lookup signature
-	var object, id, i, c_export = 0, _x=0,
-		PROPERTIES = encoder.objectTable.PROPERTIES[eid], plen = PROPERTIES.length,
+	var object, id, i, c_export = 0, _x=0, eid=meta[0], getProps=meta[1], plen=-1,
 		propertyTable = [], waveTable = [], op8 = [], op16 = [];
 	encoder.log(LOG.ARR, "array.prim.known, len="+data.length+
-		", eid="+eid+", props="+PROPERTIES.join(",")+" [");
+		", eid="+eid+", [");
 	encoder.logIndent(1);
 
 	// Put header
@@ -2191,11 +2186,6 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 	// Write EID
 	encoder.stream16.write( pack2b( eid, false ) );
 	encoder.counters.arr_hdr+=2;
-
-	// Prepare Tables
-	for (i=0; i<plen; ++i) {
-		waveTable.push( [] );
-	}
 
 	// Populate fields
 	for (var j=0, el=data.length; j<el; ++j) {
@@ -2234,9 +2224,9 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 		}
 
 		// Populate property table (for byval lookup)
-		propertyTable = new Array(plen);
-		for (i=0; i<plen; ++i) {
-			propertyTable[i] = object[ PROPERTIES[i] ];
+		propertyTable = getProps(object);
+		if (!propertyTable) {
+			throw new Errors.AssertError('Profile property encoder returned unexpected data!');
 		}
 
 		// Check ByVal ref
@@ -2258,9 +2248,17 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 		// Keep IREF
 		encoder.keepIRef( object, propertyTable, eid );
 
+		// Init weave table if empty
+		if (plen === -1) {
+			plen = propertyTable.length;
+			for (i=0; i<plen; ++i) {
+				waveTable.push( [] );
+			}
+		}
+
 		// Populate the weave table for the actual encoding.
 		for (i=0; i<plen; ++i) {
-			waveTable[i].push( object[ PROPERTIES[i] ] );
+			waveTable[i].push( propertyTable[i] );
 		}
 
 		// Count how many objects are exported in a bulk,
@@ -2285,8 +2283,10 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, eid ) {
 	}
 
 	// Write weaved properties
-	for (i=0; i<plen; ++i) {
-		encodeArray( encoder, waveTable[i] );
+	if (plen !== -1) {
+		for (i=0; i<plen; ++i) {
+			encodeArray( encoder, waveTable[i] );
+		}
 	}
 
 	// Close log group
@@ -2873,27 +2873,13 @@ function encodeObject( encoder, object ) {
 	if (id > -1) { encodeXREF( encoder, id); return }
 
 	// Lookup object type
-	var ENTITIES = encoder.objectTable.ENTITIES, eid = -1;
-	try {
-	for (var i=0, len=ENTITIES.length; i<len; ++i)
-		if ((ENTITIES[i].length > 0) && (object instanceof ENTITIES[i][0]))
-			{ eid = i; break; }
-	} catch (e) {
-		console.log("Error on item #",i,":",ENTITIES[i]);
-	}
-
-	// If no such entity exists, raise exception
-	if (eid < 0) {
-		// console.error("Unknown object:", object);
+	var enc = encoder.profile.encode(object);
+	if (!enc) {
 		throw new Errors.XRefError('An object trying to encode was not declared in the object table!');
 	}
 
 	// Populate property table
-	var	PROPERTIES = encoder.objectTable.PROPERTIES[eid],
-		propertyTable = new Array( PROPERTIES.length );
-	for (var i=0, len=PROPERTIES.length; i<len; ++i) {
-		propertyTable[i] = object[ PROPERTIES[i] ];
-	}
+	var eid = enc[0], propertyTable = enc[1]( object );
 
 	// Check ByVal ref
 	id = encoder.lookupIVal( propertyTable, eid );
@@ -3230,7 +3216,7 @@ var BinaryEncoder = function( filename, config ) {
 	this.bundleName = this.config['name'] || filename.split("/").pop().replace(".3bd","");
 
 	// Get object table
-	this.objectTable = this.config['object_table'];
+	this.profile = this.config['profile'];
 
 	// Database properties
 	this.dbTags = [];
@@ -3239,7 +3225,7 @@ var BinaryEncoder = function( filename, config ) {
 
 	// By-Reference and By-Value lookup tables
 	this.indexRef = [];
-	this.indexVal = new Array( this.objectTable.ENTITIES.length );
+	this.indexVal = new Array( this.profile.size );
 
 	// String lookup table
 	this.stringLookup = [];
@@ -3292,7 +3278,7 @@ BinaryEncoder.prototype = {
 		if (this.sparse) {
 
 			// Overwrite header
-			this.stream8.writeAt( 2,  pack2b( this.objectTable.ID ) );  // Update object table ID
+			this.stream8.writeAt( 2,  pack2b( this.profile.id ) );  // Update object table ID
 			this.stream8.writeAt( 8,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
 			this.stream8.writeAt( 12, pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
 			this.stream8.writeAt( 16, pack4b( this.stream16.offset ) ); // 16-bit buffer length
@@ -3329,7 +3315,7 @@ BinaryEncoder.prototype = {
 			// Open final stream
 			var finalStream = new BinaryStream( this.filename + '.jbb', 8 );
 			finalStream.write( pack2b( 0x4231 ) );  			 // Magic header
-			finalStream.write( pack2b( this.objectTable.ID ) );  // Object Table ID
+			finalStream.write( pack2b( this.profile.id ) );  // Object Table ID
 			finalStream.write( pack2b( VERSION ) );	  			 // Version
 			finalStream.write( pack2b( 0 ) );  					 // Reserved
 			finalStream.write( pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
