@@ -1902,6 +1902,7 @@ function encodeArray_NUM_DWS( encoder, data, n_from, n_to ) {
 	var n_dws_type = downscaleType( n_from, n_to );
 	// console.log(">>>",data.constructor,":",_NUMTYPE[n_from],"->",_NUMTYPE[n_to],":",n_dws_type);
 
+	encoder.counters.arr_dws+=1;
 	encoder.log(LOG.ARR, "array.numeric.downscaled, len="+data.length+
 		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
 		", type="+_NUMTYPE_DOWNSCALE_DWS[n_dws_type]+" ("+n_dws_type+")");
@@ -1940,6 +1941,7 @@ function encodeArray_NUM_DELTA_FLOAT( encoder, data, n_from, n_to, pivot, f_scal
 		throw new Errors.EncodeError('Non-viable float delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!');
 	}
 
+	encoder.counters.arr_delta_float+=1;
 	encoder.log(LOG.ARR, "array.numeric.delta.float, len="+data.length+
 		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
 		", type="+_NUMTYPE_DOWNSCALE_DELTA_FLOAT[n_delta_type]+" ("+n_delta_type+")"+
@@ -1993,6 +1995,7 @@ function encodeArray_NUM_DELTA_INT( encoder, data, n_from, n_to ) {
 		throw new Errors.EncodeError('Non-viable integer delta value from '+_NUMTYPE[n_from]+' to '+_NUMTYPE[n_to]+'!');
 	}
 
+	encoder.counters.arr_delta_int+=1;
 	encoder.log(LOG.ARR, "array.numeric.delta.int, len="+data.length+
 		", from="+_NUMTYPE[n_from]+", to="+_NUMTYPE[n_to]+
 		", type="+_NUMTYPE_DOWNSCALE_DELTA_INT[n_delta_type]+" ("+n_delta_type+")");
@@ -2030,6 +2033,7 @@ function encodeArray_NUM_REPEATED( encoder, data, n_type ) {
 	// 0100 [TYPE] [LN]    [16bit/32bit]
 	//
 
+	encoder.counters.arr_num_repeated+=1;		
 	encoder.log(LOG.ARR, "array.numeric.repeated, len="+data.length+
 		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
@@ -2061,6 +2065,7 @@ function encodeArray_NUM_RAW( encoder, data, n_type ) {
 	// 0101 [TYPE] [LN]    [16bit/32bit]
 	//
 
+	encoder.counters.arr_num_raw+=1;
 	encoder.log(LOG.ARR, "array.numeric.raw, len="+data.length+
 		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
@@ -2092,6 +2097,7 @@ function encodeArray_NUM_SHORT( encoder, data, n_type ) {
 	// 01110 [TYPE]
 	//
 
+	encoder.counters.arr_num_short+=1;
 	encoder.log(LOG.ARR, "array.numeric.short, len="+data.length+
 		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
@@ -2120,6 +2126,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 
 	// Lookup signature
 	var eid = encoder.getSignatureID( properties );
+	encoder.counters.arr_prim_bulk_plain+=1;
 	encoder.log(LOG.ARR, "array.prim.bulk_plain, len="+data.length+
 		", signature="+properties.toString()+
 		", eid="+eid+" [");
@@ -2168,6 +2175,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	// Lookup signature
 	var object, id, i, c_export = 0, _x=0, eid=meta[0], getProps=meta[1], plen=-1,
 		propertyTable = [], waveTable = [], op8 = [], op16 = [];
+	encoder.counters.arr_prim_bulk_known+=1;
 	encoder.log(LOG.ARR, "array.prim.known, len="+data.length+
 		", eid="+eid+", [");
 	encoder.logIndent(1);
@@ -2308,6 +2316,7 @@ function encodeArray_PRIM_SHORT( encoder, data ) {
 	//
 
 	// Open log group
+	encoder.counters.arr_prim_short+=1;
 	encoder.log(LOG.ARR, "array.prim.short, len="+data.length+
 		", peek="+data[0]+" [");
 	encoder.logIndent(1);
@@ -2340,6 +2349,7 @@ function encodeArray_PRIM_REPEATED( encoder, data ) {
 	// 0111100 [LN]     [16-bit]
 	//
 
+	encoder.counters.arr_prim_repeated+=1;
 	encoder.log(LOG.ARR, "array.prim.repeated, len="+data.length+
 		", peek="+data[0]);
 
@@ -2371,6 +2381,7 @@ function encodeArray_PRIM_RAW( encoder, data ) {
 	//
 
 	// Write chunk header
+	encoder.counters.arr_prim_raw+=1;
 	encoder.log(LOG.ARR, "array.prim.raw, len="+data.length+
 		", peek="+data[0]+" [");
 	encoder.logIndent(1);
@@ -2412,6 +2423,7 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 	// Write chunk header
 	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
 	encoder.counters.arr_hdr+=1;
+	encoder.counters.arr_prim_chunk+=1;
 	encoder.log(LOG.ARR, "array.prim.chunk, len="+data.length+
 		", chunks="+chunks.length+", peek="+data[0]+" [");
 	encoder.logIndent(1);
@@ -2443,6 +2455,7 @@ function encodeArray_EMPTY( encoder ) {
 	// 01111110
 	//
 
+	encoder.counters.arr_empty+=1;
 	encoder.log(LOG.ARR, "array.empty");
 	encoder.stream8.write( pack1b( ARR_OP.EMPTY ) );
 	encoder.counters.op_prm+=1;
@@ -3173,6 +3186,20 @@ var BinaryEncoder = function( filename, config ) {
 		op_prm:  0, dat_hdr: 0,
 		ref_str: 0, op_iref: 0,
 		arr_hdr: 0, op_xref: 0,
+
+		arr_dws: 0,
+		arr_delta_float: 0,
+		arr_delta_int: 0,
+		arr_num_repeated: 0,
+		arr_num_raw : 0,
+		arr_num_short: 0,
+		arr_prim_bulk_plain: 0,
+		arr_prim_bulk_known: 0,
+		arr_prim_short: 0,
+		arr_prim_repeated: 0,
+		arr_prim_raw: 0,
+		arr_prim_chunk: 0,
+		arr_empty: 0,
 	};
 
 	// Optimisation flags
@@ -3372,6 +3399,21 @@ BinaryEncoder.prototype = {
 					  this.counters.ref_str + this.counters.op_iref + this.counters.op_xref +
 					  this.counters.arr_hdr + this.counters.arr_chu + this.counters.dat_hdr;
 			console.info("-----------------------------------");
+			console.info(" NUM_DWS            : ",this.counters.arr_dws);
+			console.info(" NUM_DELTA_FLOAT    : ",this.counters.arr_delta_float);
+			console.info(" NUM_DELTA_INT      : ",this.counters.arr_delta_int);
+			console.info(" NUM_REPEATED       : ",this.counters.arr_num_repeated);
+			console.info(" NUM_RAW            : ",this.counters.arr_num_raw );
+			console.info(" NUM_SHORT          : ",this.counters.arr_num_short);
+			console.info(" PRIM_BULK_PLAIN    : ",this.counters.arr_prim_bulk_plain);
+			console.info(" PRIM_BULK_KNOWN    : ",this.counters.arr_prim_bulk_known);
+			console.info(" PRIM_SHORT         : ",this.counters.arr_prim_short);
+			console.info(" PRIM_REPEATED      : ",this.counters.arr_prim_repeated);
+			console.info(" PRIM_RAW           : ",this.counters.arr_prim_raw);
+			console.info(" PRIM_CHUNK         : ",this.counters.arr_prim_chunk);
+			console.info(" EMPTY              : ",this.counters.arr_empty);
+			console.info("-----------------------------------");
+			console.info("");
 			var perc = ((sum / totalSize) * 100).toFixed(2);
 			console.info(" Total Overhead     : ",sum,"b ("+perc+" %)");
 		}

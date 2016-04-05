@@ -50,84 +50,20 @@ module.exports = {
 	id: 7761,
 	size: 3,
 	decode: function( id ) {
-			if (id < 2) {
-				if (id < 1) {
-					if (id < 1) {
-						if (id < 1) {
-							switch (id) {
-								case 0: return factory_OT_ObjectA;
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					} else {
-						if (id < 1) {
-							switch (id) {
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					}
-				} else {
-					if (id < 2) {
-						if (id < 2) {
-							switch (id) {
-								case 1: return factory_OT_ObjectB;
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					} else {
-						if (id < 2) {
-							switch (id) {
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					}
-				}
+			if (id < 32) {
+				/* No items */
 			} else {
-				if (id < 3) {
-					if (id < 3) {
-						if (id < 3) {
-							switch (id) {
-								case 2: return factory_OT_ObjectC;
-							}
-						} else {
-							switch (id) {
-							}
-						}
+				if (id < 33) {
+					if (id < 32) {
+						if (id === 31)
+							return factory_OT_ObjectA;
 					} else {
-						if (id < 3) {
-							switch (id) {
-							}
-						} else {
-							switch (id) {
-							}
-						}
+						if (id === 32)
+							return factory_OT_ObjectB;
 					}
 				} else {
-					if (id < 3) {
-						if (id < 3) {
-							switch (id) {
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					} else {
-						if (id < 3) {
-							switch (id) {
-							}
-						} else {
-							switch (id) {
-							}
-						}
-					}
+					if (id === 33)
+						return factory_OT_ObjectC;
 				}
 			}
 		}

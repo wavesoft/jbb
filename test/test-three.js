@@ -102,8 +102,8 @@ function describe_clojure( bundleName, testFn ) {
 			tmpFile = path.join(__dirname, bundleName+'.tmp');// temp.path({suffix: '.test'});
 			BinaryCompiler.compileFile( path.join(mediaDir, bundleName+'.jbbsrc'), tmpFile, {
 					'path'			: mediaDir,
-					'log'			: 0x00,
-					'profile'		: THREEEncodeProfile,
+					'log'			: 0x8000,
+					'profileEncoder': THREEEncodeProfile,
 					'profileLoader'	: JBBProfileThreeLoader,
 					'sparse'		: false
 				}, function( err ) {
@@ -133,7 +133,7 @@ function describe_clojure( bundleName, testFn ) {
 				binaryLoadingTime = Date.now() - binaryLoadingTime;
 
 				/* Delete bundle */
-				// fs.unlink( tmpFile );
+				fs.unlink( tmpFile );
 
 				/* Keep the database for the next test */
 				binDB = binaryLoader.database;
