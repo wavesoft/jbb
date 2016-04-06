@@ -53,16 +53,16 @@ module.exports = {
 			if (id < 32) {
 				/* No items */
 			} else {
-				if (id < 33) {
-					if (id < 32) {
-						if (id === 31)
+				if (id < 34) {
+					if (id < 33) {
+						if (id === 32)
 							return factory_OT_ObjectA;
 					} else {
-						if (id === 32)
+						if (id === 33)
 							return factory_OT_ObjectB;
 					}
 				} else {
-					if (id === 33)
+					if (id === 34)
 						return factory_OT_ObjectC;
 				}
 			}
