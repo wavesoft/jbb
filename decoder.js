@@ -601,13 +601,11 @@ function decodeChunkedArray( bundle, database, size, is_numeric ) {
 				// Init first value
 				if (first) {
 					nans = new chunk.constructor( size );
-					console.log("<-> nans=",nans.constructor,"len=",chunk.length,"total=",size);
 					first = false;
 				}
 
 				// Test for type mismatch
 				if (!(chunk instanceof nans.constructor)) {
-					console.log("<->",chunk.constructor,"!=",nans.constructor);
 					throw new Errors.AssertError("Got is_numeric flag, but chunks are not of the same type (op was "+op+"!");
 				}
 
@@ -646,7 +644,11 @@ function decodeChunkedArray( bundle, database, size, is_numeric ) {
 		}
 
 		// Get next op-code
-		op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		if (i < size) {
+			op = bundle.readTypedNum( NUMTYPE.UINT8 );
+		} else {
+			break;
+		}
 	}
 
 	// console.log("-----------");

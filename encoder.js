@@ -1731,7 +1731,6 @@ function analyzePrimitiveArray( encoder, array ) {
 			} else if (ans[i][2] === ARR_CHUNK.REPEAT) {
 				ans[i][4] = num_type;
 			} else if (ans[i][2] == ARR_CHUNK.PRIMITIVES) {
-				console.log("Casting type="+_ARR_CHUNK[ans[i][2]]+", at="+ans[i][0]+"~"+ans[i][1]+" v=[",array.slice( ans[i][0], ans[i][0]+ans[i][1] ),"], num="+_NUMTYPE[num_type]);
 				ans[i][2] = ARR_CHUNK.NUMERIC;
 				ans[i][3] = num_type;
 			} else {
@@ -1746,32 +1745,11 @@ function analyzePrimitiveArray( encoder, array ) {
 			 (ans[i-1][3] === ans[i][3]) ) { // Same Sub-Type
 			
 			// Left engulfs right
-			console.log("Merging chunk #"+i+" (type="+_ARR_CHUNK[ans[i][2]]+", size="+ans[i][1]+") ");
 			ans[i-1][1] += ans[i][1];
 			ans.splice(i,1);
 			i--; l--;
 
 		}
-	}
-
-	if (is_numeric) {
-		for (var i=0; i<ans.length; i++) {
-			if (ans[i][2] === ARR_CHUNK.NUMERIC) {
-				 if (num_type != ans[i][3])
-				 	throw new Errors.AssertError("Something went REALLY wrong!");
-			} else if (ans[i][2] === ARR_CHUNK.REPEAT) {
-				 if (num_type != ans[i][4])
-				 	throw new Errors.AssertError("Something went REALLY wrong!");
-			} else {
-				throw new Errors.AssertError("Misidentified is_numeric, since chunk #"+i+" is type="+_ARR_CHUNK[ans[i][2]]);
-			}
-		}
-	}
-
-	if (is_numeric) {
-		console.log("ANS=[",ans,"]");
-	} else {
-		console.log("ANS=[ *mixed* ]");		
 	}
 
 	if (DEBUG_THIS) {
@@ -2496,9 +2474,7 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	// Encode individual chunks
 	for (var i=0, ofs=0, llen=chunks.length; i<llen; ++i) {
-		console.log("@@ ofs=",ofs,", len=",chunks[i][1],", llen=",ofs+chunks[i][1],", total=",data.length);
 		encodeArray_Chunk( encoder, data.slice(ofs, ofs+chunks[i][1]), chunks[i] );
-		console.log("@@ ---");
 		ofs += chunks[i][1];
 	}
 
@@ -2537,7 +2513,7 @@ function encodeArray_EMPTY( encoder ) {
 function encodeArray_Chunk( encoder, data, chunk ) {
 	var n_type, na;
 
-	console.log(">>> CFWA Chunk="+_ARR_CHUNK[chunk[2]],", from=" + chunk[0] + ", len=" + chunk[1] + ", arr=" + data.length);
+	// console.log(">>> CFWA Chunk="+_ARR_CHUNK[chunk[2]],", from=" + chunk[0] + ", len=" + chunk[1] + ", arr=" + data.length);
 	// console.log(">>> =",data);
 
 	// Encode array component according to chunk type
@@ -2698,7 +2674,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 			// Pick best, according to speed preference
 			if (b_min === b_raw) {
 				// Encode raw
-				console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+")");
+				// console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+")");
 				encodeArray_NUM_RAW( encoder, data, n_type );
 			} else if (b_min === b_dws) {
 				// Encode downscaled
@@ -2717,7 +2693,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 					}
 				}
 				// Fallback case -> Raw encode
-				console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+") (Fallback)");
+				// console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+") (Fallback)");
 				encodeArray_NUM_RAW( encoder, data, n_type );
 			}
 
@@ -3001,7 +2977,6 @@ function encodeObject( encoder, object ) {
 	}
 
 	// Write property table as an array
-	console.log("Object -> encodeArray");
 	encodeArray( encoder, propertyTable );
 
 }
@@ -3047,7 +3022,6 @@ function encodePlainObject( encoder, object ) {
 	encoder.counters.op_prm+=2;
 
 	// Keep iref and encode
-	console.log("Plain Object -> encodeArray");
 	encodeArray( encoder, values );
 
 }
@@ -3148,7 +3122,6 @@ function encodePrimitive( encoder, data ) {
 				(data instanceof Array)) {
 
 		// Write array
-		console.log("Primitive -> encodeArray");
 		encodeArray( encoder, data );
 
 	// ===============================

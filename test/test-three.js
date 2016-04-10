@@ -240,4 +240,25 @@ describe('[THREE.js Profile Tests]', function() {
 
 	}));
 
+	describe('heavy.jbbsrc', describe_clojure( 'heavy', function( original, encoded ) {
+
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: commonIgnoredKeys,
+			ignoreClasses: [ ],
+			numericTollerance: 0.001
+		};
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['heavy/hand'], 
+								   encoded['heavy/hand'], 
+								   'in heavy/hand', config );
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['heavy/ben'], 
+								   encoded['heavy/ben'], 
+								   'in heavy/ben', config );
+
+	}));
+
 });

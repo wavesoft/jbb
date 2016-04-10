@@ -71,7 +71,7 @@ var JBBBinaryLoader =
 	var Errors = __webpack_require__(2);
 
 	/* Production optimisations and debug metadata flags */
-	if (false) var PROD = true;
+	if (false) var PROD = false;
 	if (false) var DEBUG = !PROD;
 
 	/* Size constants */
@@ -473,10 +473,9 @@ var JBBBinaryLoader =
 			values.push(decodePrimitive( bundle, database ));
 
 		// Create objects
-		var ans = [], len=values[0].length;
+		var len=values[0].length, ans = new Array(len);
 		for (var i=0; i<len; ++i)
-			ans.push( objectFactory(values, i) );
-			// ans.push( objectFactory(values, values.length / properties.length, i) );
+			ans[i] = objectFactory(values, i);
 
 		return  false
 			? __debugMeta( ans, 'array.primitive.bulk_plain', { 'sid': sid } )
@@ -545,7 +544,7 @@ var JBBBinaryLoader =
 		// console.log("------");
 
 		// Start processing operators
-		var ans = [], obji = 0;
+		var ans = new Array(len), obji = 0;
 		for (i=0, k=0; k<ops.length; k++) {
 			op = ops[k][0];
 			dat = ops[k][1];
@@ -557,7 +556,7 @@ var JBBBinaryLoader =
 						obj = locals[obji];
 						FACTORY.init( obj, getProperties(propTable, obji) );
 						// ans[i++] = obj;
-						ans.push(obj);
+						ans[i++] = obj;
 						// Forward object index
 						obji++;
 					}
@@ -567,7 +566,7 @@ var JBBBinaryLoader =
 					// Import from IREF
 					if (dat >= bundle.iref_table.length)
 						throw new Errors.IRefError('Invalid IREF #'+dat+'!');
-					ans.push(bundle.iref_table[ dat ]);
+					ans[i++] = bundle.iref_table[ dat ];
 					// ans[i++] = bundle.iref_table[ dat ];
 					break;
 
@@ -575,7 +574,7 @@ var JBBBinaryLoader =
 					// Import from XREF
 					if (database[dat] === undefined) 
 						throw new Errors.XRefError('Cannot import undefined external reference '+dat+'!');
-					ans.push(database[dat]);
+					ans[i++] = database[dat];
 					// ans[i++] = database[dat];
 					break;
 
@@ -592,41 +591,127 @@ var JBBBinaryLoader =
 	/**
 	 * Read an array from the bundle
 	 */
-	function decodeChunkedArray( bundle, database ) {
+	function decodeChunkedArray( bundle, database, size, is_numeric ) {
 		var op = bundle.readTypedNum( NUMTYPE.UINT8 ),
-			chunk, chunk_meta = [],	ans =[], first = true;
+			chunk, chunk_meta = [],	nans, vans=[], i=0, first = true, j=0, l=0,
+			splicefn, peekOp, ln=0, type=0, len=0, val=0;
 
 		// Process chunks till PRIM_CHUNK_END
-		while (op !== 0x7F) {
+		while (i < size) {
+			if (is_numeric) {
 
-			// Collect chunk ops
-			chunk = decodeArray( bundle, database, op );
-			if (false) {
-				chunk_meta.push({
-					type: op,
-					len: chunk.length
-				});
+				//
+				// Use an optimised version of NUM_REPEATED when
+				// operating on a numeric array in order to avoid
+				// intermediate casting to Array()
+				//
+
+				if ((op & 0xF0) === 0x40) { // NUM_REPEATED
+
+					ln = op & 0x01;
+					type = (op >> 1) & 0x07;
+					len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
+
+					// Collect meta
+					if (false) {
+						chunk_meta.push({
+							type: op,
+							len: len
+						});
+					}
+
+					// Init first value
+					if (first) {
+						nans = new NUMTYPE_CLASS[ type ]( size );
+						first = false;
+					}
+
+					// Repeated value
+					val = bundle.readTypedNum( type );
+					nans.fill( val, i, i+len );
+					i+= len;
+
+				} else {
+
+					// Collect chunk ops
+					chunk = decodeArray( bundle, database, op );
+					if (false) {
+						chunk_meta.push({
+							type: op,
+							len: chunk.length
+						});
+					}
+
+					// Test for non-arrays
+					if (chunk.length === undefined)
+						throw new Errors.AssertError('Encountered non-array chunk as part of chunked array!');
+
+					// Init first value
+					if (first) {
+						nans = new chunk.constructor( size );
+						first = false;
+					}
+
+					// Test for type mismatch
+					if (!(chunk instanceof nans.constructor)) {
+						throw new Errors.AssertError("Got is_numeric flag, but chunks are not of the same type (op was "+op+"!");
+					}
+
+					// Merge
+					nans.set( chunk, i );
+					i += chunk.length;
+
+				}
+
+			} else {
+
+				// Collect chunk ops
+				chunk = decodeArray( bundle, database, op );
+				if (false) {
+					chunk_meta.push({
+						type: op,
+						len: chunk.length
+					});
+				}
+
+				// Test for non-arrays
+				if (chunk.length === undefined)
+					throw new Errors.AssertError('Encountered non-array chunk as part of chunked array!');
+
+				// Init first
+				if (first) {
+					vans = new Array(size);
+					first = false;
+				}
+
+				// Merge
+				for (j=0, l=chunk.length; j<l; j++, i++) {
+					vans[i] = chunk[j];
+				}
+
 			}
-			// console.log("<<< =",chunk);
-
-			// Test for non-arrays
-			if (chunk.length === undefined)
-				throw new Errors.AssertError('Encountered non-array chunk as part of chunked array!');
-
-			// Collect
-			ans.push.apply( ans, chunk );
 
 			// Get next op-code
-			op = bundle.readTypedNum( NUMTYPE.UINT8 );
+			if (i < size) {
+				op = bundle.readTypedNum( NUMTYPE.UINT8 );
+			} else {
+				break;
+			}
 		}
 
 		// console.log("-----------");
 		// console.log(ans);
 
 		// Return chunked array
-		return  false
-			? __debugMeta( ans, 'array.primitive.chunked', { 'chunks': chunk_meta } )
-			: ans;
+		if (is_numeric) {
+			return  false
+				? __debugMeta( nans, 'array.primitive.chunked', { 'chunks': chunk_meta, 'numeric': true } )
+				: nans;
+		} else {
+			return  false
+				? __debugMeta( vans, 'array.primitive.chunked', { 'chunks': chunk_meta, 'numeric': false } )
+				: vans;
+		}
 	}
 
 	/**
@@ -636,30 +721,25 @@ var JBBBinaryLoader =
 		var i=0, type=0, ln=0, len=0, nArr = [], vArr;
 		op = op & 0xFF;
 
-		if (op === 0x6C) { // PRIM_BULK_PLAIN
+		if (op === 0x6E) { // PRIM_BULK_PLAIN
 
 			// Decode and return plain bulk array
 			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Plain Bulk Plain");
 			return decodePlainBulkArray( bundle, database );
 
-		} else if (op === 0x6E) { // PRIM_SHORT
+		} else if (op === 0x6F) { // PRIM_SHORT
 
 			// Collect up to 255 primitives
 			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Short");
 			len = bundle.readTypedNum( NUMTYPE.UINT8 );
+			nArr[len-1] = null;
 			for (i=0; i<len; ++i)
-				nArr.push( decodePrimitive( bundle, database ) );
+				nArr[i] = decodePrimitive( bundle, database );
 
 			// Return
 			return  false
 				? __debugMeta( nArr, 'array.primitive.short', {} )
 				: nArr;
-
-		} else if (op === 0x6F) { // PRIM_CHUNK
-
-			// Return chunked array
-			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Chunk");
-			return decodeChunkedArray( bundle, database );
 
 		} else if (op === 0x7E) { // EMPTY
 
@@ -682,12 +762,12 @@ var JBBBinaryLoader =
 			// Read from and encode to
 			// console.log("Reading NUM_DWS len="+len+", ln="+ln);
 			vArr = bundle.readTypedArray( NUMTYPE_DOWNSCALE.TO[type] , len );
-			nArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
+			var tArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 			// Return
 			return  false
-				? __debugMeta( nArr, 'array.numeric.downscaled', { 'type': type } )
-				: nArr;
+				? __debugMeta( tArr, 'array.numeric.downscaled', { 'type': type } )
+				: tArr;
 
 		} else if ((op & 0xF0) === 0x20) { // NUM_DELTA_INT
 
@@ -718,14 +798,14 @@ var JBBBinaryLoader =
 
 			// Repeat value
 			vArr = bundle.readTypedNum( type );
-			nArr = new NUMTYPE_CLASS[ type ]( len );
-			nArr.fill(vArr);
-			// for (i=0; i<len; ++i) nArr[i]=vArr;
+			var tArr = new NUMTYPE_CLASS[ type ]( len );
+			// tArr.fill(vArr);
+			for (i=0; i<len; ++i) tArr[i]=vArr;
 
 			// Return
 			return  false
-				? __debugMeta( nArr, 'array.numeric.repeated', { 'type': type } )
-				: nArr;
+				? __debugMeta( tArr, 'array.numeric.repeated', { 'type': type } )
+				: tArr;
 
 		} else if ((op & 0xF0) === 0x50) { // NUM_RAW
 
@@ -766,9 +846,9 @@ var JBBBinaryLoader =
 
 			// Repeat value
 			vArr = decodePrimitive( bundle, database );
-			nArr = new Array( len );
-			nArr.fill( vArr );
-			// for (i=0; i<len; i++) nArr[i]=vArr;
+			nArr[len-1] = null;
+			// nArr.fill( vArr );
+			for (i=0; i<len; i++) nArr[i]=vArr;
 
 			// Return
 			return  false
@@ -783,13 +863,25 @@ var JBBBinaryLoader =
 			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
 
 			// Compile primitives
+			nArr[len-1] = null;
 			for (i=0; i<len; ++i)
-				nArr.push( decodePrimitive( bundle, database ) );
+				nArr[i] = decodePrimitive( bundle, database );
 
 			// Return
 			return  false
 				? __debugMeta( nArr, 'array.primitive.raw', {} )
 				: nArr;
+
+		} else if ((op & 0xFC) === 0x78) { // PRIM_CHUNK
+
+			// Get length and numeric flag
+			ln = op & 0x01;
+			type = (op >> 1) & 0x01;
+			len = bundle.readTypedNum( ln ? NUMTYPE.UINT32 : NUMTYPE.UINT16 );
+
+			// Return chunked array
+			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Prim Chunk");
+			return decodeChunkedArray( bundle, database, len, type );
 
 		} else if ((op & 0xFE) === 0x7C) { // PRIM_BULK_KNOWN
 
