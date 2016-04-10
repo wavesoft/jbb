@@ -61,9 +61,9 @@ const ARR_OP = {
 	NUM_SHORT: 		 0x60, // Short Numeric Value
 	PRIM_REPEATED: 	 0x68, // Repeated Primitive Value
 	PRIM_RAW: 		 0x6A, // Raw Primitive Array
-	PRIM_BULK_PLAIN: 0x6C, // Bulk Array of Plain Objects
-	PRIM_SHORT: 	 0x6E, // Short Primitive Array
-	PRIM_CHUNK: 	 0x6F, // Chunked Primitive ARray
+	PRIM_BULK_PLAIN: 0x6E, // Bulk Array of Plain Objects
+	PRIM_SHORT: 	 0x6F, // Short Primitive Array
+	PRIM_CHUNK: 	 0x78, // Chunked Primitive ARray
 	PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
 	EMPTY: 			 0x7E, // Empty Array
 	PRIM_CHUNK_END:  0x7F, // End of primary chunk
@@ -375,6 +375,12 @@ describe('[Core Tests]', function() {
 		it_should_return_array_rand('Float32Array',1024,	-1e+18,	1e-18, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
 		it_should_return_array_rand('Float32Array',65535,	-1e+18,	1e-18, [match_rawArrayType( NUMTYPE.FLOAT32 )]);
 
+		// Auto-identified arrays
+		var arr1 = Array.prototype.slice.call(gen_array_rand( 'Float32Array', 10000, FLOAT32_SMALL, FLOAT32_POS )),
+			arr2 = Array.prototype.slice.call(gen_array_rand( 'Float64Array', 10000, 1.7E-108, 1.7E-107 ));
+		it_should_return( arr1, 'Array(10,000) = [rand('+FLOAT32_SMALL+'..'+FLOAT32_POS+')]', [match_rawArrayType( NUMTYPE.FLOAT32 )] );
+		it_should_return( arr2, 'Array(10,000) = [rand(1.7E-108..1.7E-107)]', [match_rawArrayType( NUMTYPE.FLOAT64 )] );
+
 	});
 
 	describe('Object Bulks', function () {
@@ -482,7 +488,7 @@ describe('[Core Tests]', function() {
 		);
 		it_should_return( values, '[ false, 200 x SAME, 200 x NUM ]', 
 			[match_chunkTypes([
-				[ ARR_OP.PRIM_SHORT, 0x6E ],	// 1 primitive
+				[ ARR_OP.PRIM_SHORT, 0xFF ],	// 1 primitive
 				[ ARR_OP.NUM_REPEATED, 0xF0 ],	// Repeated numbers
 				[ ARR_OP.NUM_SHORT, 0xF8 ],		// Final numbers
 			])] );

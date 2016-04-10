@@ -28,9 +28,9 @@ var deepEqual 	= require('deep-equal');
 var BinaryStream = require("./lib/BinaryStream");
 var Errors 		= require("./lib/Errors");
 
-const FLOAT32_POS 	= 3.40282347e+38; // largest positive number in float32
-const FLOAT32_NEG 	= -3.40282347e+38; // largest negative number in float32
-const FLOAT32_SMALL = 1.175494351e-38; // smallest number in float32
+const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
+const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
+const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 
 /* Note that all these values are exclusive, for positive test (ex v < UING8_MAX) */
 
@@ -346,9 +346,9 @@ const ARR_OP = {
 	NUM_SHORT: 		 0x60, // Short Numeric Value
 	PRIM_REPEATED: 	 0x68, // Repeated Primitive Value
 	PRIM_RAW: 		 0x6A, // Raw Primitive Array
-	PRIM_BULK_PLAIN: 0x6C, // Bulk Array of Plain Objects
-	PRIM_SHORT: 	 0x6E, // Short Primitive Array
-	PRIM_CHUNK: 	 0x6F, // Chunked Primitive ARray
+	PRIM_BULK_PLAIN: 0x6E, // Bulk Array of Plain Objects
+	PRIM_SHORT: 	 0x6F, // Short Primitive Array
+	PRIM_CHUNK: 	 0x78, // Chunked Primitive ARray
 	PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
 	EMPTY: 			 0x7E, // Empty Array
 	PRIM_CHUNK_END:  0x7F, // End of primary chunk
@@ -1391,6 +1391,8 @@ function analyzePrimitiveArray( encoder, array ) {
 
 		new_keys, old_keys, some_overlap, n_repeat=0,
 
+		is_numeric=true, num_type=-1,
+
 		b_prim = null, 	blocks_prim = [],
 		b_rep = null,	blocks_rep = [],
 		b_num = null,	blocks_num = [],
@@ -1410,18 +1412,27 @@ function analyzePrimitiveArray( encoder, array ) {
 			case 'number':
 				t_mode = TEST_NUMBER;
 				t_numtype = getNumType( v, v, ((v % 1) !== 0) );
-
 				if (DEBUG_THIS) debug_str = 'NUM';
+
+				// Keep track of biggest num type encountered
+				if (t_numtype < NUMTYPE.NUMERIC) {
+					if (num_type === -1) num_type=t_numtype;
+					else if (isNumericSubclass(num_type, v, v, t_numtype))
+						num_type=t_numtype;
+				}
+
 				break;
 
 			case 'string':
 			case 'boolean':
 			case 'undefined':
+				is_numeric = false;
 				t_mode = TEST_PRIMITIVE;
 				if (DEBUG_THIS) debug_str = 'PRM';
 				break;
 
 			case 'object':
+				is_numeric = false;
 				if (v === null) {
 					t_mode = TEST_PRIMITIVE;
 					if (DEBUG_THIS) debug_str = 'PRM';
@@ -1442,7 +1453,7 @@ function analyzePrimitiveArray( encoder, array ) {
 		//
 
 		if (b_rep === null) {
-			b_rep = [i, 1, ARR_CHUNK.REPEAT, v];
+			b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
 			if (DEBUG_THIS) debug_str += ', rep[new]';
 		} else {
 			if (v===b_rep[3]) {
@@ -1458,7 +1469,7 @@ function analyzePrimitiveArray( encoder, array ) {
 					n_repeat += b_rep[1];
 					blocks_rep.push(b_rep);
 				}
-				b_rep = [i, 1, ARR_CHUNK.REPEAT, v];
+				b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
 				if (DEBUG_THIS) debug_str += ', rep[new]';
 			}
 		}
@@ -1712,17 +1723,55 @@ function analyzePrimitiveArray( encoder, array ) {
 		blocks_rep, blocks_num, blocks_prim, blocks_plain, blocks_known
 	] );
 
+	// Unify numeric types to the same typed array
+	if (is_numeric) {
+		for (var i=0, l=ans.length; i<l; ++i) {
+			if (ans[i][2] === ARR_CHUNK.NUMERIC) {
+				ans[i][3] = num_type;
+			} else if (ans[i][2] === ARR_CHUNK.REPEAT) {
+				ans[i][4] = num_type;
+			} else if (ans[i][2] == ARR_CHUNK.PRIMITIVES) {
+				console.log("Casting type="+_ARR_CHUNK[ans[i][2]]+", at="+ans[i][0]+"~"+ans[i][1]+" v=[",array.slice( ans[i][0], ans[i][0]+ans[i][1] ),"], num="+_NUMTYPE[num_type]);
+				ans[i][2] = ARR_CHUNK.NUMERIC;
+				ans[i][3] = num_type;
+			} else {
+				throw new Errors.AssertError("Trying to unify non-numeric type="+_ARR_CHUNK[ans[i][2]]);
+			}
+		}
+	}
+
 	// Merge consecutive bocks of exact type
 	for (var i=1, l=ans.length; i<l; ++i) {
 		if ( (ans[i-1][2] === ans[i][2]) &&  // Same Type
 			 (ans[i-1][3] === ans[i][3]) ) { // Same Sub-Type
 			
 			// Left engulfs right
+			console.log("Merging chunk #"+i+" (type="+_ARR_CHUNK[ans[i][2]]+", size="+ans[i][1]+") ");
 			ans[i-1][1] += ans[i][1];
 			ans.splice(i,1);
 			i--; l--;
 
 		}
+	}
+
+	if (is_numeric) {
+		for (var i=0; i<ans.length; i++) {
+			if (ans[i][2] === ARR_CHUNK.NUMERIC) {
+				 if (num_type != ans[i][3])
+				 	throw new Errors.AssertError("Something went REALLY wrong!");
+			} else if (ans[i][2] === ARR_CHUNK.REPEAT) {
+				 if (num_type != ans[i][4])
+				 	throw new Errors.AssertError("Something went REALLY wrong!");
+			} else {
+				throw new Errors.AssertError("Misidentified is_numeric, since chunk #"+i+" is type="+_ARR_CHUNK[ans[i][2]]);
+			}
+		}
+	}
+
+	if (is_numeric) {
+		console.log("ANS=[",ans,"]");
+	} else {
+		console.log("ANS=[ *mixed* ]");		
 	}
 
 	if (DEBUG_THIS) {
@@ -1738,6 +1787,9 @@ function analyzePrimitiveArray( encoder, array ) {
 		console.log("PICK:", ans);
 		console.log("-----------------------");
 	}
+
+	// Expose is_numeric indicator
+	ans.is_numeric = is_numeric;
 
 	// Return
 	return ans;
@@ -2150,6 +2202,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 
 		// Align values of same property for optimal encoding
 		// console.log("ENCODE["+p+"]:",prop);
+		console.log("Bulk Plain "+(i+1)+"/"+pl+" -> encodeArray");
 		encodeArray( encoder, prop );
 
 	}
@@ -2293,6 +2346,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	// Write weaved properties
 	if (plen !== -1) {
 		for (i=0; i<plen; ++i) {
+			console.log("Bulk Known "+(i+1)+"/"+plen+" -> encodeArray");
 			encodeArray( encoder, waveTable[i] );
 		}
 	}
@@ -2418,11 +2472,23 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 	// 01111101
 	//
 
-	var chunk, chunkType, chunkSize, chunkSubType, part;
+	var chunk, chunkType, chunkSize, chunkSubType, part, num_flag = 0x2;
+
+	// Check if all chunks are numeric
+	if (!chunks.is_numeric) num_flag = 0;
 
 	// Write chunk header
-	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK ) );
-	encoder.counters.arr_hdr+=1;
+	if (data.length < UINT16_MAX) { // 16-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK | NUMTYPE_LN.UINT16 | num_flag ) );
+		encoder.stream16.write( pack2b( data.length, false ) );
+		encoder.counters.arr_hdr+=3;
+	} else { // 32-bit length prefix
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK | NUMTYPE_LN.UINT32 | num_flag ) );
+		encoder.stream32.write( pack4b( data.length, false ) );
+		encoder.counters.arr_hdr+=5;
+	}
+
+	// Log
 	encoder.counters.arr_prim_chunk+=1;
 	encoder.log(LOG.ARR, "array.prim.chunk, len="+data.length+
 		", chunks="+chunks.length+", peek="+data[0]+" [");
@@ -2430,13 +2496,15 @@ function encodeArray_PRIM_CHUNK( encoder, data, chunks ) {
 
 	// Encode individual chunks
 	for (var i=0, ofs=0, llen=chunks.length; i<llen; ++i) {
-		encodeArray_Chunk( encoder, data.slice(ofs, ofs+chunks[i][1]), chunks[i][2], chunks[i][3] );
+		console.log("@@ ofs=",ofs,", len=",chunks[i][1],", llen=",ofs+chunks[i][1],", total=",data.length);
+		encodeArray_Chunk( encoder, data.slice(ofs, ofs+chunks[i][1]), chunks[i] );
+		console.log("@@ ---");
 		ofs += chunks[i][1];
 	}
 
 	// Write chunk termination
-	encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK_END ) );
-	encoder.counters.arr_hdr+=1;
+	// encoder.stream8.write( pack1b( ARR_OP.PRIM_CHUNK_END ) );
+	// encoder.counters.arr_hdr+=1;
 
 	encoder.logIndent(-1);
 	encoder.log(LOG.ARR, "]");
@@ -2466,14 +2534,14 @@ function encodeArray_EMPTY( encoder ) {
  * Encode an array chunk, previously constructed
  * by chunkForwardanalysis
  */
-function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
+function encodeArray_Chunk( encoder, data, chunk ) {
 	var n_type, na;
 
-	// console.log(">>> CFWA Chunk=", _ARR_CHUNK[chunkType]);
+	console.log(">>> CFWA Chunk="+_ARR_CHUNK[chunk[2]],", from=" + chunk[0] + ", len=" + chunk[1] + ", arr=" + data.length);
 	// console.log(">>> =",data);
 
 	// Encode array component according to chunk type
-	switch (chunkType) {
+	switch (chunk[2]) {
 
 		// Encode as an array of primitives
 		case ARR_CHUNK.PRIMITIVES:
@@ -2487,8 +2555,12 @@ function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
 		// Encode as a repeated array
 		case ARR_CHUNK.REPEAT:
 
+			// Prioritize numeric type suggested by chunk
+			n_type = chunk[4];
+			if (n_type === NUMTYPE.UNKNOWN)
+				n_type = getTypedArrayType( data );
+
 			// Check if the repeated items are numeric or primitivie
-			n_type = getTypedArrayType( data );
 			if ( n_type <= NUMTYPE.NUMERIC ) {
 
 				/* If that's numeric, perform fast numeric analysis to 
@@ -2508,17 +2580,17 @@ function encodeArray_Chunk( encoder, data, chunkType, chunkSubType ) {
 
 		// encode as a numeric array
 		case ARR_CHUNK.NUMERIC:
-			encodeArray_Numeric( encoder, data, chunkSubType );
+			encodeArray_Numeric( encoder, data, chunk[3] );
 			break;
 
 		// Encode as a bulk of plain objects
 		case ARR_CHUNK.BULK_PLAIN:
-			encodeArray_PRIM_BULK_PLAIN( encoder, data, chunkSubType );
+			encodeArray_PRIM_BULK_PLAIN( encoder, data, chunk[3] );
 			break;
 
 		// Encode as a bulk of known objects
 		case ARR_CHUNK.BULK_KNOWN:
-			encodeArray_PRIM_BULK_KNOWN( encoder, data, chunkSubType );
+			encodeArray_PRIM_BULK_KNOWN( encoder, data, chunk[3] );
 			break;
 
 		// Just precaution
@@ -2608,7 +2680,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 
 			// If we have more than <thresshold> items with the same
 			// value, break into chunked array
-			if (na.psame >= encoder.optimize.repeat_thresshold) {
+			if (na.psame >= encoder.optimize.repeat_break_thresshold) {
 				encodeArray_Primitive( encoder, data );
 				return;
 			}
@@ -2626,7 +2698,7 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 			// Pick best, according to speed preference
 			if (b_min === b_raw) {
 				// Encode raw
-				// console.log(">ARR>",data.length,"itms as RAW");
+				console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+")");
 				encodeArray_NUM_RAW( encoder, data, n_type );
 			} else if (b_min === b_dws) {
 				// Encode downscaled
@@ -2634,14 +2706,19 @@ function encodeArray_Numeric( encoder, data, n_type ) {
 				encodeArray_NUM_DWS( encoder, data, n_type, n_dws );
 			} else if (b_min === b_delta) {
 				// Encode delta
-				// console.log(">ARR>",data.length,"itms as DELTA");
-				if (na.dmode == 1) {
-					encodeArray_NUM_DELTA_INT( encoder, data, n_type, na.delta_type );
-				} else if ((na.dmode == 2) && encoder.optimize.float_int_downscale) {
-					encodeArray_NUM_DELTA_FLOAT( encoder, data, n_type, na.delta_type, na.mean, na.fscale );
-				} else {
-					encodeArray_NUM_RAW( encoder, data, n_type );
+				if ( encoder.optimize.enable_delta ) {
+					// console.log(">ARR>",data.length,"itms as DELTA");
+					if (na.dmode == 1) {
+						encodeArray_NUM_DELTA_INT( encoder, data, n_type, na.delta_type );
+						return;
+					} else if ((na.dmode == 2) && encoder.optimize.float_int_downscale) {
+						encodeArray_NUM_DELTA_FLOAT( encoder, data, n_type, na.delta_type, na.mean, na.fscale );
+						return;
+					}
 				}
+				// Fallback case -> Raw encode
+				console.log(">ARR>",data.length,"itms as RAW (type="+_NUMTYPE[n_type]+") (Fallback)");
+				encodeArray_NUM_RAW( encoder, data, n_type );
 			}
 
 		} else {
@@ -2698,7 +2775,7 @@ function encodeArray_Primitive( encoder, data ) {
 		}
 
 		// Just encode a single chunk as array component
-		encodeArray_Chunk( encoder, data, chunks[0][2], chunks[0][3] );
+		encodeArray_Chunk( encoder, data, chunks[0] );
 
 	} else {
 
@@ -2924,6 +3001,7 @@ function encodeObject( encoder, object ) {
 	}
 
 	// Write property table as an array
+	console.log("Object -> encodeArray");
 	encodeArray( encoder, propertyTable );
 
 }
@@ -2969,6 +3047,7 @@ function encodePlainObject( encoder, object ) {
 	encoder.counters.op_prm+=2;
 
 	// Keep iref and encode
+	console.log("Plain Object -> encodeArray");
 	encodeArray( encoder, values );
 
 }
@@ -3069,6 +3148,7 @@ function encodePrimitive( encoder, data ) {
 				(data instanceof Array)) {
 
 		// Write array
+		console.log("Primitive -> encodeArray");
 		encodeArray( encoder, data );
 
 	// ===============================
@@ -3204,10 +3284,13 @@ var BinaryEncoder = function( filename, config ) {
 
 	// Optimisation flags
 	this.optimize = {
-		cfwa_object_byval: true,	 // By-value de-duplication of objects in chunk forward analysis
-		repeat_thresshold: 0.25,	 // How many consecutive same items are enough for an array in order
-									 // to break it as a chunked array.
-		float_int_downscale: false,	 // Downscale floats to integers multiplied by scale
+		cfwa_object_byval: true,	 	// By-value de-duplication of objects in chunk forward analysis
+		repeat_break_thresshold: 0.50,	// How many consecutive same items are enough for a numeric array in order
+									 	// to break it as a chunked array.
+		repeat_thresshold: 0.50,	 	// How many items must be repeating in a chunk in order to prefer
+										// using reepated items (size optimisation) at cost of speed.
+		float_int_downscale: false,	 	// Downscale floats to integers multiplied by scale
+		enable_delta: true,			// Enable delta-encoding (costs in speed, but decreases size)
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8
@@ -3446,13 +3529,6 @@ BinaryEncoder.prototype = {
 		// Return stringID of the key
 		return this.stringID( key );		
 
-		// // Lookup object on xref table
-		// var id = this.dbObjects.indexOf( object );
-		// if (id < 0) return -1;
-
-		// // Get string ID of the db tag
-		// return this.stringID( this.dbTags[id] );
-
 	},
 
 	/**
@@ -3476,13 +3552,6 @@ BinaryEncoder.prototype = {
 	'lookupIRef': function( object ) {
 		if (object.__iref__ === undefined) return -1;
 		return object.__iref__;
-		// return this.indexRefLookup[ object.__iref__ ];
-
-		// var idx = this.indexRefLookup[object];
-		// if (idx === undefined) return -1;
-		// return idx;
-
-		// return this.indexRef.indexOf( object );
 	},
 
 	/**

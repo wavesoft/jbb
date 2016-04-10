@@ -1,0 +1,9 @@
+{
+	"name": "heavy",
+	"exports": {
+		"THREE.UTF8Loader": {
+			"hand": "hand.js",
+			"ben": "ben_dds.js"
+		}
+	}
+}
