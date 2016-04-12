@@ -2180,7 +2180,6 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 
 		// Align values of same property for optimal encoding
 		// console.log("ENCODE["+p+"]:",prop);
-		console.log("Bulk Plain "+(i+1)+"/"+pl+" -> encodeArray");
 		encodeArray( encoder, prop );
 
 	}
@@ -2324,7 +2323,6 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	// Write weaved properties
 	if (plen !== -1) {
 		for (i=0; i<plen; ++i) {
-			console.log("Bulk Known "+(i+1)+"/"+plen+" -> encodeArray");
 			encodeArray( encoder, waveTable[i] );
 		}
 	}
@@ -3263,7 +3261,7 @@ var BinaryEncoder = function( filename, config ) {
 		repeat_thresshold: 0.50,	 	// How many items must be repeating in a chunk in order to prefer
 										// using reepated items (size optimisation) at cost of speed.
 		float_int_downscale: false,	 	// Downscale floats to integers multiplied by scale
-		enable_delta: true,			// Enable delta-encoding (costs in speed, but decreases size)
+		enable_delta: true,				// Enable delta-encoding (costs in speed, but decreases size)
 	};
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8
