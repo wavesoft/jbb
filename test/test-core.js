@@ -119,8 +119,8 @@ describe('[Core Tests]', function() {
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
-			assert.equal( u32[3], 4,			'32-bit table size');
-			assert.equal( u32[4], 12,			'16-bit table size');
+			assert.equal( u32[3], 8,			'32-bit table size');
+			assert.equal( u32[4], 14,			'16-bit table size');
 			assert.equal( u32[5], 52,			'8-bit table size');
 			assert.equal( u32[6], 42,			'String table size');
 			assert.equal( u32[7], 10,			'Plain Object Signature table size');
@@ -451,15 +451,16 @@ describe('[Core Tests]', function() {
 		var CHUNK_COMPOSITE = [true, false, undefined, 255, 128, 67, 65535, 32535, 4294967295, {'plain':'object'}];
 		var SEQ_PRIM = [ true, undefined, false, 148, null, 64473, 12847612, 40.1927375793457, "String" ];
 
-		// Short is prioritized against chunked
-		values = [].concat(
-			false,
-			gen_array_rep( 'Array', 100, 104 ),
-			true,
-			gen_array_seq( 'Array', 100, 0,1 ),
-			null
-		);
-		it_should_return( values, '[ false, 100 x NUM, true, 100 x NUM, null ]', [match_metaType('array.primitive.short')]);
+		// This is not correct on newer version
+		// // Short is prioritized against chunked
+		// values = [].concat(
+		// 	false,
+		// 	gen_array_rep( 'Array', 100, 104 ),
+		// 	true,
+		// 	gen_array_seq( 'Array', 100, 0,1 ),
+		// 	null
+		// );
+		// it_should_return( values, '[ false, 100 x NUM, true, 100 x NUM, null ]', [match_metaType('array.primitive.short')]);
 
 		// Simple composite case
 		values = [].concat(

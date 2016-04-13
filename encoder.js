@@ -2515,7 +2515,7 @@ function encodeArray_Chunk( encoder, data, chunk ) {
 
 		// Encode as an array of primitives
 		case ARR_CHUNK.PRIMITIVES:
-			if (data.length < 255) {
+			if (data.length < 256) {
 				encodeArray_PRIM_SHORT( encoder, data );
 			} else {
 				encodeArray_PRIM_RAW( encoder, data );
