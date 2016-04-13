@@ -165,7 +165,7 @@ function it_should_return(primitive, repr, metaMatchFn) {
 		} else if (typeof primitive == 'object') {
 			assert.deepEqual( ans, primitive, 'encoded and decoded objects to not match' );
 			if (metaMatchFn) {
-				if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+				if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 				for (var i=0; i<metaMatchFn.length; i++)
 					metaMatchFn[i]( ans.__meta );
 			}
@@ -186,9 +186,9 @@ function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) 
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
+		assert.deepEqual( ans, array, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
-			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
 				metaMatchFn[i]( ans.__meta );
 		}
@@ -213,12 +213,12 @@ function it_should_return_array_seq_almost( typeName, length, min, step, tollera
 			assert.equal( array.constructor, ans.constructor );
 
 		// Explicit deep equal comparison
-		compare.explicitDeepEqual( array, ans, 
+		compare.explicitDeepEqual( ans, array, 
 			"encoded and decoded arrays not within tollerance", config );
 
 		// Check for meta-match function
 		if (metaMatchFn) {
-			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
 				metaMatchFn[i]( ans.__meta );
 		}
@@ -236,9 +236,9 @@ function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) 
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
+		assert.strictDeepEqual( ans, array, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
-			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
 				metaMatchFn[i]( ans.__meta );
 		}
@@ -256,9 +256,9 @@ function it_should_return_array_rep( typeName, length, value, metaMatchFn ) {
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.deepEqual( array, ans, "encoded and decoded arrays to not match" );
+		assert.deepEqual( ans, array, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
-			if (metaMatchFn.length === undefined) metaMatchFn = [metaMatchFn];
+			if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
 				metaMatchFn[i]( ans.__meta );
 		}
