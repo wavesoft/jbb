@@ -1439,6 +1439,13 @@ function analyzePrimitiveArray( encoder, array ) {
 				} else if (v.constructor === ({}).constructor) {
 					t_mode = TEST_PLAIN;
 					if (DEBUG_THIS) debug_str = 'PLN';
+				} else if ((v instanceof Uint8Array) || (v instanceof Int8Array) ||
+					(v instanceof Uint16Array) || (v instanceof Int16Array) ||
+					(v instanceof Uint32Array) || (v instanceof Int32Array) ||
+					(v instanceof Float32Array) || (v instanceof Float64Array) ||
+					(v instanceof Array)) {
+					t_mode = TEST_PRIMITIVE;
+					if (DEBUG_THIS) debug_str = 'ARR';
 				} else { /* Other objects */
 					t_constr = v.constructor;
 					t_mode = TEST_OBJECT;
@@ -2260,7 +2267,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		}
 
 		// Populate property table (for byval lookup)
-		propertyTable = getProps(object);
+		propertyTable = getProps( object );
 		if (!propertyTable) {
 			throw new Errors.AssertError('Profile property encoder returned unexpected data!');
 		}
