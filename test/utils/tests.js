@@ -236,7 +236,7 @@ function it_should_return_array_rand( typeName, length, min, max, metaMatchFn ) 
 		if (typeName != 'Array')
 			assert.equal( array.constructor, ans.constructor );
 		// Otherwise just check values
-		assert.strictDeepEqual( ans, array, "encoded and decoded arrays to not match" );
+		assert.deepEqual( ans, array, "encoded and decoded arrays to not match" );
 		if (metaMatchFn) {
 			if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
 			for (var i=0; i<metaMatchFn.length; i++)
