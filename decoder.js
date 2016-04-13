@@ -374,7 +374,7 @@ function decodeObject( bundle, database, op ) {
  */
 function decodePivotArrayFloat( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
-		pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ]|0 ), 
+		pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
 		scale = bundle.readFloat64(),
 		values = bundle.readTypedArray( NUMTYPE_DELTA_FLOAT.TO[ num_type ] , len );
 
@@ -395,7 +395,7 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
  * Decode delta-encoded float array
  */
 function decodeDeltaArrayInt( bundle, database, len, num_type ) {
-	var fromType = NUMTYPE_DELTA_INT.FROM[ num_type ]|0,
+	var fromType = NUMTYPE_DELTA_INT.FROM[ num_type ],
 		ans = new NUMTYPE_CLASS[ fromType ]( len ), v=0;
 
 	// readTypedNum(fromType)
@@ -454,12 +454,30 @@ function decodePlainBulkArray( bundle, database ) {
 }
 
 /**
+ * Return an array with the properties of the specified
+ * source array unweaved
+ * 
+ * from = [   to[idx=0] = [1,3,5]
+ *   1, 2     to[idx=1] = [2,4,6]
+ *   3, 4
+ *   5, 6     needs: items=from.length/props.length
+ * ]
+ *
+ */
+function unweaveProperties( lprops, litems, src, idx ) {
+	var ans = new Array(lprops), i=lprops-1;
+	for (;i>=0;--i) ans[i] = src[ idx+litems*i ];
+	return ans;
+}
+
+/**
  * Decode bulk array of entities
  */
 function decodeKnownBulkArray( bundle, database, len ) {
 	var eid = bundle.u16[bundle.i16++],
 		FACTORY = bundle.profile.decode( eid ), 
-		getProperties = bundle.getWeavePropertyFunction( FACTORY.props ),
+		proplen = FACTORY.props, itemlen=0,
+		// getProperties = bundle.getWeavePropertyFunction( FACTORY.props ),
 		ops = [], locals = [], i = 0, op = 0, dat = 0,
 		obj = null, j = 0, k = 0, propTable = [], hasValues = false;
 
@@ -501,6 +519,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 	// Get property arrays
 	if (hasValues) {
 		propTable = decodePrimitive( bundle, database );
+		itemlen = propTable.length / proplen;
 	}
 
 	// console.log("------");
@@ -522,7 +541,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 				for (j=0; j<dat; j++) {
 					// Initialize object properties and keep it on the answer array 
 					obj = locals[obji];
-					FACTORY.init( obj, getProperties(propTable, obji) );
+					FACTORY.init( obj, unweaveProperties(proplen, itemlen, propTable, obji) );
 					// ans[i++] = obj;
 					ans[i++] = obj;
 					// Forward object index
