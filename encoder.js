@@ -2155,7 +2155,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 	//
 
 	// Lookup signature
-	var eid = encoder.getSignatureID( properties );
+	var eid = encoder.getSignatureID( properties ), weave = [];
 	encoder.counters.arr_prim_bulk_plain+=1;
 	encoder.log(LOG.ARR, "array.prim.bulk_plain, len="+data.length+
 		", signature="+properties.toString()+
@@ -2168,21 +2168,19 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 	encoder.counters.arr_hdr+=3;
 
 	// Write bulked properties
-	// var weaveArrays = [];
+	var weaveArrays = [];
 	for (var i=0, pl=properties.length; i<pl; ++i) {
 
 		// Read property of all entries
 		var prop = [], p = properties[i];
 		for (var j=0, el=data.length; j<el; ++j) {
-			prop.push( data[j][p] );
-			// weaveArrays.push( data[j][p] );
+			weaveArrays.push( data[j][p] );
 		}
 
-		// Align values of same property for optimal encoding
-		// console.log("ENCODE["+p+"]:",prop);
-		encodeArray( encoder, prop );
-
 	}
+
+	// Encode cmpact weaved array
+	encodeArray( encoder, weaveArrays );
 
 	// Close log group
 	encoder.logIndent(-1);
@@ -2322,9 +2320,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 
 	// Write weaved properties
 	if (plen !== -1) {
-		for (i=0; i<plen; ++i) {
-			encodeArray( encoder, waveTable[i] );
-		}
+		encodeArray( encoder, Array.prototype.concat.apply([], waveTable) );
 	}
 
 	// Close log group
@@ -2710,32 +2706,6 @@ function encodeArray_Numeric( encoder, data, n_type ) {
  * Encode an array that is already classified as primitive
  */
 function encodeArray_Primitive( encoder, data ) {
-
-	// Check for small primitive array
-	if (data.length < 256) {
-
-		// Test if these 255 values are the same
-		var v, lv=data[0], same=(data.length>1);
-		for (var i=1, len=data.length; i<len; ++i) {
-			v = data[i];
-			if ( v !== lv ) {
-				if ((typeof lv === 'object') && encoder.optimize.cfwa_object_byval
-					&& deepEqual( v, lv, {strict:true} )) {
-					continue;
-				}
-				same = false;
-				break;
-			}
-		}
-
-		// Encode short or repeated
-		if (same) {
-			encodeArray_PRIM_REPEATED( encoder, data );
-		} else {
-			encodeArray_PRIM_SHORT( encoder, data );
-		}
-		return;
-	}
 
 	// Analyze primitive array and return clusters of values
 	// that can be efficiently merged (such as numbers, repeated values,

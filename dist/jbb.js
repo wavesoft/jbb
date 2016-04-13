@@ -488,12 +488,10 @@ var JBBBinaryLoader =
 			throw new Errors.AssertError('Could not found simple object signature with id #'+sid+'!');
 
 		// Read property arrays
-		var values = [];
-		for (var i=0, l=properties.length; i<l; ++i)
-			values.push(decodePrimitive( bundle, database ));
+		var values = decodePrimitive( bundle, database );
 
 		// Create objects
-		var len=values[0].length, ans = new Array(len);
+		var len=values.length/properties.length, ans = new Array(len);
 		for (var i=0; i<len; ++i)
 			ans[i] = factory(values, i);
 
@@ -550,9 +548,7 @@ var JBBBinaryLoader =
 
 		// Get property arrays
 		if (hasValues) {
-			for (i=0; i<FACTORY.props; ++i) {
-				propTable.push( decodePrimitive( bundle, database ) );
-			}
+			propTable = decodePrimitive( bundle, database );
 		}
 
 		// console.log("------");
@@ -1344,9 +1340,9 @@ var JBBBinaryLoader =
 		var code = "";
 		for (var i=0; i<d; ++i) {
 			if (i !== 0) code += ",";
-			code += "p["+i+"][i]";
+			code += "p[i+c*"+i+"]";
 		}
-		return new Function( "p", "i", "return ["+code+"]" );
+		return new Function( "p", "i", "var c=p.length/"+d+";return ["+code+"]" );
 	}
 
 	//////////////////////////////////////////////////////////////////
@@ -1578,11 +1574,11 @@ var JBBBinaryLoader =
 		for (var i=0; i<this.signature_table.length; ++i) {
 
 			// Build factory funtion
-			var factoryPlain = "return {", factoryBulk = factoryPlain,
-				props = this.signature_table[i], llen = props.length;
+			var props = this.signature_table[i], llen = props.length,
+				factoryPlain = "return {", factoryBulk = "var c=values.length/"+llen+";"+factoryPlain;
 			for (var j=0; j<llen; ++j) {
 				factoryPlain += "'"+props[j]+"': values["+j+"],";
-				factoryBulk +=  "'"+props[j]+"': values["+j+"][i],";
+				factoryBulk +=  "'"+props[j]+"': values[i+c*"+j+"],";
 				// factoryBulk +=  "'"+props[j]+"': values[("+j+"*len)+i],";
 			}
 			factoryPlain += "}";

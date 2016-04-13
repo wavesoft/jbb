@@ -440,12 +440,10 @@ function decodePlainBulkArray( bundle, database ) {
 		throw new Errors.AssertError('Could not found simple object signature with id #'+sid+'!');
 
 	// Read property arrays
-	var values = [];
-	for (var i=0, l=properties.length; i<l; ++i)
-		values.push(decodePrimitive( bundle, database ));
+	var values = decodePrimitive( bundle, database );
 
 	// Create objects
-	var len=values[0].length, ans = new Array(len);
+	var len=values.length/properties.length, ans = new Array(len);
 	for (var i=0; i<len; ++i)
 		ans[i] = factory(values, i);
 
@@ -502,9 +500,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 
 	// Get property arrays
 	if (hasValues) {
-		for (i=0; i<FACTORY.props; ++i) {
-			propTable.push( decodePrimitive( bundle, database ) );
-		}
+		propTable = decodePrimitive( bundle, database );
 	}
 
 	// console.log("------");

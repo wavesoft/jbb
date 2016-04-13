@@ -158,10 +158,10 @@ describe('[Core Tests]', function() {
 
 			// Validate string table
 			var plain_values = [ 1, 2, 3, 4 ];
-			var weave_values = [ [1, 10], 
-								 [2, 20], 
-								 [3, 30], 
-								 [4, 40] ];
+			var weave_values = [ 1, 10, 
+								 2, 20, 
+								 3, 30, 
+								 4, 40 ];
 
 			// Two test objects
 			var test_object_1 = {
@@ -171,10 +171,10 @@ describe('[Core Tests]', function() {
 				'object': plain_values[3],
 			};
 			var test_object_2 = {
-				'plain': weave_values[0][1],
-				'32bit': weave_values[1][1],
-				'64bit': weave_values[2][1],
-				'object': weave_values[3][1],
+				'plain': weave_values[1],
+				'32bit': weave_values[3],
+				'64bit': weave_values[5],
+				'object': weave_values[7],
 			};
 
 			assert.deepEqual( bundle.factory_plain[0]( plain_values ), test_object_1, 'plain object factory' );
