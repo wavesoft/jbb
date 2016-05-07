@@ -64,7 +64,8 @@ function open_decoder( encoder, profile, db ) {
 		buf = u8.buffer;
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( profile, db );
+	var decoder = new BinaryLoader( db );
+	decoder.addProfile(profile);
 	decoder.addByBuffer(buf);
 	decoder.load();
 
@@ -86,7 +87,8 @@ function open_decoder_sparse( encoder, profile, db ) {
 	];
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( profile, db );
+	var decoder = new BinaryLoader( db );
+	decoder.addProfile( profile );
 	decoder.addByBuffer( chunks );
 	decoder.load();
 
@@ -180,7 +182,8 @@ function encode_decode( structure, encodeProfile, decodeProfile ) {
 	// ===[ DECODE ]=====================
 
 	// Create a decoder & Parse
-	var decoder = new BinaryLoader( decodeProfile );
+	var decoder = new BinaryLoader();
+	decoder.addProfile(decodeProfile);
 	decoder.addByBuffer(buf);
 	decoder.load();
 

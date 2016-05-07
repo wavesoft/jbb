@@ -126,8 +126,9 @@ function describe_clojure( bundleName, testFn ) {
 
 			/* Load the source bundle */
 			var unmute = mute();
-			var binaryLoader = new JBBBinaryLoader( THREEDecodeProfile, path.dirname(tmpFile) );
+			var binaryLoader = new JBBBinaryLoader( path.dirname(tmpFile) );
 			binaryLoadingTime = Date.now();
+			binaryLoader.addProfile( THREEDecodeProfile );
 			binaryLoader.addByBuffer( common.readChunk(tmpFile) );
 			binaryLoader.load(function( err ) {
 				unmute();

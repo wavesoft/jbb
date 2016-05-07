@@ -29,9 +29,12 @@ function explicitDeepEqual( actual, expected, message, config, path ) {
 	var path = path || "object",
 		config = config || {}, a, b, unmute;
 
-	if ( ((actual === undefined) && (expected !== undefined)) ||
-	     ((actual !== undefined) && (expected === undefined))) {
-		assert.equal( actual, expected, path + ' mismatch ' + message );
+	if ((actual === undefined) || (expected === undefined)) {
+		if ( ((actual === undefined) && (expected !== undefined)) ||
+		     ((actual !== undefined) && (expected === undefined))) {
+			assert.equal( actual, expected, path + ' mismatch ' + message );
+		}
+		return;
 	}
 
 	if (typeof actual === "object") {

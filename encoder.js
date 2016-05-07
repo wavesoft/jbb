@@ -3402,7 +3402,7 @@ var BinaryEncoder = function( filename, config ) {
 	this.bundleName = this.config['name'] || filename.split("/").pop().replace(".3bd","");
 
 	// Get object table
-	this.profile = this.config['profile'];
+	this.profile = this.config['profile'] || null;
 
 	// Database properties
 	this.dbTags = [];
@@ -3430,6 +3430,14 @@ var BinaryEncoder = function( filename, config ) {
 BinaryEncoder.prototype = {
 
 	'constructor': BinaryEncoder,
+
+	/**
+	 */
+	'addProfile': function( profile ) {
+		if (this.profile !== null) 
+			throw new Errors.AssertError('You can currently add only one profile!');
+		this.profile = profile;
+	},
 
 	/**
 	 * Fuse parallel streams and close
@@ -3812,6 +3820,10 @@ BinaryEncoder.prototype = {
 	 */
 	'encode': function( entity, name ) {
 		var tn = this.bundleName + "/" + name;
+
+		// Check for profile
+		if (this.profile === null) 
+			throw new Errors.AssertError('You must first add a profile!');
 
 		// Write control operation
 		this.stream8.write( pack1b( CTRL_OP.EXPORT ) );

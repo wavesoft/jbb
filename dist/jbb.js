@@ -1079,7 +1079,7 @@ var JBBBinaryLoader =
 	/**
 	 * Binary bundle loader
 	 */
-	var BinaryLoader = function( profile, baseDir, database ) {
+	var BinaryLoader = function( baseDir, database ) {
 
 		// Check for missing baseDir
 		if (typeof(baseDir) === "object") {
@@ -1097,7 +1097,7 @@ var JBBBinaryLoader =
 		this.queuedRequests = [];
 
 		// Keep object table
-		this.profile = profile;
+		this.profile = null;
 
 		// References for delayed GC
 		this.__delayGC = [];
@@ -1112,6 +1112,15 @@ var JBBBinaryLoader =
 		'constructor': BinaryLoader,
 
 		/**
+		 * Add profile information to the decoder
+		 */
+		'addProfile': function( profile ) {
+			if (this.profile !== null) 
+				throw new Errors.AssertError('You can currently add only one profile!');
+			this.profile = profile;
+		},
+
+		/**
 		 * Load the specified bundle from URL and call the onsuccess callback.
 		 * If an error occures, call the onerror callback.
 		 *
@@ -1119,6 +1128,10 @@ var JBBBinaryLoader =
 		 * @param {function} callback - The callback to fire when the bundle is loaded
 		 */
 		'add': function( url, callback ) {
+
+			// Check for profile
+			if (this.profile === null) 
+				throw new Errors.AssertError('You must first add a profile!');
 
 			// Check for base dir
 			var prefix = "";
@@ -1191,7 +1204,7 @@ var JBBBinaryLoader =
 
 			// If there are no queued requests, fire callback as-is
 			if (this.queuedRequests.length === 0) {
-				callback( null, this );
+				callback( null, this.database );
 				return;
 			}
 
@@ -1299,7 +1312,7 @@ var JBBBinaryLoader =
 
 			// We are ready
 			this.queuedRequests = [];
-			callback( null, this );
+			callback( null, this.database );
 
 			// GC After a delay
 			setTimeout((function() {
