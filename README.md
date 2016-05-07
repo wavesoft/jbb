@@ -44,7 +44,10 @@ You can also use `jbb` without npm. You can find the stand-alone builds in the `
 <script src="build/jbb.min.js"></script>
 <script src="build/jbb-profile-three.min.js"></script>
 <script>
-var jbbLoader = new JBBBinaryLoader( JBBProfileThree, "base/dir/to/bundles" );
+var jbbLoader = new JBBBinaryLoader( "base/dir/to/bundles" );
+
+// Specify which profile to use
+jbbLoader.addProfile(JBBProfileThree);
 
 // Specify bundles to load
 jbbLoader.add("bundle.jbb");
@@ -176,7 +179,10 @@ var BinaryDecoder = require("jbb/decoder");
 var profile = require("jbb-profile-three");
 
 // Create a decoder
-var loader = new BinaryDecoder( profile, "bundle/base/dir" );
+var loader = new BinaryDecoder( "bundle/base/dir" );
+
+// Specify the decoding profile
+loader.addProfile( profile );
 
 // Schedule one or more budles to load
 binaryLoader.add( 'bundle1.jbb');
