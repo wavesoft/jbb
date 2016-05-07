@@ -1,0 +1,39 @@
+{
+    "normals": [0.577349,-0.577349,-0.577349,0.577349,-0.577349,0.577349,-0.577349,-0.577349,0.577349,-0.577349,-0.577349,-0.577349,0.577349,0.577349,-0.577349,-0.577349,0.577349,-0.577349,-0.577349,0.577349,0.577349,0.577349,0.577349,0.577349],
+    "uvs": [[0,0,1,0,1,1,0,1]],
+    "name": "CubeGeometry.1",
+    "materials": [{
+        "colorDiffuse": [0.64,0.64,0.64],
+        "DbgIndex": 0,
+        "colorEmissive": [0,0,0],
+        "wireframe": false,
+        "mapDiffuseWrap": ["RepeatWrapping","RepeatWrapping"],
+        "colorAmbient": [0.64,0.64,0.64],
+        "specularCoef": 50,
+        "transparent": false,
+        "colorSpecular": [0,0,0],
+        "mapDiffuseAnisotropy": 1,
+        "opacity": 1,
+        "blending": "NormalBlending",
+        "visible": true,
+        "depthWrite": true,
+        "DbgName": "Material",
+        "depthTest": true,
+        "DbgColor": 15658734,
+        "mapDiffuse": "crate.png",
+        "mapDiffuseRepeat": [1,1],
+        "shading": "phong"
+    }],
+    "vertices": [1,-1,-1,1,-1,1,-1,-1,1,-1,-1,-1,1,1,-1,0.999999,1,1,-1,1,1,-1,1,-1],
+    "faces": [43,0,1,2,3,0,0,1,2,3,0,1,2,3,43,4,7,6,5,0,0,1,2,3,4,5,6,7,43,0,4,5,1,0,0,1,2,3,0,4,7,1,43,1,5,6,2,0,0,1,2,3,1,7,6,2,43,2,6,7,3,0,0,1,2,3,2,6,5,3,43,4,0,3,7,0,0,1,2,3,4,0,3,5],
+    "metadata": {
+        "normals": 8,
+        "uvs": 1,
+        "materials": 1,
+        "faces": 6,
+        "generator": "io_three",
+        "type": "Geometry",
+        "vertices": 8,
+        "version": 3
+    }
+}

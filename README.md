@@ -6,7 +6,7 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 **Why Binary Bundles?** For *faster* loading time due to *fewer* requests and an *optimised* binary format, closely compatible with Javascript internals. If you want to learn more, check [the specifications document](https://github.com/wavesoft/jbb/blob/master/doc/Bundle%20Format.md), [the FAQ](#frequently-asked-questions) in the end of this document or [this nice blog entry](http://wavesoft.github.io/javascript-binary-bundles/) that explains my reasoning for this project.
 
-:thumbsup: This is NOT an archiving format! Even though it can store arbitrary binary blobs, it is designed to optimally serialize javascript structures!
+:thumbsup: This is NOT a plain archiving format for binary blobs! Even though it can store arbitrary binary data, it is designed to optimally serialize javascript structures!
 
 :warning: This format is Architecture-Dependant: This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
