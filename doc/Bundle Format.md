@@ -1,6 +1,6 @@
 # Bundle Format Specifications
 
-:warning: **This document is slightly outdated and is not reflecting the v1.2.0 version of the bundle.**
+:warning: **This document is slightly outdated and is not reflecting the v1.3.0 version of the bundle.**
 
 The bundle format is optimised for use in conjunction with javascript `TypedArray`. Therefore, it's contents are laid out appropriately in order to minimise alignment padding.
 
@@ -173,10 +173,20 @@ The primitive opcodes define the type of the primitive being encoded:
 
 <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_PRIM.png" />
 
+### Object Opcodes
+This is a specialisation of the OBJECT primitive.
+
+<img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_OBJECT.png" />
+
 ### Array Opcodes
 This is a specialisation of the ARRAY primitive.
 
 <img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_ARR.png" />
+
+### PRIM_BULK_KNOWN Steering OP-Codes
+This is a set of steering instructions for the `PRIM_BULK_KNOWN` array.
+
+<img src="https://raw.githubusercontent.com/wavesoft/jbb/master/doc/table_OP_BULK_KNOWN.png" />
 
 ### Other Types
 The following tables contain the values of other properties of the opcodes.
