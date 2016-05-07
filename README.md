@@ -12,7 +12,7 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 :warning: This project is still in development. Some protocol features might be buggy or might change in the future without prior notice. Also the build time in some cases might be very slow. 
 
-Curious to see some tests? [Timing Example](http://cdn.rawgit.com/wavesoft/jbb-tests/0a09dc1ac1bc4e4bb79d119dc3975f5f274bff96/jbb_test_timing.html) - [Example 1](http://cdn.rawgit.com/wavesoft/jbb-tests/0a09dc1ac1bc4e4bb79d119dc3975f5f274bff96/jbb_test_loader_1.html) - [Example 2](http://cdn.rawgit.com/wavesoft/jbb-tests/0a09dc1ac1bc4e4bb79d119dc3975f5f274bff96/jbb_test_loader_2.html)
+Curious to see some tests? [Timing Example](http://cdn.rawgit.com/wavesoft/jbb-tests/7ca3df5347ca8174b960898b3eb609444ef70310/jbb_test_timing.html) - [Example 1](http://cdn.rawgit.com/wavesoft/jbb-tests/7ca3df5347ca8174b960898b3eb609444ef70310/jbb_test_loader_1.html) - [Example 2](http://cdn.rawgit.com/wavesoft/jbb-tests/7ca3df5347ca8174b960898b3eb609444ef70310/jbb_test_loader_2.html)
 
 Or you can read the [Using JBB with THREE.js](https://github.com/wavesoft/jbb/blob/master/doc/Tutorial%201%20-%20THREEjs/Using%20with%20THREEjs.md) tutoral.
 
