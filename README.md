@@ -14,6 +14,7 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 Curious to see some tests? [Timing Example](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_timing.html) - [Example 1](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_loader_1.html) - [Example 2](http://cdn.rawgit.com/wavesoft/jbb-tests/bf678cfe78a6f037744cee76ff41acde202e500e/jbb_test_loader_2.html)
 
+Or you can read the [Using JBB with THREE.js](https://github.com/wavesoft/jbb/blob/master/doc/Tutorial%201%20-%20THREEjs/Using%20with%20THREEjs.md) tutoral.
 
 ## Installation
 
