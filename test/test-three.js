@@ -19,6 +19,8 @@
  * @author Ioannis Charalampidis / https://github.com/wavesoft
  */
 
+global.PROD = true;
+
 var assert = require('assert');
 var path = require('path');
 var temp = require('temp');

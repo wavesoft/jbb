@@ -71,7 +71,7 @@ var JBBBinaryLoader =
 	var Errors = __webpack_require__(2);
 
 	/* Production optimisations and debug metadata flags */
-	if (false) var PROD = true;
+	if (false) var PROD = false;
 	if (false) var DEBUG = !PROD;
 
 	/* Size constants */
@@ -230,9 +230,13 @@ var JBBBinaryLoader =
 	 * BULK_KNOWN Array encoding operator codes
 	 */
 	const PRIM_BULK_KNOWN_OP = {
-		DEFINE 	: 0x00,		// Define a new object for IREF
-		IREF 	: 0x40,		// Refer to an IREF object
-		XREF 	: 0x80,		// Refer to an XREF object
+		LREF_7:	0x00, // Local reference up to 7bit
+		LREF_11:0xF0, // Local reference up to 11bit
+		LREF_16:0xFE, // Local reference up to 16bit
+		IREF:	0xE0, // Internal reference up to 20bit
+		XREF:	0xFF, // External reference
+		DEFINE:	0x80, // Definition up to 5bit
+		REPEAT:	0xC0, // Repeat up to 4bit
 	};
 
 	/**
@@ -422,7 +426,7 @@ var JBBBinaryLoader =
 	 */
 	function decodePivotArrayFloat( bundle, database, len, num_type ) {
 		var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
-			pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ]|0 ), 
+			pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
 			scale = bundle.readFloat64(),
 			values = bundle.readTypedArray( NUMTYPE_DELTA_FLOAT.TO[ num_type ] , len );
 
@@ -443,7 +447,7 @@ var JBBBinaryLoader =
 	 * Decode delta-encoded float array
 	 */
 	function decodeDeltaArrayInt( bundle, database, len, num_type ) {
-		var fromType = NUMTYPE_DELTA_INT.FROM[ num_type ]|0,
+		var fromType = NUMTYPE_DELTA_INT.FROM[ num_type ],
 			ans = new NUMTYPE_CLASS[ fromType ]( len ), v=0;
 
 		// readTypedNum(fromType)
@@ -522,98 +526,98 @@ var JBBBinaryLoader =
 	 * Decode bulk array of entities
 	 */
 	function decodeKnownBulkArray( bundle, database, len ) {
+		var DEBUG_THIS = false;
+		// console.log("<-- @"+(bundle.i16 - bundle.ofs16/2),"EID:",bundle.u16[bundle.i16],"LEN:", len);
 		var eid = bundle.u16[bundle.i16++],
 			FACTORY = bundle.profile.decode( eid ), 
 			proplen = FACTORY.props, itemlen=0,
-			// getProperties = bundle.getWeavePropertyFunction( FACTORY.props ),
-			ops = [], locals = [], i = 0, op = 0, dat = 0,
-			obj = null, j = 0, k = 0, propTable = [], hasValues = false;
+			ops = [], locals = [], i = 0, op = 0, dat = 0, iref_count = 0,
+			obj = null, j = 0, k = 0, propTable = [], lref_objects = [];
 
-		// Get bulk operators
-		for (i=0; i<len;) {
-			op = bundle.u8[bundle.i8++];
-			dat = op & 0x3F;
-			op = op & 0xC0;
+		// Read number of irefs
+		if (len < 65536) {
+			iref_count = bundle.u16[bundle.i16++];
+			if (DEBUG_THIS) console.log("-<- HINT16="+iref_count);
+		} else {
+			iref_count = bundle.u32[bundle.i32++];
+			if (DEBUG_THIS) console.log("-<- HINT32="+iref_count);
+		}
 
-			// console.log("- @"+(bundle.i8-bundle.ofs8)+" OP: 0x"+op.toString(16))
-			switch (op) {
-				case PRIM_BULK_KNOWN_OP.DEFINE:
-					for (j=0; j<dat; j++) {
-						// Create entity & Keep it in the iref table
-						obj = FACTORY.create();
-						bundle.iref_table.push(obj);
-						locals.push(obj);
-					}
-					hasValues = true;
-					ops.push([ op, dat ]);
-					i += dat; 
-					break;
-
-				case PRIM_BULK_KNOWN_OP.IREF:
-					ops.push([ op, (dat << 16) | bundle.u16[bundle.i16++] ]);
-					i += 1; 
-					break;
-
-				case PRIM_BULK_KNOWN_OP.XREF:
-					ops.push([ op, bundle.readStringLT() ]);
-					i += 1; 
-					break;
-
-				default:
-					throw new Errors.AssertError('Unknown bulk array op-code 0x'+op.toString(16)+'!');
-			}
+		// Initialize irefs
+		locals = Array(iref_count);
+		for (i=0; i<iref_count; ++i) {
+			bundle.iref_table.push( locals[i] = FACTORY.create() );
 		}
 
 		// Get property arrays
-		if (hasValues) {
+		if (iref_count) {
 			propTable = decodePrimitive( bundle, database );
+			if (propTable.length === undefined)
+				throw new Errors.AssertError('Decoded known bulk primitive is not array!');
 			itemlen = propTable.length / proplen;
 		}
 
-		// console.log("------");
-		// console.log(" Ofs:", bundle.i8-bundle.ofs8);
-		// console.log(" Eid:", eid);
-		// console.log(" Len:", len);
-		// console.log(" Properties:", PROPERTIES.toString());
-		// console.log(" PropTable:", propTable);
-		// console.log("------");
+		// Process op-codes
+		var ans = new Array(len), obji=0, last=undefined;
+		i=0; while (i<len) {
+			k = bundle.u8[bundle.i8++];
+			if ((k & 0x80) === PRIM_BULK_KNOWN_OP.LREF_7) {
+				dat = k & 0x7F;
+				if (DEBUG_THIS) console.log("-<- LREF_7(",dat,"), i=",i);
+				ans[i++] = last = lref_objects[ dat ];
 
-		// Start processing operators
-		var ans = new Array(len), obji = 0;
-		for (i=0, k=0; k<ops.length; k++) {
-			op = ops[k][0];
-			dat = ops[k][1];
-			switch (op) {
-				case PRIM_BULK_KNOWN_OP.DEFINE:
-					// Construct & Export to IREF table
-					for (j=0; j<dat; j++) {
-						// Initialize object properties and keep it on the answer array 
-						obj = locals[obji];
-						FACTORY.init( obj, unweaveProperties(proplen, itemlen, propTable, obji) );
-						// ans[i++] = obj;
-						ans[i++] = obj;
-						// Forward object index
-						obji++;
-					}
-					break;
+			} else if ((k & 0xC0) === PRIM_BULK_KNOWN_OP.DEFINE) {
+				dat = (k & 0x3F)+1;
+				if (DEBUG_THIS) console.log("-<- DEFINE(",dat,"), i=",i);
 
-				case PRIM_BULK_KNOWN_OP.IREF:
-					// Import from IREF
-					if (dat >= bundle.iref_table.length)
-						throw new Errors.IRefError('Invalid IREF #'+dat+'!');
-					ans[i++] = bundle.iref_table[ dat ];
-					// ans[i++] = bundle.iref_table[ dat ];
-					break;
+				for (j=0; j<dat; j++) {
+					// Initialize object properties and keep it on the answer array 
+					obj = locals[obji];
+					FACTORY.init( obj, unweaveProperties(proplen, itemlen, propTable, obji) );
+					ans[i++] = obj;
+					// Forward object index
+					obji++;
+				}
+				last = obj;
 
-				case PRIM_BULK_KNOWN_OP.XREF:
-					// Import from XREF
-					if (database[dat] === undefined) 
-						throw new Errors.XRefError('Cannot import undefined external reference '+dat+'!');
-					ans[i++] = database[dat];
-					// ans[i++] = database[dat];
-					break;
+			} else if ((k & 0xE0) === PRIM_BULK_KNOWN_OP.REPEAT) {
+				dat = (k & 0x1F)+1;
+				if (DEBUG_THIS) console.log("-<- REPEAT(",dat,"), i=",i);
+				for (j=0; j<dat; j++) {
+					ans[i++] = last;
+				}
+
+			} else if ((k & 0xF0) === PRIM_BULK_KNOWN_OP.IREF) {
+				dat = ((k & 0x0F) << 16) | bundle.u16[bundle.i16++];
+				if (DEBUG_THIS) console.log("-<- IREF(",dat,"), i=",i);
+
+				// Import from IREF
+				if (dat >= bundle.iref_table.length)
+					throw new Errors.IRefError('Invalid IREF #'+dat+'!');
+				ans[i++] = last = bundle.iref_table[ dat ];
+				lref_objects.push( bundle.iref_table[ dat ] );
+
+			} else if ((k & 0xF8) === PRIM_BULK_KNOWN_OP.LREF_11) {
+				dat = ((k & 0x07) << 8) | bundle.u8[bundle.i8++];
+				if (DEBUG_THIS) console.log("-<- LREF_11(",dat,"), i=",i);
+				ans[i++] = last = lref_objects[ dat ];
+
+			} else if (k === PRIM_BULK_KNOWN_OP.LREF_16) {
+				dat = bundle.u16[bundle.i16++];
+				if (DEBUG_THIS) console.log("-<- LREF_16(",dat,"), i=",i);
+				ans[i++] = last = lref_objects[ dat ];
+
+			} else if (k === PRIM_BULK_KNOWN_OP.XREF) {
+				dat = bundle.readStringLT();
+				if (DEBUG_THIS) console.log("-<- XREF(",dat,"), i=",i);
+
+				// Import from XREF
+				if (database[dat] === undefined) 
+					throw new Errors.XRefError('Cannot import undefined external reference '+dat+'!');
+				ans[i++] = last = database[dat];
 
 			}
+
 		}
 
 		// Free proprty tables and return objects

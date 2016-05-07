@@ -349,7 +349,7 @@ const ARR_OP = {
 	PRIM_BULK_PLAIN: 0x6E, // Bulk Array of Plain Objects
 	PRIM_SHORT: 	 0x6F, // Short Primitive Array
 	PRIM_CHUNK: 	 0x78, // Chunked Primitive ARray
-	PRIM_BULK_KNOWN: 0x70, // Bulk Array of Known Objects
+	PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
 	EMPTY: 			 0x7E, // Empty Array
 	PRIM_CHUNK_END:  0x7F, // End of primary chunk
 };
@@ -407,7 +407,7 @@ const PRIM_BUFFER_TYPE = {
  */
 const PRIM_BULK_KNOWN_OP = {
 	LREF_7:	0x00, // Local reference up to 7bit
-	LREF_11:0xF0, // Local reference up to 10bit
+	LREF_11:0xF0, // Local reference up to 11bit
 	LREF_16:0xFE, // Local reference up to 16bit
 	IREF:	0xE0, // Internal reference up to 20bit
 	XREF:	0xFF, // External reference
@@ -2201,7 +2201,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
 
 
 /**
- * Helper function to encode i-ref
+ * Helper function to encode local-lookup internal references
  */
 function encodeLIREF(encoder, op8, op16, local_ids, xrid) {
 	const DEBUG_THIS = false;
@@ -2228,12 +2228,12 @@ function encodeLIREF(encoder, op8, op16, local_ids, xrid) {
 		if (DEBUG_THIS) console.log("->- LREF_7(",xrid,",",id,")");
 	} else if (id < 2048) { // LREF_11
 		op8.push( pack1b( PRIM_BULK_KNOWN_OP.LREF_11 | ((id >> 8) & 0x7), false ) );
-		op8.push( pack1b( PRIM_BULK_KNOWN_OP.LREF_11 | (id & 0xFF), false ) );
+		op8.push( pack1b( id & 0xFF, false ) );
 		encoder.counters.op_iref+=2;
 		if (DEBUG_THIS) console.log("->- LREF_11(",xrid,",",id,")");
 	} else if (id < 65536) { // LREF_16
-		op8.push( pack1b( PRIM_BULK_KNOWN_OP.LREF_16 | ((id >> 8) & 0x7), false ) );
-		op16.push( pack2b( id, false ) );
+		op8.push( pack1b( PRIM_BULK_KNOWN_OP.LREF_16, false ) );
+		op16.push( pack2b( id & 0xFFFF, false ) );
 		encoder.counters.op_iref+=3;
 		if (DEBUG_THIS) console.log("->- LREF_16(",xrid,",",id,")");
 	}
@@ -2256,28 +2256,29 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	// Lookup signature
 	var object, id, i, c_export = 0, eid=meta[0], getProps=meta[1], plen=-1,
 		propertyTable = [], waveTable = [], op8 = [], op16 = [], local_ids = [],
-		c_same = 0, use_same = false, last = undefined, iref_count = 0, iofs = 0, iop = 0;
+		c_same = 0, use_same = false, last = undefined, iref_count = 0;
 	encoder.counters.arr_prim_bulk_known+=1;
 	encoder.log(LOG.ARR, "array.prim.known, len="+data.length+
 		", eid="+eid+", [");
 	encoder.logIndent(1);
 
 	// Put header
-	iofs = encoder.stream8.offset;
 	if (data.length < UINT16_MAX) { // 16-bit length prefix
-		encoder.stream8.write( pack1b( iop = ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT16 ) );
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT16 ) );
 		encoder.stream16.write( pack2b( data.length, false ) );
 		encoder.counters.arr_hdr+=3;
 	} else { // 32-bit length prefix
-		encoder.stream8.write( pack1b( iop = ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT32 ) );
+		encoder.stream8.write( pack1b( ARR_OP.PRIM_BULK_KNOWN | NUMTYPE_LN.UINT32 ) );
 		encoder.stream32.write( pack4b( data.length, false ) );
 		encoder.counters.arr_hdr+=5;
 	}
 
+	// console.log("--> @"+(encoder.stream16.offset/2),"EID:",eid,"LEN:",data.length);
+
 	// Write EID
 	encoder.stream16.write( pack2b( eid, false ) );
 	encoder.counters.arr_hdr+=2;
-	if (DEBUG_THIS) console.log("--- EID",eid," ---");
+	// console.log("--- EID",eid," --- @"+encoder.stream16.offset);
 
 	// Populate fields
 	for (var j=0, el=data.length; j<el; ++j) {
@@ -2293,9 +2294,9 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 			// First encounter, flush exports
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
-				if (DEBUG_THIS) console.log("->-[==] DEFINE(",c_export,")");
+				if (DEBUG_THIS) console.log("->-[==] DEFINE(",c_export,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_export = 0;
 			}
 
@@ -2303,9 +2304,9 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 			c_same++;
 			if (c_same > 31) {
 				// console.log(">>[same="+c_same+"]>>");
-				if (DEBUG_THIS) console.log("->-[OV] REPEAT(",c_same,")");
+				if (DEBUG_THIS) console.log("->-[OV] REPEAT(",c_same,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.REPEAT | (c_same-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_same = 0;
 			}
 
@@ -2318,9 +2319,9 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 			if (c_same > 0) {
 				// console.log(last,"!=",object);
 				// console.log(">>[same="+c_same+"]>>");
-				if (DEBUG_THIS) console.log("->-[!=] REPEAT(",c_same,")");
+				if (DEBUG_THIS) console.log("->-[!=] REPEAT(",c_same,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.REPEAT | (c_same-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_same = 0;
 			}
 
@@ -2335,14 +2336,14 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		if (id > -1) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
-				if (DEBUG_THIS) console.log("->-[iR] DEFINE(",c_export,")");
+				if (DEBUG_THIS) console.log("->-[iR] DEFINE(",c_export,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_export = 0;
 			}
 
 			// console.log(">>[iref="+id+" (ref)]>>");
-			if (DEBUG_THIS) console.log("->- IREF(",id,")");
+			if (DEBUG_THIS) console.log("->- IREF(",id,"), j=",j);
 			encodeLIREF( encoder, op8, op16, local_ids, id );
 			continue;
 		}
@@ -2352,16 +2353,16 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		if (id > -1) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
-				if (DEBUG_THIS) console.log("->- DEFINE(",c_export,")");
+				if (DEBUG_THIS) console.log("->- DEFINE(",c_export,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_export = 0;
 			}
 			// console.log(">>[xref="+id+"]>>");
-			if (DEBUG_THIS) console.log("->- XREF(",id,")");
+			if (DEBUG_THIS) console.log("->- XREF(",id,"), j=",j);
 			op8.push( pack1b( PRIM_BULK_KNOWN_OP.XREF, false ) );
 			op16.push( pack2b( id & 0xFFFF, false ) );
-			encoder.counters.arr_hdr+=3;
+			encoder.counters.arr_dat+=3;
 			continue;
 		}
 
@@ -2376,15 +2377,15 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		if (id > -1) {
 			if (c_export > 0) {
 				// console.log(">>[known="+c_export+" (ref)]>>");
-				if (DEBUG_THIS) console.log("->- DEFINE(",c_export,")");
+				if (DEBUG_THIS) console.log("->- DEFINE(",c_export,"), j=",j);
 				op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) )  )
-				encoder.counters.arr_hdr+=1;
+				encoder.counters.arr_dat+=1;
 				c_export = 0;
 			}
 			// console.log(">>[iref="+id+" (val)]>>");
-			if (DEBUG_THIS) console.log("->- IREF(",id,")");
+			if (DEBUG_THIS) console.log("->- IREF(",id,"), j=",j);
 			encodeLIREF( encoder, op8, op16, local_ids, id );
-			encoder.counters.arr_hdr+=3;
+			encoder.counters.arr_dat+=3;
 			continue;
 		}
 
@@ -2411,7 +2412,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		c_export++;
 		if (c_export > 63) {
 			// console.log(">>[known="+c_export+" (bulk)]>>");
-			if (DEBUG_THIS) console.log("->- DEFINE(",c_export,")");
+			if (DEBUG_THIS) console.log("->- DEFINE(",c_export,"), j=",j);
 			op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) ) );
 			encoder.counters.arr_hdr+=1;
 			c_export = 0;
@@ -2422,10 +2423,17 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	// Finalize pending op-codes
 	if (c_export > 0) {
 		// console.log(">>[known="+c_export+" (end)]>>");
-		if (DEBUG_THIS) console.log("->- DEFINE(",c_export,")");
+		if (DEBUG_THIS) console.log("->- DEFINE(",c_export,"), j=",j);
 		op8.push( pack1b( PRIM_BULK_KNOWN_OP.DEFINE | (c_export-1) ) );
 		encoder.counters.arr_hdr+=1;
 	}
+	if (c_same > 0) {
+		// console.log(">>[same="+c_same+"]>>");
+		if (DEBUG_THIS) console.log("->- REPEAT(",c_same,"), j=",j);
+		op8.push( pack1b( PRIM_BULK_KNOWN_OP.REPEAT | (c_same-1) )  )
+		encoder.counters.arr_dat+=1;
+	}
+
 
 	// Write number of iref items for faster initialization on decoder-side
 	if (data.length < UINT16_MAX) {
@@ -2439,7 +2447,9 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 	}
 
 	// Write weaved properties
-	if (plen !== -1) {
+	if (iref_count && (plen === -1))
+		throw new Errors.AssertError("Something went really wrong in the logic!");
+	if (iref_count > 0) {
 		encodeArray( encoder, Array.prototype.concat.apply([], waveTable) );
 	}
 
@@ -3331,6 +3341,7 @@ var BinaryEncoder = function( filename, config ) {
 		op_prm:  0, dat_hdr: 0,
 		ref_str: 0, op_iref: 0,
 		arr_hdr: 0, op_xref: 0,
+		arr_dat: 0,
 
 		arr_dws: 0,
 		arr_delta_float: 0,
@@ -3349,7 +3360,7 @@ var BinaryEncoder = function( filename, config ) {
 
 	// Optimisation flags
 	this.optimize = {
-		cfwa_object_byval: true,	 	// By-value de-duplication of objects in chunk forward analysis
+		cfwa_object_byval: true,	 	// By-value de-duplication of objects in chunk forward analysis (increases encoding time)
 		repeat_break_thresshold: 0.50,	// How many consecutive same items are enough for a numeric array in order
 									 	// to break it as a chunked array.
 		repeat_thresshold: 0.50,	 	// How many items must be repeating in a chunk in order to prefer
@@ -3530,36 +3541,37 @@ BinaryEncoder.prototype = {
 			console.info("-----------------------------------");
 			console.info(" Binary Protocol Overhead Analysis");
 			console.info("-----------------------------------");
-			console.info(" 64-bit Stream      : ", this.stream64.offset, "b");
-			console.info(" 32-bit Stream      : ", this.stream32.offset, "b");
-			console.info(" 16-bit Stream      : ", this.stream16.offset, "b");
-			console.info("  8-bit Stream      : ", this.stream8.offset,  "b");
+			console.info(" 64-bit Stream       : ", this.stream64.offset, "b");
+			console.info(" 32-bit Stream       : ", this.stream32.offset, "b");
+			console.info(" 16-bit Stream       : ", this.stream16.offset, "b");
+			console.info("  8-bit Stream       : ", this.stream8.offset,  "b");
 			console.info("-----------------------------------");
-			console.info(" Control Op-Codes   : ", this.counters.op_ctr, "b");
-			console.info(" Primitive Op-Codes : ", this.counters.op_prm, "b");
-			console.info(" String References  : ", this.counters.ref_str, "b");
-			console.info(" I-Refs             : ", this.counters.op_iref, "b");
-			console.info(" X-Refs             : ", this.counters.op_xref, "b");
-			console.info(" Array Headers      : ", this.counters.arr_hdr, "b");
-			console.info(" Array Chunks       : ", this.counters.arr_chu, "b");
-			console.info(" Buffer Headers     : ", this.counters.dat_hdr, "b");
-			var sum = this.counters.op_ctr + this.counters.op_prm +
+			console.info(" Control Op-Codes    : ", this.counters.op_ctr, "b");
+			console.info(" Primitive Op-Codes  : ", this.counters.op_prm, "b");
+			console.info(" String References   : ", this.counters.ref_str, "b");
+			console.info(" I-Refs              : ", this.counters.op_iref, "b");
+			console.info(" X-Refs              : ", this.counters.op_xref, "b");
+			console.info(" Array Headers       : ", this.counters.arr_hdr, "b");
+			console.info(" Array Steering Data : ", this.counters.arr_dat, "b");
+			console.info(" Array Chunks        : ", this.counters.arr_chu, "b");
+			console.info(" Buffer Headers      : ", this.counters.dat_hdr, "b");
+			var sum = this.counters.op_ctr + this.counters.op_prm + this.counters.arr_dat +
 					  this.counters.ref_str + this.counters.op_iref + this.counters.op_xref +
 					  this.counters.arr_hdr + this.counters.arr_chu + this.counters.dat_hdr;
 			console.info("-----------------------------------");
-			console.info(" NUM_DWS            : ",this.counters.arr_dws);
-			console.info(" NUM_DELTA_FLOAT    : ",this.counters.arr_delta_float);
-			console.info(" NUM_DELTA_INT      : ",this.counters.arr_delta_int);
-			console.info(" NUM_REPEATED       : ",this.counters.arr_num_repeated);
-			console.info(" NUM_RAW            : ",this.counters.arr_num_raw );
-			console.info(" NUM_SHORT          : ",this.counters.arr_num_short);
-			console.info(" PRIM_BULK_PLAIN    : ",this.counters.arr_prim_bulk_plain);
-			console.info(" PRIM_BULK_KNOWN    : ",this.counters.arr_prim_bulk_known);
-			console.info(" PRIM_SHORT         : ",this.counters.arr_prim_short);
-			console.info(" PRIM_REPEATED      : ",this.counters.arr_prim_repeated);
-			console.info(" PRIM_RAW           : ",this.counters.arr_prim_raw);
-			console.info(" PRIM_CHUNK         : ",this.counters.arr_prim_chunk);
-			console.info(" EMPTY              : ",this.counters.arr_empty);
+			console.info(" NUM_DWS             : ",this.counters.arr_dws);
+			console.info(" NUM_DELTA_FLOAT     : ",this.counters.arr_delta_float);
+			console.info(" NUM_DELTA_INT       : ",this.counters.arr_delta_int);
+			console.info(" NUM_REPEATED        : ",this.counters.arr_num_repeated);
+			console.info(" NUM_RAW             : ",this.counters.arr_num_raw );
+			console.info(" NUM_SHORT           : ",this.counters.arr_num_short);
+			console.info(" PRIM_BULK_PLAIN     : ",this.counters.arr_prim_bulk_plain);
+			console.info(" PRIM_BULK_KNOWN     : ",this.counters.arr_prim_bulk_known);
+			console.info(" PRIM_SHORT          : ",this.counters.arr_prim_short);
+			console.info(" PRIM_REPEATED       : ",this.counters.arr_prim_repeated);
+			console.info(" PRIM_RAW            : ",this.counters.arr_prim_raw);
+			console.info(" PRIM_CHUNK          : ",this.counters.arr_prim_chunk);
+			console.info(" EMPTY               : ",this.counters.arr_empty);
 			console.info("-----------------------------------");
 			console.info("");
 			var perc = ((sum / totalSize) * 100).toFixed(2);

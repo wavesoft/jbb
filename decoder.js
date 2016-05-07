@@ -478,13 +478,13 @@ function unweaveProperties( lprops, litems, src, idx ) {
  * Decode bulk array of entities
  */
 function decodeKnownBulkArray( bundle, database, len ) {
+	var DEBUG_THIS = false;
+	// console.log("<-- @"+(bundle.i16 - bundle.ofs16/2),"EID:",bundle.u16[bundle.i16],"LEN:", len);
 	var eid = bundle.u16[bundle.i16++],
 		FACTORY = bundle.profile.decode( eid ), 
 		proplen = FACTORY.props, itemlen=0,
 		ops = [], locals = [], i = 0, op = 0, dat = 0, iref_count = 0,
 		obj = null, j = 0, k = 0, propTable = [], lref_objects = [];
-
-	if (DEBUG_THIS) console.log("--- EID",eid,"---");
 
 	// Read number of irefs
 	if (len < 65536) {
@@ -504,6 +504,8 @@ function decodeKnownBulkArray( bundle, database, len ) {
 	// Get property arrays
 	if (iref_count) {
 		propTable = decodePrimitive( bundle, database );
+		if (propTable.length === undefined)
+			throw new Errors.AssertError('Decoded known bulk primitive is not array!');
 		itemlen = propTable.length / proplen;
 	}
 
@@ -511,14 +513,14 @@ function decodeKnownBulkArray( bundle, database, len ) {
 	var ans = new Array(len), obji=0, last=undefined;
 	i=0; while (i<len) {
 		k = bundle.u8[bundle.i8++];
-		if ((k & 0x80) == PRIM_BULK_KNOWN_OP.LREF_7) {
+		if ((k & 0x80) === PRIM_BULK_KNOWN_OP.LREF_7) {
 			dat = k & 0x7F;
-			if (DEBUG_THIS) console.log("-<- LREF_7(",dat,")");
+			if (DEBUG_THIS) console.log("-<- LREF_7(",dat,"), i=",i);
 			ans[i++] = last = lref_objects[ dat ];
 
-		} else if ((k & 0xC0) == PRIM_BULK_KNOWN_OP.DEFINE) {
+		} else if ((k & 0xC0) === PRIM_BULK_KNOWN_OP.DEFINE) {
 			dat = (k & 0x3F)+1;
-			if (DEBUG_THIS) console.log("-<- DEFINE(",dat,")");
+			if (DEBUG_THIS) console.log("-<- DEFINE(",dat,"), i=",i);
 
 			for (j=0; j<dat; j++) {
 				// Initialize object properties and keep it on the answer array 
@@ -530,16 +532,16 @@ function decodeKnownBulkArray( bundle, database, len ) {
 			}
 			last = obj;
 
-		} else if ((k & 0xE0) == PRIM_BULK_KNOWN_OP.REPEAT) {
+		} else if ((k & 0xE0) === PRIM_BULK_KNOWN_OP.REPEAT) {
 			dat = (k & 0x1F)+1;
-			if (DEBUG_THIS) console.log("-<- REPEAT(",dat,")");
+			if (DEBUG_THIS) console.log("-<- REPEAT(",dat,"), i=",i);
 			for (j=0; j<dat; j++) {
 				ans[i++] = last;
 			}
 
-		} else if ((k & 0xF0) == PRIM_BULK_KNOWN_OP.IREF) {
+		} else if ((k & 0xF0) === PRIM_BULK_KNOWN_OP.IREF) {
 			dat = ((k & 0x0F) << 16) | bundle.u16[bundle.i16++];
-			if (DEBUG_THIS) console.log("-<- IREF(",dat,")");
+			if (DEBUG_THIS) console.log("-<- IREF(",dat,"), i=",i);
 
 			// Import from IREF
 			if (dat >= bundle.iref_table.length)
@@ -547,19 +549,19 @@ function decodeKnownBulkArray( bundle, database, len ) {
 			ans[i++] = last = bundle.iref_table[ dat ];
 			lref_objects.push( bundle.iref_table[ dat ] );
 
-		} else if ((k & 0xF8) == PRIM_BULK_KNOWN_OP.LREF_11) {
+		} else if ((k & 0xF8) === PRIM_BULK_KNOWN_OP.LREF_11) {
 			dat = ((k & 0x07) << 8) | bundle.u8[bundle.i8++];
-			if (DEBUG_THIS) console.log("-<- LREF_11(",dat,")");
+			if (DEBUG_THIS) console.log("-<- LREF_11(",dat,"), i=",i);
 			ans[i++] = last = lref_objects[ dat ];
 
 		} else if (k === PRIM_BULK_KNOWN_OP.LREF_16) {
 			dat = bundle.u16[bundle.i16++];
-			if (DEBUG_THIS) console.log("-<- LREF_16(",dat,")");
+			if (DEBUG_THIS) console.log("-<- LREF_16(",dat,"), i=",i);
 			ans[i++] = last = lref_objects[ dat ];
 
 		} else if (k === PRIM_BULK_KNOWN_OP.XREF) {
 			dat = bundle.readStringLT();
-			if (DEBUG_THIS) console.log("-<- XREF(",dat,")");
+			if (DEBUG_THIS) console.log("-<- XREF(",dat,"), i=",i);
 
 			// Import from XREF
 			if (database[dat] === undefined) 
