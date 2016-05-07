@@ -1,6 +1,6 @@
 # Javascript Binary Bundles (.jbb)
 
-[![Build Status](https://travis-ci.org/wavesoft/jbb.svg?branch=master)](https://travis-ci.org/wavesoft/jbb)
+[![JBB Version](https://img.shields.io/npm/v/jbb.svg?label=version&maxAge=2592000)](https://www.npmjs.com/package/jbb) [![Build Status](https://travis-ci.org/wavesoft/jbb.svg?branch=master)](https://travis-ci.org/wavesoft/jbb)
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 

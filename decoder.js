@@ -46,7 +46,7 @@ const NUMTYPE = {
 	UINT16:  2, INT16:   3,
 	UINT32:  4, INT32:   5,
 	FLOAT32: 6, FLOAT64: 7
-}
+};
 
 /**
  * Downscaling numtype conversion table
