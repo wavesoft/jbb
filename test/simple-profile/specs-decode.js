@@ -8,10 +8,10 @@ var factory_OT_ObjectA = {
 	create: function() {
 		return new OT.ObjectA();
 	},
-	init: function(inst, props) {
-		inst.objApropA = props[0];
-		inst.objApropB = props[1];
-		inst.objApropC = props[2];
+	init: function(inst, props, pagesize, offset) {
+		inst.objApropA = props[offset+pagesize*0];
+		inst.objApropB = props[offset+pagesize*1];
+		inst.objApropC = props[offset+pagesize*2];
 	}
 }
 
@@ -23,10 +23,10 @@ var factory_OT_ObjectB = {
 	create: function() {
 		return new OT.ObjectB();
 	},
-	init: function(inst, props) {
-		inst.objBpropA = props[0];
-		inst.objBpropB = props[1];
-		inst.objBpropC = props[2];
+	init: function(inst, props, pagesize, offset) {
+		inst.objBpropA = props[offset+pagesize*0];
+		inst.objBpropB = props[offset+pagesize*1];
+		inst.objBpropC = props[offset+pagesize*2];
 	}
 }
 
@@ -38,16 +38,16 @@ var factory_OT_ObjectC = {
 	create: function() {
 		return Object.create(OT.ObjectC.prototype);
 	},
-	init: function(inst, props) {
+	init: function(inst, props, pagesize, offset) {
 		OT.ObjectC.call(inst,
-			props[0],
-			props[1]);
-		inst.objCpropC = props[2];
+			props[offset+pagesize*0],
+			props[offset+pagesize*1]);
+		inst.objCpropC = props[offset+pagesize*2];
 	}
 }
 
 module.exports = {
-	id: 7761,
+	id: 7760,
 	size: 3,
 	decode: function( id ) {
 			if (id < 32) {

@@ -32,7 +32,7 @@ function getter_OT_ObjectC(inst) {
 
 
 module.exports = {
-	id: 7761,
+	id: 7760,
 	size: 3,
 	encode: function( inst ) {
 			if (inst instanceof OT.ObjectA) {
