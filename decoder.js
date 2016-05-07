@@ -330,7 +330,7 @@ function decodeObject( bundle, database, op ) {
 		var prop_table = decodePrimitive( bundle, database );
 
 		// Run initializer
-		FACTORY.init( instance, prop_table );
+		FACTORY.init( instance, prop_table, 1, 0 );
 
 		// Append debug metadata
 		DEBUG && __debugMeta( instance, 'object.known', { 'eid': eid } );
@@ -458,23 +458,6 @@ function decodePlainBulkArray( bundle, database ) {
 }
 
 /**
- * Return an array with the properties of the specified
- * source array unweaved
- * 
- * from = [   to[idx=0] = [1,3,5]
- *   1, 2     to[idx=1] = [2,4,6]
- *   3, 4
- *   5, 6     needs: items=from.length/props.length
- * ]
- *
- */
-function unweaveProperties( lprops, litems, src, idx ) {
-	var ans = new Array(lprops), i=lprops-1;
-	for (;i>=0;--i) ans[i] = src[ idx+litems*i ];
-	return ans;
-}
-
-/**
  * Decode bulk array of entities
  */
 function decodeKnownBulkArray( bundle, database, len ) {
@@ -484,7 +467,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 		FACTORY = bundle.profile.decode( eid ), 
 		proplen = FACTORY.props, itemlen=0,
 		ops = [], locals = [], i = 0, op = 0, dat = 0, iref_count = 0,
-		obj = null, j = 0, k = 0, propTable = [], lref_objects = [];
+		obj = null, j = 0, k = 0, weaved_props = [], lref_objects = [];
 
 	// Read number of irefs
 	if (len < 65536) {
@@ -503,10 +486,10 @@ function decodeKnownBulkArray( bundle, database, len ) {
 
 	// Get property arrays
 	if (iref_count) {
-		propTable = decodePrimitive( bundle, database );
-		if (propTable.length === undefined)
+		weaved_props = decodePrimitive( bundle, database );
+		if (weaved_props.length === undefined)
 			throw new Errors.AssertError('Decoded known bulk primitive is not array!');
-		itemlen = propTable.length / proplen;
+		itemlen = weaved_props.length / proplen;
 	}
 
 	// Process op-codes
@@ -525,7 +508,7 @@ function decodeKnownBulkArray( bundle, database, len ) {
 			for (j=0; j<dat; j++) {
 				// Initialize object properties and keep it on the answer array 
 				obj = locals[obji];
-				FACTORY.init( obj, unweaveProperties(proplen, itemlen, propTable, obji) );
+				FACTORY.init( obj, weaved_props, itemlen, obji );
 				ans[i++] = obj;
 				// Forward object index
 				obji++;
