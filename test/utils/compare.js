@@ -34,7 +34,10 @@ function explicitDeepEqual( actual, expected, message, config, path ) {
 		assert.equal( actual, expected, path + ' mismatch ' + message );
 	}
 
-	if (typeof actual == "object") {
+	if (typeof actual === "object") {
+		assert.equal( "object", typeof expected, path + ': ' + message );
+		assert.equal( (actual === null), (expected === null), path + ': ' + message );
+
 		for (var k in actual) {
 
 			// Get values
