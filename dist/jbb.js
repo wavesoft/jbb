@@ -94,7 +94,7 @@ var JBBBinaryLoader =
 		UINT16:  2, INT16:   3,
 		UINT32:  4, INT32:   5,
 		FLOAT32: 6, FLOAT64: 7
-	}
+	};
 
 	/**
 	 * Downscaling numtype conversion table
@@ -1127,10 +1127,10 @@ var JBBBinaryLoader =
 			if (parts[0].substr(parts[0].length - 5).toLowerCase() === ".jbbp") {
 				var base = prefix + parts[0].substr(0, parts[0].length - 5);
 				reqURL = [
-					base + '.jbbp',
-					base + '_b16.jbbp',
-					base + '_b32.jbbp',
-					base + '_b64.jbbp'
+					base + '.jbbp' + suffix,
+					base + '_b16.jbbp' + suffix,
+					base + '_b32.jbbp' + suffix,
+					base + '_b64.jbbp' + suffix
 				];
 			} else {
 				// Assume .jbb if missing (TODO: not a good idea)

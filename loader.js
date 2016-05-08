@@ -44,15 +44,17 @@ const STATE_LOADED 		= 3;
  * Apply full path by replacing the ${BUNDLE} macro or
  * by prepending the path to the path if config is only a string
  */
-function applyFullPath( baseDir, config, skipRelative ) {
+function applyFullPath( baseDir, suffix, config, skipRelative ) {
 	if (typeof(config) == "string") {
 		// Check for macros
 		if (config.indexOf('${') >= 0) {
 			config = config.replace(/\${(.+?)}/g, function(match, contents, offset, s)
 				{
 					var key = contents.toLowerCase();
-					if (key == "bundle") {
+					if (key === "bundle") {
 						return baseDir
+					} else if (key === "suffix") {
+						return suffix;
 					} else {
 						console.warn("Unknown macro '"+key+"' encountered in: "+config);
 						return "";
@@ -60,7 +62,7 @@ function applyFullPath( baseDir, config, skipRelative ) {
 				});
 		// Check for full path
 		} else if (!skipRelative && config.substr(0,1) != "/") {
-			return path.join(baseDir, config);
+			return path.join(baseDir, config) + suffix;
 		}
 		// Otherwise we are good
 		return config;
@@ -68,12 +70,12 @@ function applyFullPath( baseDir, config, skipRelative ) {
 		if (config.constructor == ({}).constructor) {
 			var ans = {};
 			for (var k in config) 
-				ans[k] = applyFullPath( baseDir, config[k], true );
+				ans[k] = applyFullPath( baseDir, suffix, config[k], true );
 			return ans;
 		} else if (config.length !== undefined) {
 			var ans = [];
 			for (var i=0; i<config.length; i++)
-				ans.push(applyFullPath( baseDir, config[i], true ));
+				ans.push(applyFullPath( baseDir, suffix, config[i], true ));
 			return ans;
 		} else {
 			return config;
@@ -111,6 +113,11 @@ var QueuedBundle = function( parent, name ) {
 	 * The bundle base directory
 	 */
 	this.bundleURL = null;
+
+	/**
+	 * Suffix to append to bundle files
+	 */
+	this.bundleURLSuffix = "";
 
 	/**
 	 * Bundle-specific resources
@@ -155,6 +162,7 @@ QueuedBundle.prototype.setURL = function( url ) {
 
 	// Separate to base dir and filename
 	this.bundleURL = url;
+	if (suffix) this.bundleURLSuffix = "?"+suffix;
 
 }
 
@@ -236,7 +244,7 @@ QueuedBundle.prototype.loadSpecs = function( loadFn, callback ) {
 	// Use the load function specified to load the specs
 	// from the URL we have stored (as text, not as blob)
 	//
-	loadFn( this.bundleURL + '/bundle.json', false, function( err, fileBufer ) {
+	loadFn( this.bundleURL + '/bundle.json' + this.bundleURLSuffix, false, function( err, fileBufer ) {
 		// Update specs
 		var specs = JSON.parse(fileBufer);
 		self.setSpecs( specs );
@@ -282,7 +290,7 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 	for (var i=0; i<items.length; i++) {
 		var item = items[i],
 			loaderClass = item[0], key = item[1],
-			loaderConfig = applyFullPath( this.bundleURL, item[2] );
+			loaderConfig = applyFullPath( this.bundleURL, this.bundleURLSuffix, item[2] );
 
 		// If this is a binary blob, don't go through the profile compiler
 		if (loaderClass.toLowerCase() == "blob") {
@@ -457,10 +465,13 @@ BundlesLoader.prototype.addProfileLoader = function( profileLoader ) {
 BundlesLoader.prototype.add = function( url, callback ) {
 
 	// Extract bundle name from URL
-	var name = path.basename(url.split("?")[0]);
+	var urlparts = url.split("?"), suffix="",
+		name = path.basename(urlparts[0]);
 	var nameParts = name.split(".");
 	if (nameParts.length > 1) nameParts.pop();
 	name = nameParts.join(".");
+	if (urlparts.length > 1) suffix="?"+urlparts[1];
+	url = urlparts[0];
 
 	// Get/Create bundle queue item
 	var item = this.__queuedBundle( name );
@@ -471,7 +482,7 @@ BundlesLoader.prototype.add = function( url, callback ) {
 			url = this.baseURL + '/' + url;
 
 		// Set URL
-		item.setURL( url + this.bundleSuffix );
+		item.setURL( url + this.bundleSuffix + suffix );
 
 	}
 
