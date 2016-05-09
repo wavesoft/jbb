@@ -3480,6 +3480,8 @@ BinaryEncoder.prototype = {
 			this.stream8.writeAt( 24, pack4b( this.stream8.offset - stream8offset ) ); // Length of string table
 			this.stream8.writeAt( 28, pack4b( this.stream16.offset - stream16offset ) ); // Length of signature table
 
+			// TODO: Separate stream8 in two in order to load them in parallel
+
 			// Close streams
 			this.stream8.close();  this.stream16.close(); 
 			this.stream32.close(); this.stream64.close(); 

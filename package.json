@@ -22,8 +22,10 @@
   },
   "homepage": "https://github.com/wavesoft/jbb#readme",
   "devDependencies": {
+    "colors": "^1.1.2",
+    "deep-equal": "^1.0.1",
     "gulp-header": "^1.7.1",
-    "jbb-profile-three": "^0.4.0",
+    "jbb-profile-three": "^1.0.1",
     "mocha": "^2.3.4",
     "mute": "^2.0.6",
     "node-getopt": "^0.2.3",

@@ -25,14 +25,18 @@ var mute 	= require('mute');
 /**
  * assert.equal with deep comparion only on some objects 
  */
-function explicitDeepEqual( actual, expected, message, config, path ) {
+function explicitDeepEqual( expected, actual, message, config, path ) {
 	var path = path || "object",
 		config = config || {}, a, b, unmute;
 
 	if ((actual === undefined) || (expected === undefined)) {
 		if ( ((actual === undefined) && (expected !== undefined)) ||
 		     ((actual !== undefined) && (expected === undefined))) {
-			assert.equal( actual, expected, path + ' mismatch ' + message );
+			console.log("- Actual=", actual);
+			assert.equal( 
+				(actual === undefined) ? '[undefined]' : (typeof actual), 
+				(expected === undefined) ? '[undefined]' : (typeof expected), 
+				path + ' mismatch ' + message );
 		}
 		return;
 	}
@@ -59,7 +63,7 @@ function explicitDeepEqual( actual, expected, message, config, path ) {
 				if (a instanceof config.ignoreClasses[i])
 					continue;
 			// Deep comparison
-			explicitDeepEqual( a, b, message, config, path+"["+k+"]" );
+			explicitDeepEqual( b, a, message, config, path+"["+k+"]" );
 		}
 	} else if (typeof actual == "number") {
 		if (Math.abs(actual - expected) > config.numericTollerance) {
