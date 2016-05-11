@@ -1,0 +1,8 @@
+{
+	"name": "obj",
+	"exports": {
+		"THREE.BinaryLoader": {
+			"obj/walthead": "walt/WaltHead_bin.js"
+		}
+	}
+}

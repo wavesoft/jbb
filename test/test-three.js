@@ -264,4 +264,20 @@ describe('[THREE.js Profile Tests]', function() {
 
 	}));
 
+	describe('obj.jbbsrc', describe_clojure( 'obj', function( original, encoded ) {
+
+		// Configuration for explicit deep equal
+		var config = {
+			ignoreKeys: commonIgnoredKeys,
+			ignoreClasses: [ ],
+			numericTollerance: 0.001
+		};
+
+		// Explicit deep equal comparison
+		compare.explicitDeepEqual( original['obj/walthead'], 
+								   encoded['obj/walthead'], 
+								   'in obj/walthead', config );
+
+	}));
+
 });
