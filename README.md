@@ -1,6 +1,6 @@
 # Javascript Binary Bundles (.jbb)
 
-[![JBB Version](https://img.shields.io/npm/v/jbb.svg?label=version&maxAge=2592000)](https://www.npmjs.com/package/jbb) [![Build Status](https://travis-ci.org/wavesoft/jbb.svg?branch=master)](https://travis-ci.org/wavesoft/jbb)
+[![JBB Logo](https://raw.githubusercontent.com/wavesoft/jbb/master/doc/jbb-logo.png)](https://github.com/wavesoft) [![JBB Version](https://img.shields.io/npm/v/jbb.svg?label=version&maxAge=2592000)](https://www.npmjs.com/package/jbb) [![Build Status](https://travis-ci.org/wavesoft/jbb.svg?branch=master)](https://travis-ci.org/wavesoft/jbb)
 
 Javascript Binary Bundle is a binary bundle format for packaging data structures and resources for the web. It is optimised in balance between size and performance, preferring performance when in doubt.
 
@@ -213,7 +213,7 @@ A. BSON can only encode primitive javascript data structures, such as arrays and
 
 **Q. How JBB compares to MessagePack?**
 
-A. Both try to solve the same problem, to encode data structures. However JBB sticks closer to the native Javascript data types, making it faster to process in the browser, while in the same time provides an additional layer of type information and arbitrary resource embedding.
+A. Both try to solve the same problem: to encode data structures. However JBB sticks closer to the native Javascript data types, making it faster to process in the browser, while in the same time provides an additional layer of type information and arbitrary resource embedding. Furthermore, JBB is optimised for size, performing data de-duplication and numeric downscaling when possible.
 
 # License
 
