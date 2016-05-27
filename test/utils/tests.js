@@ -29,6 +29,8 @@ require('../simple-profile/objects').static(global);
 
 var EncodeProfile = require('../simple-profile/specs-encode');
 var DecodeProfile = require('../simple-profile/specs-decode');
+var EncodeProfile2 = require('../simple-profile/second-encode');
+var DecodeProfile2 = require('../simple-profile/second-decode');
 
 var random = seed('jbbtests');
 
@@ -176,6 +178,33 @@ function it_should_return(primitive, repr, metaMatchFn) {
 }
 
 /**
+ * Accelerator function for primitive checking from 2 bundles
+ */
+function it_should_return_combined(primitive, repr, metaMatchFn) {
+	if (typeof repr === 'object') {
+		metaMatchFn = repr;
+		repr = undefined;
+	}
+	var text = repr || util.inspect(primitive,{'depth':0});
+	it('should return `'+text+'`, as encoded', function () {
+		var ans = encode_decode( primitive, [ EncodeProfile, EncodeProfile2 ], [ DecodeProfile, DecodeProfile2 ] );
+		if (typeof primitive == 'number') {
+			if (isNaN(ans) && isNaN(primitive)) return;
+			assert.equal( ans, primitive, 'encoded and decoded numbers to not match' );
+		} else if (typeof primitive == 'object') {
+			assert.deepEqual( ans, primitive, 'encoded and decoded objects to not match' );
+			if (metaMatchFn) {
+				if (!(metaMatchFn instanceof Array)) metaMatchFn = [metaMatchFn];
+				for (var i=0; i<metaMatchFn.length; i++)
+					metaMatchFn[i]( ans.__meta );
+			}
+		} else {
+			assert.equal( ans, primitive, 'encoded and decoded primitives to not match' );
+		}
+	});
+}
+
+/**
  * Accelerator function for sequential array checking
  */
 function it_should_return_array_seq( typeName, length, min, step, metaMatchFn ) {
@@ -277,6 +306,7 @@ var exports = module.exports = {
 	'it_should_match': it_should_match,
 	'it_should_throw': it_should_throw,
 	'it_should_return': it_should_return,
+	'it_should_return_combined': it_should_return_combined,
 	'it_should_return_array_seq': it_should_return_array_seq,
 	'it_should_return_array_rand': it_should_return_array_rand,
 	'it_should_return_array_rep': it_should_return_array_rep,

@@ -46,9 +46,16 @@ function open_encoder( profile, sparse ) {
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
 		'log'			: 0,
-		'profile' 		: profile,
 		'sparse'		: sparse || false
 	});
+
+	// Add one or more profiles
+	if (profile.length) {
+		for (var i=0; i<profile.length; i++)
+			encoder.addProfile(profile[i]);
+	} else {
+		encoder.addProfile(profile);
+	}
 
 	// Return encoder
 	return encoder;
@@ -65,7 +72,12 @@ function open_decoder( encoder, profile, db ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader( db );
-	decoder.addProfile(profile);
+	if (profile.length) {
+		for (var i=0; i<profile.length; i++)
+			decoder.addProfile(profile[i]);
+	} else {
+		decoder.addProfile(profile);
+	}
 	decoder.addByBuffer(buf);
 	decoder.load();
 
@@ -88,7 +100,15 @@ function open_decoder_sparse( encoder, profile, db ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader( db );
-	decoder.addProfile( profile );
+
+	// Add one or more profiles
+	if (profile.length) {
+		for (var i=0; i<profile.length; i++)
+			decoder.addProfile(profile[i]);
+	} else {
+		decoder.addProfile(profile);
+	}
+
 	decoder.addByBuffer( chunks );
 	decoder.load();
 
@@ -160,8 +180,15 @@ function encode_decode( structure, encodeProfile, decodeProfile ) {
 	var encoder = new BinaryEncoder(tempName, {
 		'name' 			: 'test',
 		'log'			: 0,
-		'profile'	 	: encodeProfile
 	});
+
+	// Add one or more profiles
+	if (encodeProfile.length) {
+		for (var i=0; i<encodeProfile.length; i++)
+			encoder.addProfile(encodeProfile[i]);
+	} else {
+		encoder.addProfile(encodeProfile);
+	}
 
 	// Encode object
 	encoder.encode( structure, 'test' );
@@ -183,7 +210,15 @@ function encode_decode( structure, encodeProfile, decodeProfile ) {
 
 	// Create a decoder & Parse
 	var decoder = new BinaryLoader();
-	decoder.addProfile(decodeProfile);
+
+	// Add one or more profiles
+	if (decodeProfile.length) {
+		for (var i=0; i<decodeProfile.length; i++)
+			decoder.addProfile(decodeProfile[i]);
+	} else {
+		decoder.addProfile(decodeProfile);
+	}
+
 	decoder.addByBuffer(buf);
 	decoder.load();
 

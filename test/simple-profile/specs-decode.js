@@ -49,20 +49,17 @@ var factory_OT_ObjectC = {
 module.exports = {
 	id: 7760,
 	size: 3,
+	frequent: 1,
 	decode: function( id ) {
 			if (id < 32) {
-				/* No items */
+				if (id === 0)
+					return factory_OT_ObjectA;
 			} else {
-				if (id < 34) {
-					if (id < 33) {
-						if (id === 32)
-							return factory_OT_ObjectA;
-					} else {
-						if (id === 33)
-							return factory_OT_ObjectB;
-					}
+				if (id < 33) {
+					if (id === 32)
+						return factory_OT_ObjectB;
 				} else {
-					if (id === 34)
+					if (id === 33)
 						return factory_OT_ObjectC;
 				}
 			}

@@ -13,6 +13,12 @@ gulp.task('test/simple-profile', function() {
         .pipe(jbb_profile())
         .pipe(gulp.dest('test/simple-profile'));
 });
+gulp.task('test/second-profile', function() {
+    return gulp
+        .src([ 'test/simple-profile/second.yaml' ])
+        .pipe(jbb_profile())
+        .pipe(gulp.dest('test/simple-profile'));
+});
 
 //
 // Compile the binary loader 

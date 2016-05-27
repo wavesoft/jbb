@@ -42,12 +42,34 @@ var ObjectD = function() {
 	this.objDpropC = "Not part of ObjectTable";
 };
 
+// Some more objects for the second object table
+var ObjectE = function() {
+	this.objEpropA = 125;
+	this.objEpropB = 65532;
+	this.objEpropC = "A string";
+};
+var ObjectF = function( propA, propB ) {
+	this.objFpropA = propA;
+	this.objFpropB = propB;
+	this.objFpropC = new Uint16Array([ 1, 4, 120, 4123 ]);
+};
+var ObjectG = function( propA, propB ) {
+	this.objGpropA = propA;
+	this.objGpropB = propB;
+	this.objGpropC = { 'some': { 'sub': 'object' } };
+	this.objGpropD = "I am ignored :(";
+};
+
+
 // Export objects
 var exports = module.exports = {
 	'ObjectA': ObjectA,
 	'ObjectB': ObjectB,
 	'ObjectC': ObjectC,
 	'ObjectD': ObjectD,
+	'ObjectE': ObjectE,
+	'ObjectF': ObjectF,
+	'ObjectG': ObjectG,
 };
 module.exports.static = function(scope) {
 	Object.keys(exports).forEach(function(key,index) {

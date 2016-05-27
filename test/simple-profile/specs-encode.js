@@ -34,13 +34,14 @@ function getter_OT_ObjectC(inst) {
 module.exports = {
 	id: 7760,
 	size: 3,
+	frequent: 1,
 	encode: function( inst ) {
 			if (inst instanceof OT.ObjectA) {
-				return [32, getter_OT_ObjectA];
+				return [0, getter_OT_ObjectA];
 			} else if (inst instanceof OT.ObjectB) {
-				return [33, getter_OT_ObjectB];
+				return [32, getter_OT_ObjectB];
 			} else if (inst instanceof OT.ObjectC) {
-				return [34, getter_OT_ObjectC];
+				return [33, getter_OT_ObjectC];
 			}
 		}
 };

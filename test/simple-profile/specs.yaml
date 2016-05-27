@@ -8,6 +8,7 @@
 # Simple objects
 
 OT.ObjectA:
+    frequent: true
     properties:
         - objApropA
         - objApropB

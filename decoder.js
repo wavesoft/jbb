@@ -20,6 +20,7 @@
 
 /* Imports */
 var BinaryBundle = require("./lib/BinaryBundle");
+var DecodeProfile = require("./lib/DecodeProfile");
 var Errors = require('./lib/Errors');
 
 /* Production optimisations and debug metadata flags */
@@ -1032,7 +1033,7 @@ var BinaryLoader = function( baseDir, database ) {
 	this.queuedRequests = [];
 
 	// Keep object table
-	this.profile = null;
+	this.profile = new DecodeProfile();
 
 	// References for delayed GC
 	this.__delayGC = [];
@@ -1050,9 +1051,7 @@ BinaryLoader.prototype = {
 	 * Add profile information to the decoder
 	 */
 	'addProfile': function( profile ) {
-		if (this.profile !== null) 
-			throw new Errors.AssertError('You can currently add only one profile!');
-		this.profile = profile;
+		this.profile.add( profile );
 	},
 
 	/**
@@ -1065,7 +1064,7 @@ BinaryLoader.prototype = {
 	'add': function( url, callback ) {
 
 		// Check for profile
-		if (this.profile === null) 
+		if (this.profile.size === 0) 
 			throw new Errors.AssertError('You must first add a profile!');
 
 		// Check for base dir

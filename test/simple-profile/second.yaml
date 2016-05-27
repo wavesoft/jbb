@@ -1,0 +1,29 @@
+
+# Meta
+
+@uuid: 0x3AB
+@require:
+    OT: ./objects
+
+# Simple objects
+
+OT.ObjectE:
+    frequent: 1
+    properties:
+        - objEpropA
+        - objEpropB
+        - objEpropC
+
+OT.ObjectF:
+    frequent: 1
+    properties:
+        - objFpropA
+        - objFpropB
+        - objFpropC
+
+OT.ObjectG:
+    init: [ objGpropA, objGpropB ]
+    properties:
+        - objGpropA
+        - objGpropB
+        - objGpropC

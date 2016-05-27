@@ -33,6 +33,7 @@ require('./simple-profile/objects').static(global);
 
 var EncodeProfile = require('./simple-profile/specs-encode');
 var DecodeProfile = require('./simple-profile/specs-decode');
+var DecodeCombProfile = require('../lib/DecodeProfile');
 
 const FLOAT32_POS = 3.40282346e+38; // largest positive number in float32
 const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
@@ -115,7 +116,7 @@ describe('[Core Tests]', function() {
 			assert.equal( u16[0], 0x4231, 		'Magic number should be 0x4231');
 			assert.equal( u16[1], EncodeProfile.id, 'Object table should be 0x'+EncodeProfile.id.toString(16));
 			assert.equal( u16[2], 0x0102,		'Protocol version should be v1.2');
-			assert.equal( u16[3], 0,			'Reserved header field should be 0');
+			assert.equal( u16[3], 1,			'Profile table size field should be 1');
 
 			// Check table
 			assert.equal( u32[2], 8,			'64-bit table size');
@@ -136,7 +137,9 @@ describe('[Core Tests]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, DecodeProfile );
+			var decodeProfile = new DecodeCombProfile();
+			decodeProfile.add( DecodeProfile );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, decodeProfile );
 
 			// Validate string table
 			assert.deepEqual( bundle.string_table, 
@@ -154,7 +157,9 @@ describe('[Core Tests]', function() {
 
 			// Get parts
 			var p = encode_stream( sparse );
-			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, DecodeProfile );
+			var decodeProfile = new DecodeCombProfile();
+			decodeProfile.add( DecodeProfile );
+			var bundle = new BinaryBundle( (p.length == 1) ? p[0] : p, decodeProfile );
 
 			// Validate string table
 			var plain_values = [ 1, 2, 3, 4 ];
@@ -711,6 +716,14 @@ describe('[Core Tests]', function() {
 			obj20.push(new ObjectB( 5123, "good" ));
 		}
 		it_should_return( obj20, '[ 256 x new ObjectB(5123, "good") ]', [match_metaType('array.primitive.repeated')] );
+
+		// Multiple object tables
+		var obj21 = new ObjectE(),
+			obj22 = new ObjectA(),
+			obj23 = new ObjectF( obj21, "simple" ),
+			obj24 = new ObjectF( obj22, "simple-cross" );
+			obj25 = new ObjectC( [obj22, obj23, obj24], "combined" );
+		it_should_return_combined( obj24, "[ Objects from 2 Object Tables ]" );
 
 	});
 

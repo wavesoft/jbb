@@ -27,6 +27,7 @@ var mime 		= require("mime");
 var deepEqual 	= require('deep-equal');
 var BinaryStream = require("./lib/BinaryStream");
 var Errors 		= require("./lib/Errors");
+var EncodeProfile = require('./lib/EncodeProfile');
 
 const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
 const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
@@ -3373,10 +3374,10 @@ var BinaryEncoder = function( filename, config ) {
 	this.sparse = (config['sparse'] === undefined) ? false : config['sparse'];
 	if (this.sparse) {
 
-		this.stream8.write( pack2b( 0x4231 ) ); 		// Magic header
-		this.stream8.write( pack2b( 0 ) ); 				// Object Table ID
-		this.stream8.write( pack2b( VERSION ) );	 	// Protocol Version
-		this.stream8.write( pack2b( 0 ) ); 				// Reserved
+		this.stream8.write( pack2b( 0x4231 ) ); 	// Magic header
+		this.stream8.write( pack2b( 0 ) ); 			// Object Table ID
+		this.stream8.write( pack2b( VERSION ) );	// Protocol Version
+		this.stream8.write( pack2b( 0 ) ); 			// Reserved
 
 		this.stream8.write( pack4b( 0 ) ); // 64-bit buffer lenght
 		this.stream8.write( pack4b( 0 ) ); // 32-bit buffer lenght
@@ -3401,8 +3402,8 @@ var BinaryEncoder = function( filename, config ) {
 	// Get bundle name
 	this.bundleName = this.config['name'] || filename.split("/").pop().replace(".3bd","");
 
-	// Get object table
-	this.profile = this.config['profile'] || null;
+	// Create a combined profile object
+	this.profile = new EncodeProfile();
 
 	// Database properties
 	this.dbTags = [];
@@ -3422,6 +3423,21 @@ var BinaryEncoder = function( filename, config ) {
 	this.plainObjectSignatureLookup = {};
 	this.plainObjectSignatureTable = [];
 
+	// Flag to prohibit profile adding after first encoding
+	this.canAddProfile = true;
+
+	// Add config profile if needed
+	if ( this.config['profile'] ) {
+		var prof = this.config['profile'];
+		if ( prof instanceof Array ) {
+			for (var i=0; i<prof.length; i++) {
+				this.addProfile( prof[i] );
+			}
+		} else {
+			this.addProfile( prof );
+		}
+	}
+
 }
 
 /**
@@ -3434,9 +3450,24 @@ BinaryEncoder.prototype = {
 	/**
 	 */
 	'addProfile': function( profile ) {
-		if (this.profile !== null) 
-			throw new Errors.AssertError('You can currently add only one profile!');
-		this.profile = profile;
+		if (!this.canAddProfile)
+			throw new Errors.AssertError('You cannot add a profile after you started encoding objects!');
+
+		// Combine profile information
+		this.profile.add( profile );
+
+		// If we have only 1 profile we are using the legacy mode
+		if (this.profile.count > 1) {
+
+			// Include previous ID when we switch to multi-profile mode
+			if (this.profile.count === 2) {
+				this.stream16.write( pack2b( this.profile.id, false ) );
+			}
+
+			// Keep profile ID on the top of the 16-bit table
+			this.stream16.write( pack2b( profile.id, false ) );
+		}
+
 	},
 
 	/**
@@ -3467,12 +3498,19 @@ BinaryEncoder.prototype = {
 		this.stream16.finalize();
 		this.stream8.finalize();
 
+		// Calculate the value to put on the profile table ID
+		var profile_id = 0x00;
+		if (this.profile.count == 1) {
+			profile_id = this.profile.id;
+		}
+
 		// If sparse bundle update stream8
 		var totalSize = 0;
 		if (this.sparse) {
 
 			// Overwrite header
-			this.stream8.writeAt( 2,  pack2b( this.profile.id ) );  // Update object table ID
+			this.stream8.writeAt( 2,  pack2b( profile_id ) );  	// Update object table ID
+			this.stream8.writeAt( 6,  pack2b( this.profile.count ) ); 	// Number of profile tables
 			this.stream8.writeAt( 8,  pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
 			this.stream8.writeAt( 12, pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
 			this.stream8.writeAt( 16, pack4b( this.stream16.offset ) ); // 16-bit buffer length
@@ -3511,9 +3549,9 @@ BinaryEncoder.prototype = {
 			// Open final stream
 			var finalStream = new BinaryStream( this.filename + '.jbb', 8 );
 			finalStream.write( pack2b( 0x4231 ) );  			 // Magic header
-			finalStream.write( pack2b( this.profile.id ) );  // Object Table ID
+			finalStream.write( pack2b( profile_id ) ); 	 		 // Object Table ID
 			finalStream.write( pack2b( VERSION ) );	  			 // Version
-			finalStream.write( pack2b( 0 ) );  					 // Reserved
+			finalStream.write( pack2b( this.profile.count ) );   // Number of profile tables
 			finalStream.write( pack4b( this.stream64.offset ) ); // 64-bit buffer lenght
 			finalStream.write( pack4b( this.stream32.offset ) ); // 32-bit buffer lenght
 			finalStream.write( pack4b( this.stream16.offset ) ); // 16-bit buffer length
@@ -3824,8 +3862,11 @@ BinaryEncoder.prototype = {
 		var tn = this.bundleName + "/" + name;
 
 		// Check for profile
-		if (this.profile === null) 
+		if (this.profile.size === 0) 
 			throw new Errors.AssertError('You must first add a profile!');
+
+		// Prohibit profile addition from now on
+		this.canAddProfile = false;
 
 		// Write control operation
 		this.stream8.write( pack1b( CTRL_OP.EXPORT ) );
