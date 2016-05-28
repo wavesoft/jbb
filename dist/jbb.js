@@ -68,20 +68,21 @@ var JBBBinaryLoader =
 
 	/* Imports */
 	var BinaryBundle = __webpack_require__(1);
-	var Errors = __webpack_require__(2);
+	var DecodeProfile = __webpack_require__(2);
+	var Errors = __webpack_require__(3);
 
 	/* Production optimisations and debug metadata flags */
 	if (false) var PROD = false;
 	if (false) var DEBUG = !PROD;
 
 	/* Size constants */
-	const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
-	const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+	var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+	var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
 
 	/**
 	 * Bundle loading states
 	 */
-	const PBUND_REQUESTED = 0,
+	var PBUND_REQUESTED = 0,
 		PBUND_LOADED = 1,
 		PBUND_PARSED = 2,
 		PBUND_ERROR = 3;
@@ -89,7 +90,7 @@ var JBBBinaryLoader =
 	/**
 	 * Numerical types
 	 */
-	const NUMTYPE = {
+	var NUMTYPE = {
 		UINT8: 	 0, INT8:    1,
 		UINT16:  2, INT16:   3,
 		UINT32:  4, INT32:   5,
@@ -99,7 +100,7 @@ var JBBBinaryLoader =
 	/**
 	 * Downscaling numtype conversion table
 	 */
-	const NUMTYPE_DOWNSCALE = {
+	var NUMTYPE_DOWNSCALE = {
 		// Source conversion type (actual)
 		FROM: [
 			NUMTYPE.UINT16,
@@ -147,7 +148,7 @@ var JBBBinaryLoader =
 	/**
 	 * Delta-Encoding for integers
 	 */
-	const NUMTYPE_DELTA_INT = {
+	var NUMTYPE_DELTA_INT = {
 		FROM: [
 			NUMTYPE.UINT16,
 			NUMTYPE.INT16 ,
@@ -169,7 +170,7 @@ var JBBBinaryLoader =
 	/**
 	 * Delta-Encoding for floats
 	 */
-	const NUMTYPE_DELTA_FLOAT = {
+	var NUMTYPE_DELTA_FLOAT = {
 		FROM: [
 			NUMTYPE.FLOAT32,
 			NUMTYPE.FLOAT32,
@@ -187,7 +188,7 @@ var JBBBinaryLoader =
 	/**
 	 * Numerical type classes
 	 */
-	const NUMTYPE_CLASS = [
+	var NUMTYPE_CLASS = [
 		Uint8Array,
 		Int8Array,
 		Uint16Array,
@@ -201,7 +202,7 @@ var JBBBinaryLoader =
 	/**
 	 * Lookup table of numerical type for NL (1-but) length fields
 	 */
-	const LN_NUMTYPE = [
+	var LN_NUMTYPE = [
 		NUMTYPE.UINT16,
 		NUMTYPE.UINT32
 	];
@@ -209,7 +210,7 @@ var JBBBinaryLoader =
 	/**
 	 * Lookup table of numerical type for LEN (2-but) length fields
 	 */
-	const LEN_NUMTYPE = [
+	var LEN_NUMTYPE = [
 		NUMTYPE.UINT8,
 		NUMTYPE.UINT16,
 		NUMTYPE.UINT32,
@@ -219,7 +220,7 @@ var JBBBinaryLoader =
 	/**
 	 * Delta encoding scale factor
 	 */
-	const DELTASCALE = {
+	var DELTASCALE = {
 		S_001 : 1, 	// Divide by 100 the value
 		S_1	  : 2, 	// Keep value as-is
 		S_R   : 3, 	// Multiply by 127 on 8-bit and by 32768 on 16-bit
@@ -229,7 +230,7 @@ var JBBBinaryLoader =
 	/**
 	 * BULK_KNOWN Array encoding operator codes
 	 */
-	const PRIM_BULK_KNOWN_OP = {
+	var PRIM_BULK_KNOWN_OP = {
 		LREF_7:	0x00, // Local reference up to 7bit
 		LREF_11:0xF0, // Local reference up to 11bit
 		LREF_16:0xFE, // Local reference up to 16bit
@@ -242,7 +243,7 @@ var JBBBinaryLoader =
 	/**
 	 * Simple primitive translation
 	 */
-	const PRIM_SIMPLE = [ undefined, null, false, true ],
+	var PRIM_SIMPLE = [ undefined, null, false, true ],
 		PRIM_SIMPLE_EX = [ NaN, /* Reserved */ ];
 
 	//////////////////////////////////////////////////////////////////
@@ -1080,7 +1081,7 @@ var JBBBinaryLoader =
 		this.queuedRequests = [];
 
 		// Keep object table
-		this.profile = null;
+		this.profile = new DecodeProfile();
 
 		// References for delayed GC
 		this.__delayGC = [];
@@ -1098,9 +1099,7 @@ var JBBBinaryLoader =
 		 * Add profile information to the decoder
 		 */
 		'addProfile': function( profile ) {
-			if (this.profile !== null) 
-				throw new Errors.AssertError('You can currently add only one profile!');
-			this.profile = profile;
+			this.profile.add( profile );
 		},
 
 		/**
@@ -1113,7 +1112,7 @@ var JBBBinaryLoader =
 		'add': function( url, callback ) {
 
 			// Check for profile
-			if (this.profile === null) 
+			if (this.profile.size === 0) 
 				throw new Errors.AssertError('You must first add a profile!');
 
 			// Check for base dir
@@ -1341,7 +1340,7 @@ var JBBBinaryLoader =
 	/**
 	 * Numerical types
 	 */
-	const NUMTYPE = {
+	var NUMTYPE = {
 		UINT8: 	 0, INT8:    1,
 		UINT16:  2, INT16:   3,
 		UINT32:  4, INT32:   5,
@@ -1428,11 +1427,13 @@ var JBBBinaryLoader =
 		this.magic  	= hv16[0];
 		this.table_id  	= hv16[1];
 		this.version 	= hv16[2];
+		this.table_count= hv16[3];
 
 		// Expand version
 		this.ver_major = this.version & 0x00ff;
 		this.ver_minor = (this.version & 0xff00) >> 8;
 
+		// Calculate upper bounds
 		this.max64  	= hv32[2];
 		this.max32 		= hv32[3];
 		this.max16 		= hv32[4];
@@ -1460,15 +1461,6 @@ var JBBBinaryLoader =
 			throw {
 				'name' 		: 'DecodingError',
 				'message'	: 'Unsupported bundle version v'+this.ver_minor+'.'+this.ver_minor,
-				toString 	: function(){return this.name + ": " + this.message;}
-			}
-		}
-
-		// Validate object table id
-		if (this.table_id != this.profile.id) {
-			throw {
-				'name' 		: 'DecodingError',
-				'message'	: 'The profile ID (0x'+this.profile.id.toString(16)+') does not match the object table in the binary bundle (0x'+this.table_id.toString(16)+')',
 				toString 	: function(){return this.name + ": " + this.message;}
 			}
 		}
@@ -1510,6 +1502,26 @@ var JBBBinaryLoader =
 			this.i64 /= 8;
 
 		}
+
+		// Load object tables
+		var ots = [];
+		if (this.table_count <= 1) {
+			ots.push( this.table_id );
+		} else if (this.table_id !== 0x00) {
+			throw {
+				'name' 		: 'DecodingError',
+				'message'	: 'Invalid header data',
+				toString 	: function(){return this.name + ": " + this.message;}
+			}
+		} else {
+			// Read known table IDs
+			for (var i=0; i<this.table_count; ++i) {
+				ots.push( this.u16[ this.i16++ ] );
+			}
+		}
+
+		// Activate the correct object IDs
+		this.profile.use( ots );		
 
 		// Internal reference table
 		this.iref_table = [];
@@ -1670,6 +1682,119 @@ var JBBBinaryLoader =
 
 /***/ },
 /* 2 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Decoder Multi-Profile Drop-in replacement
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	/**
+	 * Encoder profile
+	 */
+	var DecodeProfile = function() {
+		this.size = 0;
+		this._lib = [];
+		this._profiles = [];
+		this._offset = 0;
+		this._foffset = 0;
+	};
+
+	/**
+	 * Combine current profile with the given one
+	 */
+	DecodeProfile.prototype.add = function( profile ) {
+		// Add in the library. They will be used
+		// only when explicitly requested.
+		this._lib.push( profile );
+	}
+
+	/**
+	 * From the profiles added, use the ones specified in the list,
+	 * in the order they were given.
+	 */
+	DecodeProfile.prototype.use = function( ids ) {
+
+		// Pick the profiles of interest
+		for (var i=0, l=ids.length; i<l; i++) {
+			var profile = null, id = ids[i];
+
+			// Find profile
+			for (var j=0, ll=this._lib.length; j<ll; j++) {
+				var p = this._lib[j];
+				if (p.id === id) {
+					profile = p;
+					break;
+				}
+			}
+
+			// Throw an exception if not found
+			if (profile === null) {
+				var pid = (id & 0xFFF0) >> 4, rev = id & 0xF;
+				throw {
+					'name' 		: 'DecodingError',
+					'message'	: 'The bundle uses profile 0x'+pid.toString(16)+', rev '+rev+' but it was not loaded!',
+					toString 	: function(){return this.name + ": " + this.message;}
+				}
+			}
+
+			// Update size
+			this.size += profile.size;
+
+			// Keep profiles and bounds for fast segment lookup
+			this._profiles.push([ profile, 
+				this._foffset, this._foffset + profile.frequent,
+				this._offset, this._offset + profile.size - profile.frequent ]);
+
+			// Update offsets
+			this._offset += profile.size - profile.frequent;
+			this._foffset += profile.frequent;
+
+		}
+
+	}
+
+	/**
+	 * Drop-in replacement for the profile decode function
+	 */
+	DecodeProfile.prototype.decode = function( eid ) {
+		if (eid < 32) {
+			for (var i=0, l=this._profiles.length; i<l; ++i) {
+				var e = this._profiles[i], p = e[0], ofs = e[1], end = e[2];
+				if ((eid >= ofs) && (eid < end))
+					return p.decode( eid - ofs );
+			}
+		} else {
+			eid -= 32;
+			for (var i=0, l=this._profiles.length; i<l; ++i) {
+				var e = this._profiles[i], p = e[0], ofs = e[3], end = e[4];
+				if ((eid >= ofs) && (eid < end))
+					return p.decode( eid - ofs + 32 );
+			}
+		}
+	};
+
+	// Export profile
+	module.exports = DecodeProfile;
+
+
+/***/ },
+/* 3 */
 /***/ function(module, exports) {
 
 	"use strict";

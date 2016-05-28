@@ -28,13 +28,13 @@ if (typeof PROD === 'undefined') var PROD = false;
 if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
 
 /* Size constants */
-const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
-const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
 
 /**
  * Bundle loading states
  */
-const PBUND_REQUESTED = 0,
+var PBUND_REQUESTED = 0,
 	PBUND_LOADED = 1,
 	PBUND_PARSED = 2,
 	PBUND_ERROR = 3;
@@ -42,7 +42,7 @@ const PBUND_REQUESTED = 0,
 /**
  * Numerical types
  */
-const NUMTYPE = {
+var NUMTYPE = {
 	UINT8: 	 0, INT8:    1,
 	UINT16:  2, INT16:   3,
 	UINT32:  4, INT32:   5,
@@ -52,7 +52,7 @@ const NUMTYPE = {
 /**
  * Downscaling numtype conversion table
  */
-const NUMTYPE_DOWNSCALE = {
+var NUMTYPE_DOWNSCALE = {
 	// Source conversion type (actual)
 	FROM: [
 		NUMTYPE.UINT16,
@@ -100,7 +100,7 @@ const NUMTYPE_DOWNSCALE = {
 /**
  * Delta-Encoding for integers
  */
-const NUMTYPE_DELTA_INT = {
+var NUMTYPE_DELTA_INT = {
 	FROM: [
 		NUMTYPE.UINT16,
 		NUMTYPE.INT16 ,
@@ -122,7 +122,7 @@ const NUMTYPE_DELTA_INT = {
 /**
  * Delta-Encoding for floats
  */
-const NUMTYPE_DELTA_FLOAT = {
+var NUMTYPE_DELTA_FLOAT = {
 	FROM: [
 		NUMTYPE.FLOAT32,
 		NUMTYPE.FLOAT32,
@@ -140,7 +140,7 @@ const NUMTYPE_DELTA_FLOAT = {
 /**
  * Numerical type classes
  */
-const NUMTYPE_CLASS = [
+var NUMTYPE_CLASS = [
 	Uint8Array,
 	Int8Array,
 	Uint16Array,
@@ -154,7 +154,7 @@ const NUMTYPE_CLASS = [
 /**
  * Lookup table of numerical type for NL (1-but) length fields
  */
-const LN_NUMTYPE = [
+var LN_NUMTYPE = [
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32
 ];
@@ -162,7 +162,7 @@ const LN_NUMTYPE = [
 /**
  * Lookup table of numerical type for LEN (2-but) length fields
  */
-const LEN_NUMTYPE = [
+var LEN_NUMTYPE = [
 	NUMTYPE.UINT8,
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32,
@@ -172,7 +172,7 @@ const LEN_NUMTYPE = [
 /**
  * Delta encoding scale factor
  */
-const DELTASCALE = {
+var DELTASCALE = {
 	S_001 : 1, 	// Divide by 100 the value
 	S_1	  : 2, 	// Keep value as-is
 	S_R   : 3, 	// Multiply by 127 on 8-bit and by 32768 on 16-bit
@@ -182,7 +182,7 @@ const DELTASCALE = {
 /**
  * BULK_KNOWN Array encoding operator codes
  */
-const PRIM_BULK_KNOWN_OP = {
+var PRIM_BULK_KNOWN_OP = {
 	LREF_7:	0x00, // Local reference up to 7bit
 	LREF_11:0xF0, // Local reference up to 11bit
 	LREF_16:0xFE, // Local reference up to 16bit
@@ -195,7 +195,7 @@ const PRIM_BULK_KNOWN_OP = {
 /**
  * Simple primitive translation
  */
-const PRIM_SIMPLE = [ undefined, null, false, true ],
+var PRIM_SIMPLE = [ undefined, null, false, true ],
 	PRIM_SIMPLE_EX = [ NaN, /* Reserved */ ];
 
 //////////////////////////////////////////////////////////////////

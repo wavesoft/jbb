@@ -29,26 +29,26 @@ var BinaryStream = require("./lib/BinaryStream");
 var Errors 		= require("./lib/Errors");
 var EncodeProfile = require('./lib/EncodeProfile');
 
-const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
-const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
-const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
+var FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
+var FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
+var FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 
 /* Note that all these values are exclusive, for positive test (ex v < UING8_MAX) */
 
-const UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
-const UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
-const UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
+var UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
+var UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
+var UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
 
-const INT8_MIN 		= -129; // largest negative signed integer on 8-bit
-const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
-const INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
-const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
-const INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
-const INT32_MAX 	= 2147483648; // largest positive signed integer on 16-bit
+var INT8_MIN 		= -129; // largest negative signed integer on 8-bit
+var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+var INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
+var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+var INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
+var INT32_MAX 	= 2147483648; // largest positive signed integer on 16-bit
 
 /* Version of binary bundle */
 
-const VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
+var VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
 
 /*
 
@@ -63,7 +63,7 @@ Known Limitations
  * If this constant is true, the packing functions will do sanity checks,
  * which might increase the build time.
  */
-const SAFE = 1;
+var SAFE = 1;
 
 /**
  * Fake DOM environment when from node
@@ -122,7 +122,7 @@ var BinarySearchTree = bst.BinarySearchTree,
 /**
  * Numerical types
  */
-const NUMTYPE = {
+var NUMTYPE = {
 	// For protocol use
 	UINT8: 	 0, INT8:    1,
 	UINT16:  2, INT16:   3,
@@ -135,11 +135,11 @@ const NUMTYPE = {
 /**
  * Numerical length types
  */
-const NUMTYPE_LN = {
+var NUMTYPE_LN = {
 	UINT16: 0,
 	UINT32 : 1
 };
-const NUMTYPE_LEN = {
+var NUMTYPE_LEN = {
 	UINT8: 	 0,
 	UINT16:  1,
 	UINT32:  2,
@@ -149,7 +149,7 @@ const NUMTYPE_LEN = {
 /**
  * Log flags
  */
-const LOG = {
+var LOG = {
 	PRM: 	0x0001, // Primitive messages
 	ARR: 	0x0002, // Array messages
 	CHU: 	0x0004, // Array Chunk
@@ -168,7 +168,7 @@ const LOG = {
 /**
  * Log prefix chunks
  */
-const LOG_PREFIX_STR = {
+var LOG_PREFIX_STR = {
 	0x0001 	: 'PRM',
 	0x0002 	: 'ARR',
 	0x0004 	: 'CHU',
@@ -186,7 +186,7 @@ const LOG_PREFIX_STR = {
 /**
  * Numerical type classes
  */
-const NUMTYPE_CLASS = [
+var NUMTYPE_CLASS = [
 	Uint8Array,
 	Int8Array,
 	Uint16Array,
@@ -200,7 +200,7 @@ const NUMTYPE_CLASS = [
 /**
  * Downscaling numtype conversion table from/to
  */
-const NUMTYPE_DOWNSCALE = {
+var NUMTYPE_DOWNSCALE = {
 	FROM: [
 		NUMTYPE.UINT16,
 		NUMTYPE.INT16 ,
@@ -246,7 +246,7 @@ const NUMTYPE_DOWNSCALE = {
 /**
  * Delta-Encoding for integers
  */
-const NUMTYPE_DELTA_INT = {
+var NUMTYPE_DELTA_INT = {
 	FROM: [
 		NUMTYPE.UINT16,
 		NUMTYPE.INT16 ,
@@ -268,7 +268,7 @@ const NUMTYPE_DELTA_INT = {
 /**
  * Delta-Encoding for floats
  */
-const NUMTYPE_DELTA_FLOAT = {
+var NUMTYPE_DELTA_FLOAT = {
 	FROM: [
 		NUMTYPE.FLOAT32,
 		NUMTYPE.FLOAT32,
@@ -286,7 +286,7 @@ const NUMTYPE_DELTA_FLOAT = {
 /**
  * Delta encoding scale factor
  */
-const DELTASCALE = {
+var DELTASCALE = {
 	S_001 : 1, 	// Divide by 100 the value
 	S_1	  : 2, 	// Keep value as-is
 	S_R   : 3, 	// Multiply by 127 on 8-bit and by 32768 on 16-bit
@@ -296,7 +296,7 @@ const DELTASCALE = {
 /**
  * Control Op-Codes
  */
-const CTRL_OP = {
+var CTRL_OP = {
 	ATTRIB 	: 0x80,		// Attribute
 	EXPORT	: 0xF8, 	// External Export
 	EMBED 	: 0xF9, 	// Embedded resource
@@ -305,7 +305,7 @@ const CTRL_OP = {
 /**
  * Primitive Op-Codes
  */
-const PRIM_OP = {
+var PRIM_OP = {
 	ARRAY: 		0x00, 	// Array
 	OBJECT: 	0x80, 	// Object / Plain Object [ID=0]
 	BUFFER: 	0xC0, 	// Buffer
@@ -319,7 +319,7 @@ const PRIM_OP = {
 /**
  * Object Op-Codes
  */
-const OBJ_OP = {
+var OBJ_OP = {
 	KNOWN_5:		0x00,	// Known object (5-bit)
 	KNOWN_12: 		0x20,	// Known object (12-bit)
 	PLAIN_LOOKUP:	0x30,	// A plain object from lookup table
@@ -331,14 +331,14 @@ const OBJ_OP = {
 /**
  * Primitive object op-codes
  */
-const OBJ_PRIM = {
+var OBJ_PRIM = {
 	DATE: 			0x00, 	// A DATE primitive
 };
 
 /**
  * Array Op-Codes
  */
-const ARR_OP = {
+var ARR_OP = {
 	NUM_DWS: 		 0x00, // Downscaled Numeric Type
 	NUM_DELTA_INT:	 0x20, // Delta-Encoded Integer Array
 	NUM_DELTA_FLOAT: 0x30, // Delta-Encoded Float Array
@@ -358,7 +358,7 @@ const ARR_OP = {
 /**
  * Array chunk types
  */
-const ARR_CHUNK = {
+var ARR_CHUNK = {
 	PRIMITIVES:  1, // Two or more primitives
 	REPEAT: 	 2, // Repeated of the same primitive
 	NUMERIC: 	 3, // A numeric TypedArray
@@ -366,7 +366,7 @@ const ARR_CHUNK = {
 	BULK_KNOWN:  5, // A bulk of known objects
 };
 
-const _ARR_CHUNK = [
+var _ARR_CHUNK = [
 	undefined,
 	'PRIMITIVES',
 	'REPEAT',
@@ -378,7 +378,7 @@ const _ARR_CHUNK = [
 /**
  * Simple primitives
  */
-const PRIM_SIMPLE = {
+var PRIM_SIMPLE = {
 	UNDEFINED: 	0,
 	NULL: 		1,
 	FALSE: 		2,
@@ -388,14 +388,14 @@ const PRIM_SIMPLE = {
 /**
  * Extended simple primitives
  */
-const PRIM_SIMPLE_EX = {
+var PRIM_SIMPLE_EX = {
 	NAN: 	0,
 };
 
 /**
  * Buffer primitive MIME Types
  */
-const PRIM_BUFFER_TYPE = {
+var PRIM_BUFFER_TYPE = {
 	STRING_LATIN: 	 0,
 	STRING_UTF8: 	 1,
 	BUF_IMAGE: 		 2,
@@ -406,7 +406,7 @@ const PRIM_BUFFER_TYPE = {
 /**
  * BULK_KNOWN Array encoding operator codes
  */
-const PRIM_BULK_KNOWN_OP = {
+var PRIM_BULK_KNOWN_OP = {
 	LREF_7:	0x00, // Local reference up to 7bit
 	LREF_11:0xF0, // Local reference up to 11bit
 	LREF_16:0xFE, // Local reference up to 16bit
@@ -419,7 +419,7 @@ const PRIM_BULK_KNOWN_OP = {
 /**
  * String representation of numerical type for debug messages
  */
-const _NUMTYPE = [
+var _NUMTYPE = [
 	'UINT8',
 	'INT8',
 	'UINT16',
@@ -432,7 +432,7 @@ const _NUMTYPE = [
 	'UNKNOWN',
 	'NaN',
 ];
-const _NUMTYPE_DOWNSCALE_DWS = [
+var _NUMTYPE_DOWNSCALE_DWS = [
 	'UINT16 -> UINT8',
 	'INT16 -> INT8',
 	'UINT32 -> UINT8',
@@ -449,7 +449,7 @@ const _NUMTYPE_DOWNSCALE_DWS = [
 	'FLOAT64 -> INT16',
 	'FLOAT64 -> FLOAT32'
 ];
-const _NUMTYPE_DOWNSCALE_DELTA_INT = [
+var _NUMTYPE_DOWNSCALE_DELTA_INT = [
 	'UINT16 -> INT8',
 	'INT16 -> INT8',
 	'UINT32 -> INT8',
@@ -457,7 +457,7 @@ const _NUMTYPE_DOWNSCALE_DELTA_INT = [
 	'UINT32 -> INT16',
 	'INT32 -> INT16'
 ];
-const _NUMTYPE_DOWNSCALE_DELTA_FLOAT = [
+var _NUMTYPE_DOWNSCALE_DELTA_FLOAT = [
 	'FLOAT32 -> INT8',
 	'FLOAT32 -> INT16',
 	'FLOAT64 -> INT8',
@@ -1377,14 +1377,14 @@ function arrangeBlocks( start, len, blocks ) {
  */
 function analyzePrimitiveArray( encoder, array ) {
 
-	const DEBUG_THIS = 0;
+	var DEBUG_THIS = 0;
 
-	const TEST_NUMBER = 0,
+	var TEST_NUMBER = 0,
 		  TEST_PLAIN = 1,
 		  TEST_OBJECT = 2,
 		  TEST_PRIMITIVE = 3;
 
-	const BF_PRIM 	= 0x01,
+	var BF_PRIM 	= 0x01,
 		  BF_REP	= 0x02,
 		  BF_NUM 	= 0x04,
 		  BF_PLAIN 	= 0x08,	
@@ -2205,7 +2205,7 @@ function encodeArray_PRIM_BULK_PLAIN( encoder, data, properties ) {
  * Helper function to encode local-lookup internal references
  */
 function encodeLIREF(encoder, op8, op16, local_ids, xrid) {
-	const DEBUG_THIS = false;
+	var DEBUG_THIS = false;
 
 	// Check if the given object is part of the array
 	var id=-1, i=0, l=local_ids.length;
@@ -2245,7 +2245,7 @@ function encodeLIREF(encoder, op8, op16, local_ids, xrid) {
  * Encode array data as bulk of known objects
  */
 function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
-	const DEBUG_THIS = false;
+	var DEBUG_THIS = false;
 
 	//
 	// Bulk Array for Known Object (PRIM_BULK_KNOWN)
