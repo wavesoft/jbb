@@ -39,8 +39,8 @@ var UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
 var UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
 var UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
 
-var INT8_MIN 		= -129; // largest negative signed integer on 8-bit
-var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+var INT8_MIN 	= -129; // largest negative signed integer on 8-bit
+var INT8_MAX 	= 128; // largest positive signed integer on 8-bit
 var INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
 var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
 var INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
@@ -3452,6 +3452,11 @@ BinaryEncoder.prototype = {
 	'addProfile': function( profile ) {
 		if (!this.canAddProfile)
 			throw new Errors.AssertError('You cannot add a profile after you started encoding objects!');
+
+		// If this is a string, use require to locate the actual module.
+		if (typeof profile === "string") {
+			profile = require( "jbb-profile-"+profile+'/profile-encode' );
+		}
 
 		// Combine profile information
 		this.profile.add( profile );

@@ -10,8 +10,6 @@ Javascript Binary Bundle is a binary bundle format for packaging data structures
 
 :warning: This format is Architecture-Dependant: This means if you are compiling a binary bundle in little-endian machine it will *only* work on little-endian machines! _(We are not using `DataView`, but rather raw TypedArrays for performance purposes)._
 
-:warning: This project is still in development. Some protocol features might be buggy or might change in the future without prior notice. Also the build time in some cases might be very slow. 
-
 Curious to see some tests? [Timing Example](https://cdn.rawgit.com/wavesoft/jbb-tests/7d71eb26378860d4059097f3ee6d41fb0940299b/jbb_test_timing.html) - [Example 1](http://cdn.rawgit.com/wavesoft/jbb-tests/7d71eb26378860d4059097f3ee6d41fb0940299b/jbb_test_loader_1.html) - [Example 2](http://cdn.rawgit.com/wavesoft/jbb-tests/7d71eb26378860d4059097f3ee6d41fb0940299b/jbb_test_loader_2.html)
 
 Or you can read the [Using JBB with THREE.js](https://github.com/wavesoft/jbb/blob/master/doc/Tutorial%201%20-%20THREEjs/Using%20with%20THREEjs.md) tutoral.
@@ -151,16 +149,15 @@ If you want more fine-grained control on the creation of your bundle, you can us
 But you can now do something like this:
 
 ```javascript
-var BinaryEncoder = require("jbb").BinaryEncoder;
-
-// You will need to load a releavant object table
-var THREEObjectTable = require("jbb-profile-three");
+var BinaryEncoder = require("jbb/encoder");
 
 // Create a new bundle
 var bundle = new BinaryEncoder('path/to/bundle', {
-    'name': 'bundle',                 // Bundle Name (For x-ref)
-    'object_table': THREEObjectTable, // Object Table to Use
+    'name': 'bundle'    // Bundle Name (For x-ref)
 })
+
+// Register the encoding profile
+bundle.addProfile( require("jbb-profile-three/profile-encode") );
 
 // Encode your objects
 bundle.encode( new THREE.Vector3(0,0,0), "scene/zero" );
@@ -176,22 +173,22 @@ The following snippet demonstrates how to load a binary bundle in your project:
 
 ```javascript
 var BinaryDecoder = require("jbb/decoder");
-var profile = require("jbb-profile-three");
+var Profile = require("jbb-profile-three/profile-decode");
 
 // Create a decoder
 var loader = new BinaryDecoder( "bundle/base/dir" );
 
-// Specify the decoding profile
-loader.addProfile( profile );
+// Register the decoding profile
+loader.addProfile( Profile );
 
 // Schedule one or more budles to load
 binaryLoader.add( 'bundle1.jbb');
 binaryLoader.add( 'bundle2.jbbp'); // Sparse bundles (multiple files)
 
 // Load everything and call back
-binaryLoader.load(function() {
+binaryLoader.load(function( error, database ) {
     // All resources are now loaded in the database
-    console.log( binaryLoader.database );
+    console.log( database );
 });
 ```
 

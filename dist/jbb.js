@@ -1112,7 +1112,7 @@ var JBBBinaryLoader =
 		'add': function( url, callback ) {
 
 			// Check for profile
-			if (this.profile.size === 0) 
+			if (this.profile._lib.length === 0) 
 				throw new Errors.AssertError('You must first add a profile!');
 
 			// Check for base dir
