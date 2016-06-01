@@ -54,7 +54,7 @@ function compileFile( sourceBundle, bundleFile, config, callback ) {
  */
 function compile( bundleData, bundleFile, config, callback ) {
 	var baseDir = config['path'] || path.dirname(bundleFile);
-	var encoder, profileEncoder, profileLoader, bundleLoader;
+	var encoder, profileEncoder = [], profileLoader = [], bundleLoader;
 
 	// Compile stages
 	var openBundle = function( cb ) {
@@ -66,11 +66,15 @@ function compile( bundleData, bundleFile, config, callback ) {
 					{
 						'name' 			: bundleData['name'],
 						'base_dir' 		: baseDir,
-						'profile'	 	: profileEncoder,
 						'log'			: config['log'] || 0x00,
 						'sparse'		: config['sparse'],
 					}
 				);
+
+			// Add profiles
+			for (var i=0; i<profileEncoder.length; i++) {
+				encoder.addProfile( profileEncoder[i] );
+			}
 
 			// We are ready
 			cb();
@@ -131,6 +135,12 @@ function compile( bundleData, bundleFile, config, callback ) {
 		profileEncoder = config['profileEncoder'];
 		profileLoader = config['profileLoader'];
 
+		// Make sure it's array
+		if (typeof profileEncoder === 'string')
+			profileEncoder = [ profileEncoder ];
+		if (typeof profileLoader === 'string')
+			profileLoader = [ profileLoader ];
+
 	} else {
 
 		// Identify some important information
@@ -140,26 +150,41 @@ function compile( bundleData, bundleFile, config, callback ) {
 			return;
 		}
 
-		// Fetch
-		profileEncoder = require('jbb-profile-'+profile+'/profile-encode');
-		profileLoader = require('jbb-profile-'+profile+"/profile-loader");
+		// Make sure it's array
+		if (typeof profile === 'string')
+			profile = [ profile ];
+
+		// Require
+		for (var i=0; i<profile.length; i++) {
+			profileEncoder.push( require('jbb-profile-'+profile[i]+'/profile-encode') );
+			profileLoader.push( require('jbb-profile-'+profile[i]+"/profile-loader") );
+		}
 
 	}
 
 	// Load profile table and compiler helper
 	bundleLoader = new BundlesLoader( baseDir );
-	bundleLoader.addProfileLoader( profileLoader );
+	for (var i=0; i<profileLoader.length; i++) {
+		bundleLoader.addProfileLoader( profileLoader[i] );
+	}
+
+	var context = { 'remaining': profileLoader.length }
+	var init_callback = (function() {
+		if (--this.remaining == 0) {
+			openBundle(
+				loadBundles(
+					compileExports(
+						closeBundle( callback || function(){} )
+						) 
+					) 
+			)();
+		}
+	}).bind(context);
 
 	// Initialize profile compiler
-	profileLoader.initialize( 
-		openBundle(
-			loadBundles(
-				compileExports(
-					closeBundle( callback || function(){} )
-					) 
-				) 
-			)
-	);
+	for (var i=0; i<profileLoader.length; i++) {
+		profileLoader[i].initialize( init_callback );
+	}
 
 }
 

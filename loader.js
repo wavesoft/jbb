@@ -39,6 +39,7 @@ const STATE_REQUESTED 	= 0;
 const STATE_SPECS 		= 1;
 const STATE_LOADING		= 2;
 const STATE_LOADED 		= 3;
+const STATE_FAILED 		= 4;
 
 /**
  * Apply full path by replacing the ${BUNDLE} macro or
@@ -276,8 +277,6 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 	var load_callback = (function() {
 		// When we reached 0, call process again
 		if (--this.counter == 0) {
-			// Mark as loaded
-			this.state = STATE_LOADED;
 			// Callback
 			callback( self );
 		}
@@ -308,13 +307,27 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 			// Use loader function to load file contents
 			loadFn( file, true, function( err, fileBufer ) {
 
-				// Expose blob
-				self.blobs[key] = [fileBufer, mime];
+				// Handle errors
+				if (err) {
 
-				// Expose blobs to the database only if accessing from the browser
-				if (IS_BROWSER) {
-					var blob = new Blob([ fileBufer ], { type: mime });
-					self.bundles.database[self.name+'/'+key] = URL.createObjectURL(blob);
+					// Mark as failed
+					self.state = STATE_FAILED;
+					self.error = err;
+
+				} else {
+
+					// Expose blob
+					self.blobs[key] = [fileBufer, mime];
+
+					// Expose blobs to the database only if accessing from the browser
+					if (IS_BROWSER) {
+						var blob = new Blob([ fileBufer ], { type: mime });
+						self.bundles.database[self.name+'/'+key] = URL.createObjectURL(blob);
+					}
+
+					// Mark as loaded
+					self.state = STATE_LOADED;
+
 				}
 
 				// Decrement counter
@@ -331,18 +344,49 @@ QueuedBundle.prototype.loadBundle = function( loadFn, callback ) {
 				// Try this bundle loader to load the specified resources
 				loaded = loaders[j].load( loaderClass, loaderConfig, key,
 					function(err, objects) {
-						// Collect resources
-						for (var k in objects) {
+						// Handle errors
+						if (err) {
 
-							// Expose resources
-							self.resources[k] = objects[k];
-							self.bundles.database[self.name+'/'+k] = objects[k];
+							// Mark as failed
+							self.state = STATE_FAILED;
+							self.error = err;
+
+						} else {
+
+							// Collect resources
+							for (var k in objects) {
+
+								// Expose resources
+								self.resources[k] = objects[k];
+								self.bundles.database[self.name+'/'+k] = objects[k];
+
+							}
+
+							// Mark as loaded
+							self.state = STATE_LOADED;
 
 						}
+
 						// Decrement counter
 						setTimeout(load_callback, 1);
+
 					}
 				);
+
+				// If this worked, don't try other loader
+				if (loaded) break;
+			}
+
+			// Check if this could't be loaded
+			if (!loaded) {
+
+				// Mark as failed
+				self.state = STATE_FAILED;
+				self.error = "The load class '"+loaderClass+"' is not handled by any profile(s)";
+
+				// Decrement counter
+				setTimeout(load_callback, 1);
+
 			}
 
 		}
@@ -374,9 +418,12 @@ QueuedBundle.prototype.addCallback = function( cb ) {
 	// If not really a callback, return
 	if (!cb) return;
 
-	// If loaded trigger right away
+	// If loaded or failed trigger right away
 	if (this.state == STATE_LOADED) {
 		cb( null, this );
+		return;
+	} else if (this.state == STATE_FAILED) {
+		cb( this.error, null );
 		return;
 	}
 
@@ -388,14 +435,14 @@ QueuedBundle.prototype.addCallback = function( cb ) {
 /**
  * Trigger all the pending callbacks
  */
-QueuedBundle.prototype.triggerCallbacks = function( error ) {
+QueuedBundle.prototype.triggerCallbacks = function() {
 
 	// Trigger callbacks
-	if (error) {
+	if (this.state == STATE_FAILED) {
 		for (var i=0; i<this.callbacks.length; i++) {
-			this.callbacks[i]( error, null );
+			this.callbacks[i]( this.error, null );
 		}
-	} else {
+	} else if (this.state == STATE_LOADED) {
 		for (var i=0; i<this.callbacks.length; i++) {
 			this.callbacks[i]( null, this );
 		}
@@ -421,6 +468,11 @@ var BundlesLoader = function( baseURL ) {
 	 * Loaded bundles
 	 */
 	this.bundles = {};
+
+	/**
+	 * Failed bundles
+	 */
+	this.failedBundles = [];
 
 	/**
 	 * Database of all loaded resources
@@ -679,6 +731,9 @@ BundlesLoader.prototype.__process = function() {
 			// Download pending requests in parallel
 			context.counter++;
 			item.loadBundle( this.__loadFileContents, function(bundle) {
+				// Collect failed bundles
+				if (bundle.state == STATE_FAILED)
+					this.failedBundles.push(bundle);
 				// Callback bundle callbacks
 				bundle.triggerCallbacks();
 				// Decrement counter
@@ -706,7 +761,7 @@ BundlesLoader.prototype.__process = function() {
 		if (!item) {
 			// We are done loading the bundle chain, fire callbacks
 			for (var i=0; i<self.loadCallbacks.length; i++)
-				self.loadCallbacks[i]();
+				self.loadCallbacks[i]( this.database, this.failedBundles );
 			// And reset them
 			self.loadCallbacks = [];
 			return;
