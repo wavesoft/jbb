@@ -387,7 +387,7 @@ function decodeObject( bundle, database, op ) {
  */
 function decodePivotArrayFloat( bundle, database, len, num_type ) {
 	var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
-		pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
+		// pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
 		scale = bundle.readFloat64(),
 		values = bundle.readTypedArray( NUMTYPE_DELTA_FLOAT.TO[ num_type ] , len );
 
@@ -396,7 +396,7 @@ function decodePivotArrayFloat( bundle, database, len, num_type ) {
 	// Decode
 	for (var i=0; i<len; ++i) {
 		ans[i] = pivot + (values[i] * scale);
-		console.log("<<<", values[i],"->", ans[i]);
+		// console.log("<<<", values[i],"->", ans[i]);
 	}
 
 	return DEBUG
@@ -470,7 +470,7 @@ function decodePlainBulkArray( bundle, database ) {
  * Decode bulk array of entities
  */
 function decodeKnownBulkArray( bundle, database, len ) {
-	var DEBUG_THIS = false;
+	const DEBUG_THIS = false;
 	// console.log("<-- @"+(bundle.i16 - bundle.ofs16/2),"EID:",bundle.u16[bundle.i16],"LEN:", len);
 	var eid = bundle.u16[bundle.i16++],
 		FACTORY = bundle.profile.decode( eid ), 
