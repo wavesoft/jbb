@@ -732,8 +732,9 @@ BundlesLoader.prototype.__process = function() {
 			context.counter++;
 			item.loadBundle( this.__loadFileContents, function(bundle) {
 				// Collect failed bundles
-				if (bundle.state == STATE_FAILED)
-					this.failedBundles.push(bundle);
+				if (bundle.state == STATE_FAILED) {
+					self.failedBundles.push(bundle);
+				}
 				// Callback bundle callbacks
 				bundle.triggerCallbacks();
 				// Decrement counter

@@ -156,8 +156,14 @@ function compile( bundleData, bundleFile, config, callback ) {
 
 		// Require
 		for (var i=0; i<profile.length; i++) {
-			profileEncoder.push( require('jbb-profile-'+profile[i]+'/profile-encode') );
-			profileLoader.push( require('jbb-profile-'+profile[i]+"/profile-loader") );
+			var pname = profile[i];
+			if (pname[0] == ".") {
+				profileEncoder.push( require( path.join(process.cwd(), pname, '/profile-encode') ) );
+				profileLoader.push( require( path.join(process.cwd(), pname, "/profile-loader") ) );
+			} else {
+				profileEncoder.push( require('jbb-profile-'+pname+'/profile-encode') );
+				profileLoader.push( require('jbb-profile-'+pname+"/profile-loader") );
+			}
 		}
 
 	}
@@ -168,6 +174,7 @@ function compile( bundleData, bundleFile, config, callback ) {
 		bundleLoader.addProfileLoader( profileLoader[i] );
 	}
 
+	// Chained initialization of profile loaders
 	var context = { 'remaining': profileLoader.length }
 	var init_callback = (function() {
 		if (--this.remaining == 0) {
@@ -181,9 +188,13 @@ function compile( bundleData, bundleFile, config, callback ) {
 		}
 	}).bind(context);
 
-	// Initialize profile compiler
+	// Initialize profile compiler with the specs file
 	for (var i=0; i<profileLoader.length; i++) {
-		profileLoader[i].initialize( init_callback );
+		if (!profileLoader[i].initialize) {
+			init_callback();
+		} else {
+			profileLoader[i].initialize( init_callback, bundleData );
+		}
 	}
 
 }

@@ -1,5 +1,5 @@
 /* JBB Binary Bundle Loader - https://github.com/wavesoft/jbb */
-var JBBBinaryLoader =
+var JBB = JBB || {}; JBB["BinaryLoader"] =
 /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -46,7 +46,7 @@ var JBBBinaryLoader =
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	"use strict";
+	/* WEBPACK VAR INJECTION */(function(process) {"use strict";
 	/**
 	 * JBB - Javascript Binary Bundles - Binary Decoder
 	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
@@ -67,13 +67,21 @@ var JBBBinaryLoader =
 	 */
 
 	/* Imports */
-	var BinaryBundle = __webpack_require__(1);
-	var DecodeProfile = __webpack_require__(2);
-	var Errors = __webpack_require__(3);
+	var BinaryBundle = __webpack_require__(2);
+	var DecodeProfile = __webpack_require__(3);
+	var ProgressManager = __webpack_require__(4);
+	var Errors = __webpack_require__(5);
 
 	/* Production optimisations and debug metadata flags */
-	if (false) var PROD = false;
-	if (false) var DEBUG = !PROD;
+	if (false) var GULP_BUILD = false;
+	var IS_NODE = !(0) || (typeof window === "undefined");
+	var PROD = (0) || !process.env.JBB_DEBUG;
+	var DEBUG = !PROD;
+
+	/* Additional includes on node builds */
+	if (IS_NODE) {
+		var fs = __webpack_require__(6);
+	}
 
 	/* Size constants */
 	var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
@@ -307,7 +315,7 @@ var JBBBinaryLoader =
 	function decodeBlobURL( bundle, length ) {
 		var mimeType = bundle.readStringLT(),
 			blob = new Blob([ bundle.readTypedArray(NUMTYPE.UINT8, length ) ], { type: mimeType });
-		return  false
+		return DEBUG
 			? __debugMeta( URL.createObjectURL(blob), 'buffer', { 'mime': mimeType, 'size': length } )
 			: URL.createObjectURL(blob);
 	}
@@ -327,13 +335,13 @@ var JBBBinaryLoader =
 		// Process buffer according to type
 		if (buf_type === 0) { // STRING_LATIN
 			ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT8 , length ) );
-			return  false
+			return DEBUG
 				? __debugMeta( ans, 'string.latin', {} )
 				: ans;
 
 		} else if (buf_type === 1) { // STRING_UTF8
 			ans = String.fromCharCode.apply(null, bundle.readTypedArray( NUMTYPE.UINT16 , length ) );
-			return  false
+			return DEBUG
 				? __debugMeta( ans, 'string.utf8', {} )
 				: ans;
 
@@ -382,7 +390,7 @@ var JBBBinaryLoader =
 			FACTORY.init( instance, prop_table, 1, 0 );
 
 			// Append debug metadata
-			(false) && __debugMeta( instance, 'object.known', { 'eid': eid } );
+			DEBUG && __debugMeta( instance, 'object.known', { 'eid': eid } );
 			return instance;
 
 		} else if ((op & 0x3C) === 0x38) { // Primitive object
@@ -393,7 +401,7 @@ var JBBBinaryLoader =
 						tzOffset = bundle.s8[bundle.i8++] * 10;
 
 					// Return date
-					return  false 
+					return DEBUG 
 							? __debugMeta( new Date( date ), 'object.date', {} )
 							: new Date( date );
 
@@ -412,7 +420,7 @@ var JBBBinaryLoader =
 				throw new Errors.AssertError('Could not found simple object signature with id #'+eid+'!');
 
 			// Create object
-			return  false
+			return DEBUG
 				? __debugMeta( factory(values), 'object.plain', { 'eid': eid } )
 				: factory(values);
 
@@ -439,7 +447,7 @@ var JBBBinaryLoader =
 			console.log("<<<", values[i],"->", ans[i]);
 		}
 
-		return  false
+		return DEBUG
 			? __debugMeta( ans, 'array.delta.float', {} )
 			: ans;
 	}
@@ -473,7 +481,7 @@ var JBBBinaryLoader =
 		}
 
 		// Return
-		return  false
+		return DEBUG
 			? __debugMeta( ans, 'array.delta.int', {} )
 			: ans;
 	}
@@ -500,7 +508,7 @@ var JBBBinaryLoader =
 		for (var i=0; i<len; ++i)
 			ans[i] = factory(values, i);
 
-		return  false
+		return DEBUG
 			? __debugMeta( ans, 'array.primitive.bulk_plain', { 'sid': sid } )
 			: ans;
 		
@@ -605,7 +613,7 @@ var JBBBinaryLoader =
 		}
 
 		// Free proprty tables and return objects
-		return  false
+		return DEBUG
 			? __debugMeta( ans, 'array.bulk', { 'eid': eid } )
 			: ans;
 
@@ -636,7 +644,7 @@ var JBBBinaryLoader =
 					len = ln ? bundle.u32[bundle.i32++] : bundle.u16[bundle.i16++];
 
 					// Collect meta
-					if (false) {
+					if (DEBUG) {
 						chunk_meta.push({
 							type: op,
 							len: len
@@ -667,7 +675,7 @@ var JBBBinaryLoader =
 
 					// Collect chunk ops
 					chunk = decodeArray( bundle, database, op );
-					if (false) {
+					if (DEBUG) {
 						chunk_meta.push({
 							type: op,
 							len: chunk.length
@@ -699,7 +707,7 @@ var JBBBinaryLoader =
 
 				// Collect chunk ops
 				chunk = decodeArray( bundle, database, op );
-				if (false) {
+				if (DEBUG) {
 					chunk_meta.push({
 						type: op,
 						len: chunk.length
@@ -736,11 +744,11 @@ var JBBBinaryLoader =
 
 		// Return chunked array
 		if (is_numeric) {
-			return  false
+			return DEBUG
 				? __debugMeta( nans, 'array.primitive.chunked', { 'chunks': chunk_meta, 'numeric': true } )
 				: nans;
 		} else {
-			return  false
+			return DEBUG
 				? __debugMeta( vans, 'array.primitive.chunked', { 'chunks': chunk_meta, 'numeric': false } )
 				: vans;
 		}
@@ -769,7 +777,7 @@ var JBBBinaryLoader =
 				nArr[i] = decodePrimitive( bundle, database );
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( nArr, 'array.primitive.short', {} )
 				: nArr;
 
@@ -777,7 +785,7 @@ var JBBBinaryLoader =
 
 			// Return empty array
 			// console.log("<<< @"+(bundle.i8-bundle.ofs8)+" Empty");
-			return  false
+			return DEBUG
 				? __debugMeta( [], 'array.empty', {} )
 				: [];
 
@@ -797,7 +805,7 @@ var JBBBinaryLoader =
 			var tArr = new NUMTYPE_CLASS[ NUMTYPE_DOWNSCALE.FROM[type] ]( vArr );
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( tArr, 'array.numeric.downscaled', { 'type': type } )
 				: tArr;
 
@@ -844,7 +852,7 @@ var JBBBinaryLoader =
 			for (i=0; i<len; ++i) tArr[i]=vArr;
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( tArr, 'array.numeric.repeated', { 'type': type } )
 				: tArr;
 
@@ -860,7 +868,7 @@ var JBBBinaryLoader =
 			nArr = bundle.readTypedArray( type , len );
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( nArr, 'array.numeric.raw', { 'type': type } )
 				: nArr;
 
@@ -875,7 +883,7 @@ var JBBBinaryLoader =
 	  		nArr = bundle.readTypedArray( type , len );
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( nArr, 'array.numeric.short', { 'type': type } )
 				: nArr;
 
@@ -892,7 +900,7 @@ var JBBBinaryLoader =
 			for (i=0; i<len; i++) nArr[i]=vArr;
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( nArr, 'array.primitive.repeated', { 'type': type } )
 				: nArr;
 
@@ -909,7 +917,7 @@ var JBBBinaryLoader =
 				nArr[i] = decodePrimitive( bundle, database );
 
 			// Return
-			return  false
+			return DEBUG
 				? __debugMeta( nArr, 'array.primitive.raw', {} )
 				: nArr;
 
@@ -962,7 +970,7 @@ var JBBBinaryLoader =
 			id = ((op & 0x0F) << 16) | id;
 			if (id >= bundle.iref_table.length)
 				throw new Errors.IRefError('Invalid IREF #'+id+'!');
-			return  false
+			return DEBUG
 				? __debugMeta( bundle.iref_table[id], 'object.iref', { 'id': id } )
 				: bundle.iref_table[id];
 
@@ -988,7 +996,7 @@ var JBBBinaryLoader =
 			var name = bundle.readStringLT();
 			if (database[name] === undefined) 
 				throw new Errors.XRefError('Cannot import undefined external reference '+name+'!');
-			return  false
+			return DEBUG
 				? __debugMeta( database[name], 'object.string', { 'key': name } )
 				: database[name];
 
@@ -1019,7 +1027,7 @@ var JBBBinaryLoader =
 	/**
 	 * Download helper
 	 */
-	function downloadArrayBuffers( urls, callback ) {
+	function downloadArrayBuffers( urls, progressPart, callback ) {
 
 		// Prepare the completion calbacks
 		var pending = urls.length, buffers = Array(pending);
@@ -1036,18 +1044,29 @@ var JBBBinaryLoader =
 			req.responseType = "arraybuffer";
 			req.send();
 
+			// Listen for progress events & end updates
+			req.addEventListener('progress', function(e) {
+				if (e.lengthComputable) {
+					progressPart.update( req, e.loaded, e.total );
+				}
+			});
+
 			// Wait until the bundle is loaded
 			req.addEventListener('readystatechange', function () {
 				if (req.readyState !== 4) return;
 				if (req.status === 200) {  
 					// Continue loading
 					buffers[index] = req.response;
-					if (--pending === 0) callback( null );
+					if (--pending === 0) {
+						progressPart.complete();
+						callback( null );
+					}
 				} else {
 					// Trigger callback only once
 					if (triggeredError) return;
-					callback( "Error loading "+urls[index]+": "+req.statusText );
 					triggeredError = true;
+					progressPart.complete();
+					callback( "Error loading "+urls[index]+": "+req.statusText );
 				}
 			});
 		});
@@ -1083,8 +1102,8 @@ var JBBBinaryLoader =
 		// Keep object table
 		this.profile = new DecodeProfile();
 
-		// References for delayed GC
-		this.__delayGC = [];
+		// Progress manager
+		this.progressManager = new ProgressManager();
 
 	};
 
@@ -1111,9 +1130,41 @@ var JBBBinaryLoader =
 		 */
 		'add': function( url, callback ) {
 
-			// Check for profile
-			if (this.profile._lib.length === 0) 
-				throw new Errors.AssertError('You must first add a profile!');
+			// Node quick, not present on browser builds
+			if (IS_NODE) {
+
+				// Helper function
+				var readChunk = function ( filename ) {
+					// Read into buffer
+					var file = fs.readFileSync(filename),
+						u8 = new Uint8Array(file);
+					// Return buffer
+					return u8.buffer;
+				}
+
+				// Read by chunks
+				if (url.substr(-5) === ".jbbp") {
+
+					// Add by buffer
+					var base = url.substr(0,url.length-5);
+					this.addByBuffer( [
+						readChunk(base + '.jbbp'),
+						readChunk(base + '_b16.jbbp'),
+						readChunk(base + '_b32.jbbp'),
+						readChunk(base + '_b64.jbbp'),
+					], callback );
+
+				} else {
+
+					// Add by buffer
+					this.addByBuffer( readChunk(url), callback );
+
+				}
+
+				// Don't continue on browser builds
+				return;
+
+			}
 
 			// Check for base dir
 			var prefix = "";
@@ -1155,11 +1206,11 @@ var JBBBinaryLoader =
 		/**
 		 * Load from buffer
 		 */
-		'addByBuffer': function( buffer ) {
+		'addByBuffer': function( buffer, callback ) {
 
 			// Prepare pending bundle
 			var pendingBundle = {
-				'callback': undefined,
+				'callback': callback,
 				'status': PBUND_LOADED,
 				'buffer': buffer,
 				'url': undefined,
@@ -1168,6 +1219,20 @@ var JBBBinaryLoader =
 			// Keep this pending action
 			this.queuedRequests.push( pendingBundle );
 
+		},
+
+		/**
+		 * Add a progress handler
+		 */
+		'addProgressHandler': function(fn) {
+			this.progressManager.addHandler( fn );
+		},
+
+		/**
+		 * Remove a progress handler
+		 */
+		'removeProgressHandler': function(fn) {
+			this.progressManager.removeHandler( fn );
 		},
 
 		/**
@@ -1218,12 +1283,12 @@ var JBBBinaryLoader =
 				// Place all requests in parallel
 				var triggeredError = false;
 				for (var i=0; i<this.queuedRequests.length; ++i) {
-					var req = this.queuedRequests[i];
+					var req = this.queuedRequests[i], part = this.progressManager.part();
 					if (req.status === PBUND_REQUESTED) {
 
 						// Download bundle from URL(s)
 						state.counter++;
-						req.buffer = downloadArrayBuffers(req.url,
+						req.buffer = downloadArrayBuffers(req.url, part,
 							(function(req) {
 								return function( err ) {
 
@@ -1296,14 +1361,6 @@ var JBBBinaryLoader =
 			this.queuedRequests = [];
 			callback( null, this.database );
 
-			// GC After a delay
-			setTimeout((function() {
-
-				// Release delayed GC References
-				this.__delayGC = [];
-
-			}).bind(this), 500);
-
 		}
 
 
@@ -1312,9 +1369,110 @@ var JBBBinaryLoader =
 	// Export the binary loader
 	module.exports = BinaryLoader;
 
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ },
 /* 1 */
+/***/ function(module, exports) {
+
+	// shim for using process in browser
+
+	var process = module.exports = {};
+	var queue = [];
+	var draining = false;
+	var currentQueue;
+	var queueIndex = -1;
+
+	function cleanUpNextTick() {
+	    if (!draining || !currentQueue) {
+	        return;
+	    }
+	    draining = false;
+	    if (currentQueue.length) {
+	        queue = currentQueue.concat(queue);
+	    } else {
+	        queueIndex = -1;
+	    }
+	    if (queue.length) {
+	        drainQueue();
+	    }
+	}
+
+	function drainQueue() {
+	    if (draining) {
+	        return;
+	    }
+	    var timeout = setTimeout(cleanUpNextTick);
+	    draining = true;
+
+	    var len = queue.length;
+	    while(len) {
+	        currentQueue = queue;
+	        queue = [];
+	        while (++queueIndex < len) {
+	            if (currentQueue) {
+	                currentQueue[queueIndex].run();
+	            }
+	        }
+	        queueIndex = -1;
+	        len = queue.length;
+	    }
+	    currentQueue = null;
+	    draining = false;
+	    clearTimeout(timeout);
+	}
+
+	process.nextTick = function (fun) {
+	    var args = new Array(arguments.length - 1);
+	    if (arguments.length > 1) {
+	        for (var i = 1; i < arguments.length; i++) {
+	            args[i - 1] = arguments[i];
+	        }
+	    }
+	    queue.push(new Item(fun, args));
+	    if (queue.length === 1 && !draining) {
+	        setTimeout(drainQueue, 0);
+	    }
+	};
+
+	// v8 likes predictible objects
+	function Item(fun, array) {
+	    this.fun = fun;
+	    this.array = array;
+	}
+	Item.prototype.run = function () {
+	    this.fun.apply(null, this.array);
+	};
+	process.title = 'browser';
+	process.browser = true;
+	process.env = {};
+	process.argv = [];
+	process.version = ''; // empty string to avoid regexp issues
+	process.versions = {};
+
+	function noop() {}
+
+	process.on = noop;
+	process.addListener = noop;
+	process.once = noop;
+	process.off = noop;
+	process.removeListener = noop;
+	process.removeAllListeners = noop;
+	process.emit = noop;
+
+	process.binding = function (name) {
+	    throw new Error('process.binding is not supported');
+	};
+
+	process.cwd = function () { return '/' };
+	process.chdir = function (dir) {
+	    throw new Error('process.chdir is not supported');
+	};
+	process.umask = function() { return 0; };
+
+
+/***/ },
+/* 2 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -1506,7 +1664,11 @@ var JBBBinaryLoader =
 		// Load object tables
 		var ots = [];
 		if (this.table_count <= 1) {
-			ots.push( this.table_id );
+
+			// The bundle can have no profile if needed
+			if (this.table_id !== 0x00)
+
+				ots.push( this.table_id );
 		} else if (this.table_id !== 0x00) {
 			throw {
 				'name' 		: 'DecodingError',
@@ -1681,7 +1843,7 @@ var JBBBinaryLoader =
 
 
 /***/ },
-/* 2 */
+/* 3 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -1729,6 +1891,10 @@ var JBBBinaryLoader =
 	 * in the order they were given.
 	 */
 	DecodeProfile.prototype.use = function( ids ) {
+
+		// If empty profile, return
+		if (ids.length == 0)
+			return;
 
 		// Pick the profiles of interest
 		for (var i=0, l=ids.length; i<l; i++) {
@@ -1794,7 +1960,183 @@ var JBBBinaryLoader =
 
 
 /***/ },
-/* 3 */
+/* 4 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Decoder
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	/**
+	 * A partial progress item
+	 */
+	var ProgressManagerPart = function(parent) {
+		this.parent = parent;
+		this.objectLookup = [];
+		this.objects = [];
+		this.value = 0;
+	};
+
+	/**
+	 * Update sub-object progress
+	 */
+	ProgressManagerPart.prototype.update = function( obj, progress, total ) {
+
+		// Get/Create new object for tracking this object
+		var id = this.objectLookup.indexOf(obj);
+		if (id === -1) {
+			id = this.objectLookup.length;
+			this.objectLookup.push(obj);
+			this.objects.push([ progress, total ])
+		} else {
+			this.objects[id][0] = progress;
+			this.objects[id][1] = total;
+		}
+
+		// Update summary
+		var prog=0, tot=0;
+		for (var i=0; i<this.objects.length; i++) {
+			prog += this.objects[i][0];
+			tot += this.objects[i][1];
+		}
+
+		// Update value
+		this.value = prog / tot;
+		this.parent.update();
+
+	};
+
+	/**
+	 * Complete item progress
+	 */
+	ProgressManagerPart.prototype.complete = function() {
+		this.value = 1;
+		this.parent.update();
+
+		// Remove me from parent
+		var id = this.parent.parts.indexOf(this);
+		if (id === -1) return;
+		this.parent.parts.splice(id,1);
+	}
+
+	/**
+	 * Progress logic manager
+	 */
+	var ProgressManager = function() {
+
+		/**
+		 * Progress handlers
+		 */
+		this.handlers = [];
+
+		/**
+		 * Progress parts
+		 */
+		this.parts = [];
+
+		/**
+		 * Indicator if a progress is active
+		 */
+		this.active = false;
+
+	};
+
+	/**
+	 * Start managing a new part
+	 */
+	ProgressManager.prototype.part = function() {
+
+		// Create and return new part
+		var part = new ProgressManagerPart(this);
+		this.parts.push(part);
+
+		// Update
+		this.update();
+
+		// Return part
+		return part;
+
+	};
+
+	/**
+	 * Update state and trigger callbacks
+	 */
+	ProgressManager.prototype.update = function() {
+
+		// Calculate aggregated progress
+		var progress = 0, eventID = 0;
+
+		// No items means full progress 
+		if (this.parts.length === 0) {
+			progress = 1.0;
+		} else {
+			for (var i=0; i<this.parts.length; i++) {
+				progress += this.parts[i].value;
+			}
+			progress /= this.parts.length;
+		}
+
+
+		// Check for start
+		if (!this.active && (progress != 1.0)) {
+			this.active = true;
+			eventID = 1;
+
+		// Check for complete
+		} else if (this.active && (progress == 1.0)) {
+			this.active = false;
+			eventID = 2;
+
+		}
+
+		// Trigger update
+		if (this.active || (eventID === 2)) {
+			for (var i=0; i<this.handlers.length; i++) {
+				this.handlers[i]( progress, eventID );
+			}
+			console.log(">",progress,eventID);
+		}
+
+	};
+
+	/**
+	 * Add a progress handler function
+	 */
+	ProgressManager.prototype.addHandler = function( fn ) {
+		this.handlers.push(fn);
+	};
+
+	/**
+	 * Remove a progress handler function
+	 */
+	ProgressManager.prototype.removeHandler = function( fn ) {
+		var id = this.handlers.indexOf(fn);
+		if (id === -1) return;
+		this.handlers.splice(id,1);
+	};
+
+	// Expose progress logic
+	module.exports = ProgressManager;
+
+
+/***/ },
+/* 5 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -1902,6 +2244,12 @@ var JBBBinaryLoader =
 		'IRefError': IRefError,
 		'XRefError': XRefError,
 	};
+
+/***/ },
+/* 6 */
+/***/ function(module, exports) {
+
+	
 
 /***/ }
 /******/ ]);

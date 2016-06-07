@@ -1,5 +1,5 @@
 /* JBB Source Bundle Loader - https://github.com/wavesoft/jbb */
-var JBBSourceLoader =
+var JBB = JBB || {}; JBB["SourceLoader"] =
 /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -780,8 +780,9 @@ var JBBSourceLoader =
 				context.counter++;
 				item.loadBundle( this.__loadFileContents, function(bundle) {
 					// Collect failed bundles
-					if (bundle.state == STATE_FAILED)
-						this.failedBundles.push(bundle);
+					if (bundle.state == STATE_FAILED) {
+						self.failedBundles.push(bundle);
+					}
 					// Callback bundle callbacks
 					bundle.triggerCallbacks();
 					// Decrement counter

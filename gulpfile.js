@@ -39,8 +39,8 @@ gulp.task('dist/jbb', function() {
 		    	filename: PROD ? 'jbb.min.js' : 'jbb.js',
 				// Export itself to a global var
 				libraryTarget: 'var',
-				// Name of the global var: 'Foo'
-				library: 'JBBBinaryLoader'
+				// Name of the global var: 'JBB.BinaryLoader'
+				library: [ 'JBB', 'BinaryLoader' ]
 			},
 			externals: {
 				'three': 'THREE',
@@ -48,8 +48,7 @@ gulp.task('dist/jbb', function() {
 		    plugins: ([
 		    	new webpack.webpack.optimize.DedupePlugin(),
 				new webpack.webpack.DefinePlugin({
-				    PROD 	  	: PROD,
-				    LOG_PARSING : false
+				    GULP_BUILD 	: PROD
 				})
 		    ]).concat(PROD ? [
 			    new webpack.webpack.optimize.UglifyJsPlugin({
@@ -81,19 +80,21 @@ gulp.task('dist/jbb-loader', function() {
 				// Export itself to a global var
 				libraryTarget: 'var',
 				// Name of the global var: 'Foo'
-				library: 'JBBSourceLoader'
+				library: [ 'JBB', 'SourceLoader' ]
 			},
 			externals: {
 				'three': 'THREE',
 			},
-		    plugins: PROD ? [
+		    plugins: ([
 		    	new webpack.webpack.optimize.DedupePlugin(),
+				new webpack.webpack.DefinePlugin({
+				    GULP_BUILD 	: PROD
+				})
+		    ]).concat(PROD ? [
 			    new webpack.webpack.optimize.UglifyJsPlugin({
 			    	minimize: true
 			    })
-		    ] : [
-		    	new webpack.webpack.optimize.DedupePlugin(),
-		    ]
+		    ] : [])
 		}))
 		.pipe(header("/* JBB Source Bundle Loader - https://github.com/wavesoft/jbb */\n"))
 		.pipe(gulp.dest('dist'));

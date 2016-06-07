@@ -4,7 +4,7 @@
   "description": "Javascript Binary Bundle",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha test/test-core.js"
+    "test": "JBB_DEBUG=1 ./node_modules/.bin/mocha test/test-core.js"
   },
   "repository": {
     "type": "git",

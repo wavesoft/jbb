@@ -21,11 +21,19 @@
 /* Imports */
 var BinaryBundle = require("./lib/BinaryBundle");
 var DecodeProfile = require("./lib/DecodeProfile");
+var ProgressManager = require("./lib/ProgressManager");
 var Errors = require('./lib/Errors');
 
 /* Production optimisations and debug metadata flags */
-if (typeof PROD === 'undefined') var PROD = false;
-if (typeof DEBUG === 'undefined') var DEBUG = !PROD;
+if (typeof GULP_BUILD === "undefined") var GULP_BUILD = false;
+var IS_NODE = !GULP_BUILD || (typeof window === "undefined");
+var PROD = GULP_BUILD || !process.env.JBB_DEBUG;
+var DEBUG = !PROD;
+
+/* Additional includes on node builds */
+if (IS_NODE) {
+	var fs = require("fs");
+}
 
 /* Size constants */
 var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
@@ -971,7 +979,7 @@ function parseBundle( bundle, database ) {
 /**
  * Download helper
  */
-function downloadArrayBuffers( urls, callback ) {
+function downloadArrayBuffers( urls, progressPart, callback ) {
 
 	// Prepare the completion calbacks
 	var pending = urls.length, buffers = Array(pending);
@@ -988,18 +996,29 @@ function downloadArrayBuffers( urls, callback ) {
 		req.responseType = "arraybuffer";
 		req.send();
 
+		// Listen for progress events & end updates
+		req.addEventListener('progress', function(e) {
+			if (e.lengthComputable) {
+				progressPart.update( req, e.loaded, e.total );
+			}
+		});
+
 		// Wait until the bundle is loaded
 		req.addEventListener('readystatechange', function () {
 			if (req.readyState !== 4) return;
 			if (req.status === 200) {  
 				// Continue loading
 				buffers[index] = req.response;
-				if (--pending === 0) callback( null );
+				if (--pending === 0) {
+					progressPart.complete();
+					callback( null );
+				}
 			} else {
 				// Trigger callback only once
 				if (triggeredError) return;
-				callback( "Error loading "+urls[index]+": "+req.statusText );
 				triggeredError = true;
+				progressPart.complete();
+				callback( "Error loading "+urls[index]+": "+req.statusText );
 			}
 		});
 	});
@@ -1035,8 +1054,8 @@ var BinaryLoader = function( baseDir, database ) {
 	// Keep object table
 	this.profile = new DecodeProfile();
 
-	// References for delayed GC
-	this.__delayGC = [];
+	// Progress manager
+	this.progressManager = new ProgressManager();
 
 };
 
@@ -1063,9 +1082,41 @@ BinaryLoader.prototype = {
 	 */
 	'add': function( url, callback ) {
 
-		// Check for profile
-		if (this.profile._lib.length === 0) 
-			throw new Errors.AssertError('You must first add a profile!');
+		// Node quick, not present on browser builds
+		if (IS_NODE) {
+
+			// Helper function
+			var readChunk = function ( filename ) {
+				// Read into buffer
+				var file = fs.readFileSync(filename),
+					u8 = new Uint8Array(file);
+				// Return buffer
+				return u8.buffer;
+			}
+
+			// Read by chunks
+			if (url.substr(-5) === ".jbbp") {
+
+				// Add by buffer
+				var base = url.substr(0,url.length-5);
+				this.addByBuffer( [
+					readChunk(base + '.jbbp'),
+					readChunk(base + '_b16.jbbp'),
+					readChunk(base + '_b32.jbbp'),
+					readChunk(base + '_b64.jbbp'),
+				], callback );
+
+			} else {
+
+				// Add by buffer
+				this.addByBuffer( readChunk(url), callback );
+
+			}
+
+			// Don't continue on browser builds
+			return;
+
+		}
 
 		// Check for base dir
 		var prefix = "";
@@ -1107,11 +1158,11 @@ BinaryLoader.prototype = {
 	/**
 	 * Load from buffer
 	 */
-	'addByBuffer': function( buffer ) {
+	'addByBuffer': function( buffer, callback ) {
 
 		// Prepare pending bundle
 		var pendingBundle = {
-			'callback': undefined,
+			'callback': callback,
 			'status': PBUND_LOADED,
 			'buffer': buffer,
 			'url': undefined,
@@ -1120,6 +1171,20 @@ BinaryLoader.prototype = {
 		// Keep this pending action
 		this.queuedRequests.push( pendingBundle );
 
+	},
+
+	/**
+	 * Add a progress handler
+	 */
+	'addProgressHandler': function(fn) {
+		this.progressManager.addHandler( fn );
+	},
+
+	/**
+	 * Remove a progress handler
+	 */
+	'removeProgressHandler': function(fn) {
+		this.progressManager.removeHandler( fn );
 	},
 
 	/**
@@ -1170,12 +1235,12 @@ BinaryLoader.prototype = {
 			// Place all requests in parallel
 			var triggeredError = false;
 			for (var i=0; i<this.queuedRequests.length; ++i) {
-				var req = this.queuedRequests[i];
+				var req = this.queuedRequests[i], part = this.progressManager.part();
 				if (req.status === PBUND_REQUESTED) {
 
 					// Download bundle from URL(s)
 					state.counter++;
-					req.buffer = downloadArrayBuffers(req.url,
+					req.buffer = downloadArrayBuffers(req.url, part,
 						(function(req) {
 							return function( err ) {
 
@@ -1247,14 +1312,6 @@ BinaryLoader.prototype = {
 		// We are ready
 		this.queuedRequests = [];
 		callback( null, this.database );
-
-		// GC After a delay
-		setTimeout((function() {
-
-			// Release delayed GC References
-			this.__delayGC = [];
-
-		}).bind(this), 500);
 
 	}
 

@@ -3327,6 +3327,18 @@ var BinaryEncoder = function( filename, config ) {
 	this.logPrefix = "";
 	this.logFlags = this.config['log'] || 0x00;
 
+	// If filename contains an extension, extract missing information
+	// in the config and trim it
+	if (filename.substr(-4) == ".jbb") {
+		filename = filename.substr(0,filename.length-4);
+		if (this.config['sparse'] === undefined)
+			this.config['sparse'] = false;
+	} else if (filename.substr(-5) == ".jbbp") {
+		filename = filename.substr(0,filename.length-5);
+		if (this.config['sparse'] === undefined)
+			this.config['sparse'] = true;
+	}
+
 	// Open parallel streams in order to avoid memory exhaustion.
 	// The final file is assembled from these chunks, or kept as-is if
 	// requested to separate into multiple bundles (sparse bundle).
@@ -3370,8 +3382,11 @@ var BinaryEncoder = function( filename, config ) {
 		enable_delta: true,				// Enable delta-encoding (costs in speed, but decreases size)
 	};
 
+	// Check if this is sparse
+	this.sparse = ( this.config['sparse'] === undefined ) ? 
+			false : this.config['sparse'];
+
 	// If we are requested to use sparse bundless, add some space for header in the stream8
-	this.sparse = (config['sparse'] === undefined) ? false : config['sparse'];
 	if (this.sparse) {
 
 		this.stream8.write( pack2b( 0x4231 ) ); 	// Magic header
@@ -3400,7 +3415,7 @@ var BinaryEncoder = function( filename, config ) {
 	}
 
 	// Get bundle name
-	this.bundleName = this.config['name'] || filename.split("/").pop().replace(".3bd","");
+	this.bundleName = this.config['name'] || filename.split("/").pop();;
 
 	// Create a combined profile object
 	this.profile = new EncodeProfile();
@@ -3865,10 +3880,6 @@ BinaryEncoder.prototype = {
 	 */
 	'encode': function( entity, name ) {
 		var tn = this.bundleName + "/" + name;
-
-		// Check for profile
-		if (this.profile.size === 0) 
-			throw new Errors.AssertError('You must first add a profile!');
 
 		// Prohibit profile addition from now on
 		this.canAddProfile = false;
