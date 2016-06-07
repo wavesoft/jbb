@@ -39,8 +39,8 @@ const UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
 const UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
 const UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
 
-const INT8_MIN 	= -129; // largest negative signed integer on 8-bit
-const INT8_MAX 	= 128; // largest positive signed integer on 8-bit
+const INT8_MIN 		= -129; // largest negative signed integer on 8-bit
+const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
 const INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
 const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
 const INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
@@ -88,6 +88,8 @@ if (typeof(document) === "undefined") {
 var DOMElement = window.Element;
 var ImageElement = document.createElement('img').constructor;
 var ScriptElement = document.createElement('script').constructor;
+var AudioElement = document.createElement('audio').constructor;
+var VideoElement = document.createElement('video').constructor;
 
 /**
  * Binary Search Tree Helpers
@@ -401,6 +403,8 @@ var PRIM_BUFFER_TYPE = {
 	STRING_UTF8: 	 1,
 	BUF_IMAGE: 		 2,
 	BUF_SCRIPT: 	 3,
+	BUF_AUDIO: 	 	 4,
+	BUF_VIDEO: 	 	 5,
 	RESOURCE: 		 7,
 };
 
@@ -1383,7 +1387,8 @@ function analyzePrimitiveArray( encoder, array ) {
 	var TEST_NUMBER = 0,
 		  TEST_PLAIN = 1,
 		  TEST_OBJECT = 2,
-		  TEST_PRIMITIVE = 3;
+		  TEST_PRIMITIVE = 3,
+		  TEST_DOM = 4;
 
 	var BF_PRIM 	= 0x01,
 		  BF_REP	= 0x02,
@@ -1452,6 +1457,10 @@ function analyzePrimitiveArray( encoder, array ) {
 					(v instanceof Array)) {
 					t_mode = TEST_PRIMITIVE;
 					if (DEBUG_THIS) debug_str = 'ARR';
+				} else if (v instanceof DOMElement) {
+					t_constr = v.constructor;
+					t_mode = TEST_DOM;
+					if (DEBUG_THIS) debug_str = 'DOM';
 				} else { /* Other objects */
 					t_constr = v.constructor;
 					t_mode = TEST_OBJECT;
@@ -1466,7 +1475,7 @@ function analyzePrimitiveArray( encoder, array ) {
 		//
 
 		if (b_rep === null) {
-			b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN, t_constr];
+			b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
 			if (DEBUG_THIS) debug_str += ', rep[new]';
 		} else {
 			if (v===b_rep[3]) {
@@ -1474,16 +1483,20 @@ function analyzePrimitiveArray( encoder, array ) {
 				if (DEBUG_THIS) debug_str += ', rep[++](ref)';
 			} else if (encoder.optimize.cfwa_object_byval
 				&& ((t_mode === TEST_OBJECT) || (t_mode === TEST_PLAIN))
-				&& ((t_mode != TEST_OBJECT) || (!(v instanceof DOMElement) && (b_rep[5] === t_constr)))
 				&& deepEqual(b_rep[3], v, {strict:true})) {
 				b_rep[1]++;
 				if (DEBUG_THIS) debug_str += ', rep[++](val)';
+			} else if ((t_mode === TEST_DOM)
+				&& (v.src !== undefined)
+				&& (b_rep[3].src === v.src)) {
+				b_rep[1]++;
+				if (DEBUG_THIS) debug_str += ', rep[.src](val)';
 			} else {
 				if (b_rep[1]>1) {
 					n_repeat += b_rep[1];
 					blocks_rep.push(b_rep);
 				}
-				b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN, t_constr];
+				b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
 				if (DEBUG_THIS) debug_str += ', rep[new]';
 			}
 		}
@@ -3262,6 +3275,18 @@ function encodePrimitive( encoder, data ) {
 		// Create a buffer from image
 		encoder.log(LOG.PRM, "buffer[script], file="+data.src);
 		encodeEmbeddedFileBuffer( encoder, PRIM_BUFFER_TYPE.BUF_SCRIPT, data.src );
+
+	} else if (data instanceof VideoElement) {
+
+		// Create a buffer from video
+		encoder.log(LOG.PRM, "buffer[video], file="+data.src);
+		encodeEmbeddedFileBuffer( encoder, PRIM_BUFFER_TYPE.BUF_VIDEO, data.src, data.type );
+
+	} else if (data instanceof AudioElement) {
+
+		// Create a buffer from audio
+		encoder.log(LOG.PRM, "buffer[audio], file="+data.src);
+		encodeEmbeddedFileBuffer( encoder, PRIM_BUFFER_TYPE.BUF_AUDIO, data.src, data.type );
 
 	// ===============================
 	//  Objects
