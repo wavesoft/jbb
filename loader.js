@@ -533,8 +533,13 @@ BundlesLoader.prototype.add = function( url, callback ) {
 		if (this.baseURL)
 			url = this.baseURL + '/' + url;
 
+		// Add bundle suffix if not already exists
+		if (url.substr(-this.bundleSuffix.length) != this.bundleSuffix) {
+			url += this.bundleSuffix;
+		}
+
 		// Set URL
-		item.setURL( url + this.bundleSuffix + suffix );
+		item.setURL( url + suffix );
 
 	}
 
