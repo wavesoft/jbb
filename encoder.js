@@ -85,6 +85,7 @@ if (typeof(document) === "undefined") {
 }
 
 // Get references to DOM element classes
+var DOMElement = window.Element;
 var ImageElement = document.createElement('img').constructor;
 var ScriptElement = document.createElement('script').constructor;
 
