@@ -78,11 +78,6 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	var PROD = (0) || !process.env.JBB_DEBUG;
 	var DEBUG = !PROD;
 
-	/* Warn debug version */
-	if (DEBUG) {
-		console.warn("Using debug version of decoder");
-	}
-
 	/* Additional includes on node builds */
 	if (IS_NODE) {
 		var fs = __webpack_require__(6);

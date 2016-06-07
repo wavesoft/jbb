@@ -30,11 +30,6 @@ var IS_NODE = !GULP_BUILD || (typeof window === "undefined");
 var PROD = GULP_BUILD || !process.env.JBB_DEBUG;
 var DEBUG = !PROD;
 
-/* Warn debug version */
-if (DEBUG) {
-	console.debug("WARNING: Using debug version of decoder");
-}
-
 /* Additional includes on node builds */
 if (IS_NODE) {
 	var fs = require("fs");
