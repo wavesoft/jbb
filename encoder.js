@@ -29,26 +29,26 @@ var BinaryStream = require("./lib/BinaryStream");
 var Errors 		= require("./lib/Errors");
 var EncodeProfile = require('./lib/EncodeProfile');
 
-var FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
-var FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
-var FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
+const FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
+const FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
+const FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
 
 /* Note that all these values are exclusive, for positive test (ex v < UING8_MAX) */
 
-var UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
-var UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
-var UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
+const UINT8_MAX 	= 256; // largest positive unsigned integer on 8-bit
+const UINT16_MAX	= 65536; // largest positive unsigned integer on 16-bit
+const UINT32_MAX	= 4294967296;  // largest positive unsigned integer on 32-bit
 
-var INT8_MIN 	= -129; // largest negative signed integer on 8-bit
-var INT8_MAX 	= 128; // largest positive signed integer on 8-bit
-var INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
-var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
-var INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
-var INT32_MAX 	= 2147483648; // largest positive signed integer on 16-bit
+const INT8_MIN 	= -129; // largest negative signed integer on 8-bit
+const INT8_MAX 	= 128; // largest positive signed integer on 8-bit
+const INT16_MIN 	= -32769; // largest negative signed integer on 16-bit
+const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+const INT32_MIN 	= -2147483649; // largest negative signed integer on 16-bit
+const INT32_MAX 	= 2147483648; // largest positive signed integer on 16-bit
 
 /* Version of binary bundle */
 
-var VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
+const VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
 
 /*
 
@@ -63,7 +63,7 @@ Known Limitations
  * If this constant is true, the packing functions will do sanity checks,
  * which might increase the build time.
  */
-var SAFE = 1;
+const SAFE = 1;
 
 /**
  * Fake DOM environment when from node
@@ -1465,7 +1465,7 @@ function analyzePrimitiveArray( encoder, array ) {
 		//
 
 		if (b_rep === null) {
-			b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
+			b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN, t_constr];
 			if (DEBUG_THIS) debug_str += ', rep[new]';
 		} else {
 			if (v===b_rep[3]) {
@@ -1473,6 +1473,7 @@ function analyzePrimitiveArray( encoder, array ) {
 				if (DEBUG_THIS) debug_str += ', rep[++](ref)';
 			} else if (encoder.optimize.cfwa_object_byval
 				&& ((t_mode === TEST_OBJECT) || (t_mode === TEST_PLAIN))
+				&& ((t_mode != TEST_OBJECT) || (!(v instanceof DOMElement) && (b_rep[5] === t_constr)))
 				&& deepEqual(b_rep[3], v, {strict:true})) {
 				b_rep[1]++;
 				if (DEBUG_THIS) debug_str += ', rep[++](val)';
@@ -1481,7 +1482,7 @@ function analyzePrimitiveArray( encoder, array ) {
 					n_repeat += b_rep[1];
 					blocks_rep.push(b_rep);
 				}
-				b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN];
+				b_rep = [i, 1, ARR_CHUNK.REPEAT, v, NUMTYPE.UNKNOWN, t_constr];
 				if (DEBUG_THIS) debug_str += ', rep[new]';
 			}
 		}
