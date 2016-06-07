@@ -26,9 +26,9 @@ var Errors = require('./lib/Errors');
 
 /* Production optimisations and debug metadata flags */
 if (typeof GULP_BUILD === "undefined") var GULP_BUILD = false;
-var IS_NODE = !GULP_BUILD || (typeof window === "undefined");
-var PROD = GULP_BUILD || !process.env.JBB_DEBUG;
-var DEBUG = !PROD;
+const IS_NODE = GULP_BUILD ? false : (typeof window === "undefined");
+const PROD = GULP_BUILD ? true : (!process.env.JBB_DEBUG);
+const DEBUG = GULP_BUILD ? false : (!PROD);
 
 /* Additional includes on node builds */
 if (IS_NODE) {
@@ -36,13 +36,13 @@ if (IS_NODE) {
 }
 
 /* Size constants */
-var INT8_MAX 		= 128; // largest positive signed integer on 8-bit
-var INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
+const INT8_MAX 		= 128; // largest positive signed integer on 8-bit
+const INT16_MAX 	= 32768; // largest positive signed integer on 16-bit
 
 /**
  * Bundle loading states
  */
-var PBUND_REQUESTED = 0,
+const PBUND_REQUESTED = 0,
 	PBUND_LOADED = 1,
 	PBUND_PARSED = 2,
 	PBUND_ERROR = 3;
@@ -50,7 +50,7 @@ var PBUND_REQUESTED = 0,
 /**
  * Numerical types
  */
-var NUMTYPE = {
+const NUMTYPE = {
 	UINT8: 	 0, INT8:    1,
 	UINT16:  2, INT16:   3,
 	UINT32:  4, INT32:   5,
@@ -60,7 +60,7 @@ var NUMTYPE = {
 /**
  * Downscaling numtype conversion table
  */
-var NUMTYPE_DOWNSCALE = {
+const NUMTYPE_DOWNSCALE = {
 	// Source conversion type (actual)
 	FROM: [
 		NUMTYPE.UINT16,
@@ -108,7 +108,7 @@ var NUMTYPE_DOWNSCALE = {
 /**
  * Delta-Encoding for integers
  */
-var NUMTYPE_DELTA_INT = {
+const NUMTYPE_DELTA_INT = {
 	FROM: [
 		NUMTYPE.UINT16,
 		NUMTYPE.INT16 ,
@@ -130,7 +130,7 @@ var NUMTYPE_DELTA_INT = {
 /**
  * Delta-Encoding for floats
  */
-var NUMTYPE_DELTA_FLOAT = {
+const NUMTYPE_DELTA_FLOAT = {
 	FROM: [
 		NUMTYPE.FLOAT32,
 		NUMTYPE.FLOAT32,
@@ -148,7 +148,7 @@ var NUMTYPE_DELTA_FLOAT = {
 /**
  * Numerical type classes
  */
-var NUMTYPE_CLASS = [
+const NUMTYPE_CLASS = [
 	Uint8Array,
 	Int8Array,
 	Uint16Array,
@@ -162,7 +162,7 @@ var NUMTYPE_CLASS = [
 /**
  * Lookup table of numerical type for NL (1-but) length fields
  */
-var LN_NUMTYPE = [
+const LN_NUMTYPE = [
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32
 ];
@@ -170,7 +170,7 @@ var LN_NUMTYPE = [
 /**
  * Lookup table of numerical type for LEN (2-but) length fields
  */
-var LEN_NUMTYPE = [
+const LEN_NUMTYPE = [
 	NUMTYPE.UINT8,
 	NUMTYPE.UINT16,
 	NUMTYPE.UINT32,
@@ -180,7 +180,7 @@ var LEN_NUMTYPE = [
 /**
  * Delta encoding scale factor
  */
-var DELTASCALE = {
+const DELTASCALE = {
 	S_001 : 1, 	// Divide by 100 the value
 	S_1	  : 2, 	// Keep value as-is
 	S_R   : 3, 	// Multiply by 127 on 8-bit and by 32768 on 16-bit
@@ -190,7 +190,7 @@ var DELTASCALE = {
 /**
  * BULK_KNOWN Array encoding operator codes
  */
-var PRIM_BULK_KNOWN_OP = {
+const PRIM_BULK_KNOWN_OP = {
 	LREF_7:	0x00, // Local reference up to 7bit
 	LREF_11:0xF0, // Local reference up to 11bit
 	LREF_16:0xFE, // Local reference up to 16bit
@@ -203,7 +203,7 @@ var PRIM_BULK_KNOWN_OP = {
 /**
  * Simple primitive translation
  */
-var PRIM_SIMPLE = [ undefined, null, false, true ],
+const PRIM_SIMPLE = [ undefined, null, false, true ],
 	PRIM_SIMPLE_EX = [ NaN, /* Reserved */ ];
 
 //////////////////////////////////////////////////////////////////
@@ -349,8 +349,8 @@ function decodeObject( bundle, database, op ) {
 		var poid = (op & 0x03);
 		switch (poid) {
 			case 0:
-				var date = bundle.f64[bundle.i64++],
-					tzOffset = bundle.s8[bundle.i8++] * 10;
+				var date = bundle.f64[bundle.i64++];
+				var tzOffset = bundle.s8[bundle.i8++] * 10;
 
 				// Return date
 				return DEBUG 

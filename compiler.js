@@ -136,9 +136,9 @@ function compile( bundleData, bundleFile, config, callback ) {
 		profileLoader = config['profileLoader'];
 
 		// Make sure it's array
-		if (typeof profileEncoder === 'string')
+		if (!(profileEncoder instanceof Array))
 			profileEncoder = [ profileEncoder ];
-		if (typeof profileLoader === 'string')
+		if (!(profileLoader instanceof Array))
 			profileLoader = [ profileLoader ];
 
 	} else {
