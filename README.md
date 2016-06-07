@@ -4,11 +4,11 @@
 
 **Why Binary Bundles?** For *faster* loading time due to *fewer* requests and an *optimised* binary format, closely compatible with Javascript internals. It is optimised in balance between size and performance, preferring performance when in doubt.
 
+[Examples](https://github.com/wavesoft/jbb/wiki#examples) — [Documentation](https://github.com/wavesoft/jbb/wiki) — [Tutorials](https://github.com/wavesoft/jbb/wiki#tutorials) — [Help](https://gitter.im/wavesoft/jbb)
+
 <img src="https://raw.githubusercontent.com/wiki/wavesoft/jbb/img/jbb-desc.png" />
 
 With JBB you can load all of your project's resources in a `node.js` instance and then serialize them in a single file. You can then load this file instead. 
-
-[Examples](https://github.com/wavesoft/jbb/wiki#examples) — [Documentation](https://github.com/wavesoft/jbb/wiki) — [Tutorials](https://github.com/wavesoft/jbb/wiki#tutorials) — [Help](https://gitter.im/wavesoft/jbb)
 
 ## Usage - Loading Bundles
 
