@@ -435,7 +435,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 */
 	function decodePivotArrayFloat( bundle, database, len, num_type ) {
 		var ans = new NUMTYPE_CLASS[ NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ]( len ),
-			pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
+			// pivot = bundle.readTypedNum( NUMTYPE_DELTA_FLOAT.FROM[ num_type ] ), 
 			scale = bundle.readFloat64(),
 			values = bundle.readTypedArray( NUMTYPE_DELTA_FLOAT.TO[ num_type ] , len );
 
@@ -444,7 +444,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 		// Decode
 		for (var i=0; i<len; ++i) {
 			ans[i] = pivot + (values[i] * scale);
-			console.log("<<<", values[i],"->", ans[i]);
+			// console.log("<<<", values[i],"->", ans[i]);
 		}
 
 		return DEBUG
@@ -518,7 +518,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 * Decode bulk array of entities
 	 */
 	function decodeKnownBulkArray( bundle, database, len ) {
-		var DEBUG_THIS = false;
+		const DEBUG_THIS = false;
 		// console.log("<-- @"+(bundle.i16 - bundle.ofs16/2),"EID:",bundle.u16[bundle.i16],"LEN:", len);
 		var eid = bundle.u16[bundle.i16++],
 			FACTORY = bundle.profile.decode( eid ), 
@@ -1796,20 +1796,6 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	}
 
 	/**
-	 * Print the index offsets
-	 */
-	BinaryBundle.prototype.getWeavePropertyFunction = function( d ) {
-		// Check if we already have this function
-		if (this.factory_weave[d] !== undefined) {
-			return this.factory_weave[d];
-		}
-
-		// Otherwise generate and return
-		this.factory_weave[d] = genWeavePropFn(d);
-		return this.factory_weave[d];
-	}
-
-	/**
 	 * Read a 16-bit string lookup table ID and translate to it's string
 	 */
 	BinaryBundle.prototype.readStringLT = function() {
@@ -2110,7 +2096,6 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 			for (var i=0; i<this.handlers.length; i++) {
 				this.handlers[i]( progress, eventID );
 			}
-			console.log(">",progress,eventID);
 		}
 
 	};
