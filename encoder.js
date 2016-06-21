@@ -82,6 +82,9 @@ if (typeof(document) === "undefined") {
 	// Fake 'XMLHttpRequest' (shall not be used)
 	global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
+	// Fake 'DOMParser'
+	global.DOMParser = require('xmldom').DOMParser;
+
 }
 
 // Get references to DOM element classes

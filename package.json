@@ -44,6 +44,7 @@
     "mock-browser": "^0.92.12",
     "temp": "^0.8.3",
     "toposort": "^1.0.0",
+    "xmldom": "^0.1.22",
     "xmlhttprequest": "^1.8.0"
   }
 }
