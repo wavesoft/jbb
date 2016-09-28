@@ -22,6 +22,9 @@
   },
   "homepage": "https://github.com/wavesoft/jbb#readme",
   "devDependencies": {
+    "babel-core": "^6.14.0",
+    "babel-loader": "^6.2.5",
+    "babel-preset-es2016": "^6.11.3",
     "colors": "^1.1.2",
     "deep-equal": "^1.0.1",
     "gulp-header": "^1.7.1",
