@@ -7,7 +7,7 @@ var PROD = (process.env.NODE_ENV || "production") == "production";
 // Compile the jbb library
 //
 gulp.task('jbb/lib', function() {
-  return gulp.src('decoder.js')
+  return gulp.src('lib/JBB.js')
     .pipe(webpack({
       module: {
         loaders: [
@@ -17,7 +17,7 @@ gulp.task('jbb/lib', function() {
             exclude: /(node_modules|bower_components)/,
             loader: 'babel',
             query: {
-              presets: ['es2016']
+              presets: [ 'es2015' ]
             }
           }
         ],
