@@ -201,9 +201,10 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	   * data on an ever-growing buffer in memory.
 	   *
 	   * Since expanding the array buffer is quite costly, we are doing so in bulks
-	   * of large enough data. By default, it will add 16MiB of data on every update
-	   * but this might not be enough for every case. Tweak the `bytesPerPage`
-	   * parameter in order to fine-tune it for your particular case.
+	   * of large enough data. By default, it will add 16MiB of data on every update.
+	   * This might be OK in most of the cases, without too much memory going to
+	   * waste. Of course, if you are going to pack a lot of data, it's a good idea
+	   * to increase this value, or use the WriteTypeFile class.
 	   *
 	   * @param {Number} bytesPerElement - The size of the individual elements
 	   * @param {Number} bytesPerPage - For how many bytes to grow the buffer when needed
