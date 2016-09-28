@@ -66,86 +66,11 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 * @author Ioannis Charalampidis / https://github.com/wavesoft
 	 */
 
-	// import BundleReader from './bundles/BundleReader';
-	// import BundleWriter from './bundles/BundleWriter';
+	var _Header = __webpack_require__(1);
 
-	var _WriteTypeBuffer = __webpack_require__(1);
-
-	var _WriteTypeBuffer2 = _interopRequireDefault(_WriteTypeBuffer);
+	var _Header2 = _interopRequireDefault(_Header);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-	// import BufferedTypeWriter from './streams/BufferedTypeWriter';
-
-	// class ClassAccess {
-	//   constructor() {
-	//     this.i = 0;
-	//   }
-	//   next() {
-	//     return this.i++;
-	//   }
-	// }
-
-	// function functionAccss() {
-	//   var i = 0;
-	//   return {
-	//     next() {
-	//       return i++;
-	//     }
-	//   }
-	// }
-
-	// console.time('classAccess');
-	// var c1 = new ClassAccess();
-	// while (c1.next() < 100000000) { };
-	// console.timeEnd('classAccess');
-
-	// console.time('functionAccss');
-	// var c2 = functionAccss();
-	// while (c2.next() < 100000000) { };
-	// console.timeEnd('functionAccss');
-
-	// var i8 = new TypeIndex(1);
-	// var w8 = new BufferedTypeWriter( Uint8Array, i8 );
-
-	// console.time('writeUint8');
-	// var count8 = 100000000;
-	// while (count8--) {
-	//   w8.put( 0xBABA );
-	// };
-	// console.timeEnd('writeUint8');
-	// console.log('Length:', w8.buffer.byteLength, '/ Actual:', w8.byteLength);
-
-	// var i16 = new TypeIndex(2);
-	// var w16 = new BufferedTypeWriter( Uint16Array, i16 );
-
-	// console.time('writeUint16');
-	// var count16 = 100000000;
-	// while (count16--) {
-	//   w16.put( 0xCACAD1D1 );
-	// };
-	// console.timeEnd('writeUint16');
-	// console.log('Length:', w16.buffer.byteLength, '/ Actual:', w16.byteLength);
-
-	function test_16() {
-	  var buf = new _WriteTypeBuffer2.default(2);
-	  var view = buf.openView(Uint16Array);
-
-	  console.time('writeBuffer[16]');
-	  var count16 = 100000000;
-	  while (count16--) {
-	    view.put(0xAABBCCDD);
-	  };
-	  console.timeEnd('writeBuffer[16]');
-	  console.log('Length:', buf.buffer.byteLength, '/ Actual:', buf.byteOffset);
-	}
-
-	test_16();
-
-	// export {
-	//   BundleReader,
-	//   BundleWriter
-	// }
 
 /***/ },
 /* 1 */
@@ -175,158 +100,13 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  value: true
 	});
 
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	var _DecodingHeader = __webpack_require__(2);
 
-	var _WriteTypeBufferView = __webpack_require__(2);
-
-	var _WriteTypeBufferView2 = _interopRequireDefault(_WriteTypeBufferView);
-
-	var _TypeBuffer2 = __webpack_require__(4);
-
-	var _TypeBuffer3 = _interopRequireDefault(_TypeBuffer2);
+	var _DecodingHeader2 = _interopRequireDefault(_DecodingHeader);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-	var WriteTypeBuffer = function (_TypeBuffer) {
-	  _inherits(WriteTypeBuffer, _TypeBuffer);
-
-	  /**
-	   * Constructs a new WriteTypeBuffer object that can be used for writing
-	   * data on an ever-growing buffer in memory.
-	   *
-	   * Since expanding the array buffer is quite costly, we are doing so in bulks
-	   * of large enough data. By default, it will add 16MiB of data on every update.
-	   * This might be OK in most of the cases, without too much memory going to
-	   * waste. Of course, if you are going to pack a lot of data, it's a good idea
-	   * to increase this value, or use the WriteTypeFile class.
-	   *
-	   * @param {Number} bytesPerElement - The size of the individual elements
-	   * @param {Number} bytesPerPage - For how many bytes to grow the buffer when needed
-	   */
-	  function WriteTypeBuffer() {
-	    var bytesPerElement = arguments.length <= 0 || arguments[0] === undefined ? 1 : arguments[0];
-	    var bytesPerPage = arguments.length <= 1 || arguments[1] === undefined ? 16777216 : arguments[1];
-
-	    _classCallCheck(this, WriteTypeBuffer);
-
-	    var _this = _possibleConstructorReturn(this, (WriteTypeBuffer.__proto__ || Object.getPrototypeOf(WriteTypeBuffer)).call(this, new ArrayBuffer(bytesPerPage), bytesPerElement, 0));
-
-	    _this.bytesPerPage = bytesPerPage;
-	    _this.elementsLength = bytesPerPage / bytesPerElement;
-	    return _this;
-	  }
-
-	  /**
-	   * Expand the buffer, adding enough pages in order to fit the items
-	   */
-
-
-	  _createClass(WriteTypeBuffer, [{
-	    key: 'expand',
-	    value: function expand() {
-	      var fitItems = arguments.length <= 0 || arguments[0] === undefined ? 1 : arguments[0];
-	      var bytesPerElement = this.bytesPerElement;
-	      var bytesPerPage = this.bytesPerPage;
-
-	      var fitBytes = fitItems * bytesPerElement;
-	      var expandBy = Math.ceil(fitBytes / bytesPerPage) * bytesPerPage;
-	      var oldBuffer = this.buffer;
-
-	      // Create new buffer and update new element length
-	      this.buffer = new ArrayBuffer(oldBuffer.byteLength + expandBy);
-	      this.elementsLength = this.buffer.byteLength / bytesPerElement;
-
-	      // Clone contents so-far
-	      new Uint8Array(this.buffer).set(new Uint8Array(oldBuffer));
-
-	      // Regenerate all open views
-	      this.openViews.forEach(function (view) {
-	        return view.regenerate();
-	      });
-	    }
-
-	    /**
-	     * Return the index of the next item and advance offset by 1.
-	     *
-	     * If there is no more room in the buffer, this function will call
-	     * `expand` in order to append another page to the buffer.
-	     *
-	     * @override
-	     * @returns {Number} Returns the new item offset
-	     */
-
-	  }, {
-	    key: 'next',
-	    value: function next() {
-	      var ofs = this.itemOffset++;
-	      if (ofs >= this.elementsLength) {
-	        this.expand();
-	      }
-
-	      return ofs;
-	    }
-
-	    /**
-	     * Return the index of the next item and advance offset by a number
-	     *
-	     * If there is no more room in the buffer, this function will call
-	     * `expand` as many times as needed in order to append enough data to fit
-	     * the new number of items.
-	     *
-	     * @override
-	     * @param {Number} itemCount - The number of items to move forward
-	     * @returns {Number} Returns the new item offset
-	     */
-
-	  }, {
-	    key: 'nextArray',
-	    value: function nextArray(itemCount) {
-	      var ofs = this.itemOffset;
-	      this.itemOffset += itemCount;
-	      if (this.itemOffset >= this.elementsLength) {
-	        this.expand(itemCount);
-	      }
-
-	      return ofs;
-	    }
-
-	    /**
-	     * Open a new view using a shared buffer, for the specified type length
-	     *
-	     * @param {Class} viewType - The class of the array view (Ex. Uint8Array)
-	     * @returns {WriteTypeBufferView} Returns a view for accessing the items.
-	     */
-
-	  }, {
-	    key: 'openView',
-	    value: function openView(viewType) {
-	      if (viewType.BYTES_PER_ELEMENT !== this.bytesPerElement) {
-	        throw new TypeError('Trying to open a view with ' + viewType.BYTES_PER_ELEMENT + ' bytes per element, on a stream with ' + this.bytesPerElement + ' bytes per element');
-	      }
-
-	      // Create a new view and store it for reference
-	      var view = new _WriteTypeBufferView2.default(this, viewType);
-	      this.openViews.push(view);
-
-	      // Ask view to re-generate using our buffer
-	      view.regenerate();
-
-	      // Return it
-	      return view;
-	    }
-	  }]);
-
-	  return WriteTypeBuffer;
-	}(_TypeBuffer3.default);
-
-	exports.default = WriteTypeBuffer;
-	;
+	exports.default = _DecodingHeader2.default;
 
 /***/ },
 /* 2 */
@@ -356,84 +136,138 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  value: true
 	});
 
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
-	var _TypeBufferView2 = __webpack_require__(3);
+	var _Header_v = __webpack_require__(3);
 
-	var _TypeBufferView3 = _interopRequireDefault(_TypeBufferView2);
+	var _Header_v2 = _interopRequireDefault(_Header_v);
+
+	var _Header_v3 = __webpack_require__(4);
+
+	var _Header_v4 = _interopRequireDefault(_Header_v3);
+
+	var _Read = __webpack_require__(5);
+
+	var _Common = __webpack_require__(6);
+
+	var _FileFormatConstants = __webpack_require__(7);
+
+	var _FileFormatConstants2 = _interopRequireDefault(_FileFormatConstants);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+	/**
+	 * This class represents the JBB header, allowing bi-directional modifications
+	 * to the underlying payload.
+	 */
+	var DecodingHeader =
 
-	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	/**
+	 * Construct a new JBB Header
+	 *
+	 * @param {ArrayBuffer} buffer - The array buffer to extract the header data from
+	 * @param {Array} supportedVersions - An array of possible version specs supported by the decoder
+	 */
+	function DecodingHeader() {
+	  var _this = this;
 
-	var WriteTypeBufferView = function (_TypeBufferView) {
-	  _inherits(WriteTypeBufferView, _TypeBufferView);
+	  var buffer = arguments.length <= 0 || arguments[0] === undefined ? undefined : arguments[0];
+	  var supportedVersions = arguments.length <= 1 || arguments[1] === undefined ? [_Header_v2.default, _Header_v4.default] : arguments[1];
 
-	  /**
-	   * Construct the view of given type on the shared buffer in the typeBuffer
-	   * specified.
-	   *
-	   * @param {TypeBuffer} typeBuffer - The buffer to use for this type
-	   * @param {Class} viewClass - The array class to construct (ex. Uint8Array)
-	   */
-	  function WriteTypeBufferView(typeBuffer, viewClass) {
-	    _classCallCheck(this, WriteTypeBufferView);
+	  _classCallCheck(this, DecodingHeader);
 
-	    return _possibleConstructorReturn(this, (WriteTypeBufferView.__proto__ || Object.getPrototypeOf(WriteTypeBufferView)).call(this, typeBuffer, viewClass));
+	  // Open views to the buffer
+	  var u8 = new Uint8Array(buffer);
+	  var u16 = new Uint16Array(buffer);
+	  var u32 = new Uint32Array(buffer);
+
+	  // Perform some obvious validations on the fixed part of the header
+	  if (u16[0] !== _FileFormatConstants2.default.MAGIC_NUMBER) {
+	    var swapMagic = (u16[0] & 0x00FF) << 8 || u[16] >> 8 & 0x00FF;
+	    if (swapMagic === _FileFormatConstants2.default.MAGIC_NUMBER) {
+	      throw new _Read.EndianessError('Your machine\'s and the bundle\'s endianess types do not match');
+	    } else {
+	      throw new _Read.MalformedError('Unexpected magic number encountered in the bundle header');
+	    }
 	  }
 
-	  /**
-	   * Re-generate the internal view with the latest buffer from typeBuffer
-	   *
-	   * @private This method is internally used by `ReadTypeBuffer`
-	   */
+	  // Iterate over header versions and try to match the correct one
+	  var matchedVersion = supportedVersions.reduce(function (matchedInfo, versionInfo) {
+	    var ofs = 0;
+	    var applyFields = [];
+	    var isMatch = true;
 
-
-	  _createClass(WriteTypeBufferView, [{
-	    key: "regenerate",
-	    value: function regenerate() {
-	      this.view = new this.viewClass(this.typeBuffer.buffer);
+	    // If we already found something, return it
+	    if (matchedInfo) {
+	      return matchedInfo;
 	    }
 
-	    /**
-	     * Append a value to the current position and advance offset by one
-	     *
-	     * @param {Any} value - The value to add to the array
-	     */
+	    // Extract fields and compare fixed fields for match
+	    versionInfo.fields.forEach(function (field) {
+	      var value = 0;
+	      switch (field.size) {
+	        case 1:
+	          value = u8[ofs];
+	          ofs += 1;
+	          break;
 
-	  }, {
-	    key: "put",
-	    value: function put(value) {
-	      var ofs = this.typeBuffer.next();
+	        case 2:
+	          value = u16[ofs / 2];
+	          ofs += 2;
+	          break;
 
-	      // Note: View might be re-generated here
+	        case 4:
+	          value = u32[ofs / 4];
+	          ofs += 4;
+	          break;
 
-	      this.view[ofs] = value;
+	        default:
+	          if (true) {
+	            throw new _Common.IntegrityError('Unexpected `size` property value in header_versions');
+	          }
+	      }
+
+	      // Check for incompatible fixed field values
+	      if (field.fixed !== undefined && field.fixed !== value) {
+	        isMatch = false;
+	        return;
+	      }
+
+	      // Keep this field for later application
+	      applyFields.push([field.name, value]);
+	    });
+
+	    // If we have a match, return it
+	    if (isMatch) {
+	      return {
+	        fields: applyFields,
+	        version: versionInfo
+	      };
 	    }
 
-	    /**
-	     * Append an array to the current position and advance the indes by
-	     * the number of elements in the array.
-	     *
-	     * @param {Array} array - The new array to append
-	     */
+	    // Otherwise keep returning null
+	    return null;
+	  }, null);
 
-	  }, {
-	    key: "putArray",
-	    value: function putArray(array) {
-	      var ofs = this.typeBuffer.nextArray(array.length);
-	      this.view.set(array, ofs);
-	    }
-	  }]);
+	  // Check if nothing found
+	  if (!matchedVersion) {
+	    throw new NotSupportedError('Unsupported bundle version');
+	  }
 
-	  return WriteTypeBufferView;
-	}(_TypeBufferView3.default);
+	  // Apply fields
+	  matchedVersion.fields.forEach(function (_ref) {
+	    var _ref2 = _slicedToArray(_ref, 2);
 
-	exports.default = WriteTypeBufferView;
+	    var key = _ref2[0];
+	    var value = _ref2[1];
+
+	    _this[key] = value;
+	  });
+	};
+
+	exports.default = DecodingHeader;
 	;
 
 /***/ },
@@ -463,43 +297,15 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	Object.defineProperty(exports, "__esModule", {
 	  value: true
 	});
+	var Header_v1 = {
 
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	  version: 1,
 
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	  fields: [{ name: 'magic', size: 2, fixed: 0x3142 }, { name: 'version', size: 1, fixed: 1 }, { name: 'reserved', size: 1 }, { name: 's64_length', size: 4 }, { name: 's32_length', size: 4 }, { name: 's16_length', size: 4 }, { name: 's8_length', size: 4 }, { name: 'st_length', size: 4 }, { name: 'ot_length', size: 4 }]
 
-	var TypeBufferView = function () {
+	};
 
-	  /**
-	   * Construct the view of given type on the shared buffer in the typeBuffer
-	   * specified.
-	   *
-	   * @param {TypeBuffer} typeBuffer - The buffer to use for this type
-	   * @param {Class} viewClass - The array class to construct (ex. Uint8Array)
-	   */
-	  function TypeBufferView(typeBuffer, viewClass) {
-	    _classCallCheck(this, TypeBufferView);
-
-	    this.typeBuffer = typeBuffer;
-	    this.viewClass = viewClass;
-	  }
-
-	  /**
-	   * Close the current view by calling back to our parent buffer
-	   */
-
-
-	  _createClass(TypeBufferView, [{
-	    key: "close",
-	    value: function close() {
-	      this.typeBuffer.closeView(this);
-	    }
-	  }]);
-
-	  return TypeBufferView;
-	}();
-
-	exports.default = TypeBufferView;
+	exports.default = Header_v1;
 
 /***/ },
 /* 4 */
@@ -528,117 +334,263 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	Object.defineProperty(exports, "__esModule", {
 	  value: true
 	});
+	var Header_v2 = {
 
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	  version: 2,
+
+	  fields: [{ name: 'magic', size: 2, fixed: 0x3142 }, { name: 'version', size: 1, fixed: 2 }, { name: 'reserved', size: 1 }, { name: 's64_length', size: 4 }, { name: 's32_length', size: 4 }, { name: 's16_length', size: 4 }, { name: 's8_length', size: 4 }, { name: 'fd_length', size: 4 }]
+
+	};
+
+	exports.default = Header_v2;
+
+/***/ },
+/* 5 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.VersionError = exports.EndianessError = exports.MalformedError = exports.ReadError = undefined;
+
+	var _Common = __webpack_require__(6);
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-	var TypeBuffer = function () {
+	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
-	  /**
-	   * Constructs a new TypeBuffer object that is responsible of keeping track
-	   * of the current index of a particular typed buffer.
-	   *
-	   * @param {Number} bytesPerElement - The size of the individual elements
-	   * @param {Number} byteOffset - The initial offset (must be multiplicand of bytesPerElement)
-	   */
-	  function TypeBuffer(buffer) {
-	    var bytesPerElement = arguments.length <= 1 || arguments[1] === undefined ? 1 : arguments[1];
-	    var byteOffset = arguments.length <= 2 || arguments[2] === undefined ? 0 : arguments[2];
+	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-	    _classCallCheck(this, TypeBuffer);
+	/**
+	 * General purpose reading error
+	 */
+	var ReadError = exports.ReadError = function (_JBBError) {
+	  _inherits(ReadError, _JBBError);
 
-	    this.buffer = buffer;
-	    this.bytesPerElement = bytesPerElement;
-	    this.itemOffset = byteOffset / bytesPerElement;
-	    this.openViews = [];
+	  function ReadError(message) {
+	    _classCallCheck(this, ReadError);
+
+	    return _possibleConstructorReturn(this, (ReadError.__proto__ || Object.getPrototypeOf(ReadError)).call(this, message));
 	  }
 
+	  return ReadError;
+	}(_Common.JBBError);
+
+	/**
+	 * Malformed data encountered in the bundle
+	 */
+
+
+	var MalformedError = exports.MalformedError = function (_ReadError) {
+	  _inherits(MalformedError, _ReadError);
+
+	  function MalformedError(message) {
+	    _classCallCheck(this, MalformedError);
+
+	    return _possibleConstructorReturn(this, (MalformedError.__proto__ || Object.getPrototypeOf(MalformedError)).call(this, message));
+	  }
+
+	  return MalformedError;
+	}(ReadError);
+
+	/**
+	 * The bundle has different endianess than the one it was encoded with
+	 */
+
+
+	var EndianessError = exports.EndianessError = function (_ReadError2) {
+	  _inherits(EndianessError, _ReadError2);
+
+	  function EndianessError(message) {
+	    _classCallCheck(this, EndianessError);
+
+	    return _possibleConstructorReturn(this, (EndianessError.__proto__ || Object.getPrototypeOf(EndianessError)).call(this, message));
+	  }
+
+	  return EndianessError;
+	}(ReadError);
+
+	/**
+	 * A feature in the bundle has a different
+	 */
+
+
+	var VersionError = exports.VersionError = function (_ReadError3) {
+	  _inherits(VersionError, _ReadError3);
+
+	  function VersionError(message) {
+	    _classCallCheck(this, VersionError);
+
+	    return _possibleConstructorReturn(this, (VersionError.__proto__ || Object.getPrototypeOf(VersionError)).call(this, message));
+	  }
+
+	  return VersionError;
+	}(ReadError);
+
+/***/ },
+/* 6 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	/**
+	 * Base class for implementing JBB exceptions
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+	var JBBError = exports.JBBError = function (_Error) {
+	  _inherits(JBBError, _Error);
+
+	  function JBBError(message) {
+	    _classCallCheck(this, JBBError);
+
+	    // Hack to provide the correct call stack
+	    var _this = _possibleConstructorReturn(this, (JBBError.__proto__ || Object.getPrototypeOf(JBBError)).call(this));
+
+	    var temp = Error.call(_this, message);
+	    temp.name = _this.name = _this.constructor.name;
+	    _this.stack = temp.stack;
+	    _this.message = temp.message;
+	    return _this;
+	  }
+
+	  return JBBError;
+	}(Error);
+
+	/**
+	 * Internal, integrity error
+	 */
+
+
+	var IntegrityError = exports.IntegrityError = function (_JBBError) {
+	  _inherits(IntegrityError, _JBBError);
+
+	  function IntegrityError(message) {
+	    _classCallCheck(this, IntegrityError);
+
+	    return _possibleConstructorReturn(this, (IntegrityError.__proto__ || Object.getPrototypeOf(IntegrityError)).call(this, message));
+	  }
+
+	  return IntegrityError;
+	}(JBBError);
+
+	/**
+	 * Not implemented default error
+	 */
+
+
+	var NotImplementedError = exports.NotImplementedError = function (_JBBError2) {
+	  _inherits(NotImplementedError, _JBBError2);
+
+	  function NotImplementedError(message) {
+	    _classCallCheck(this, NotImplementedError);
+
+	    return _possibleConstructorReturn(this, (NotImplementedError.__proto__ || Object.getPrototypeOf(NotImplementedError)).call(this, message));
+	  }
+
+	  return NotImplementedError;
+	}(JBBError);
+
+	/**
+	 * Requested a feature not supported by the system
+	 */
+
+
+	var NotSupportedError = exports.NotSupportedError = function (_JBBError3) {
+	  _inherits(NotSupportedError, _JBBError3);
+
+	  function NotSupportedError(message) {
+	    _classCallCheck(this, NotSupportedError);
+
+	    return _possibleConstructorReturn(this, (NotSupportedError.__proto__ || Object.getPrototypeOf(NotSupportedError)).call(this, message));
+	  }
+
+	  return NotSupportedError;
+	}(JBBError);
+
+/***/ },
+/* 7 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	/**
+	 * Constants specific to the JBB file format
+	 */
+
+	module.exports = {
+
 	  /**
-	   * Convert the item offset to byte offset and return
-	   *
-	   * @returns {Number} The offset of this index in bytes
+	   * The magic number
 	   */
+	  MAGIC_NUMBER: 0x4231
 
-
-	  _createClass(TypeBuffer, [{
-	    key: "closeView",
-
-
-	    /**
-	     * Closes a view previously crated with openView
-	     *
-	     * @param {WriteTypeBufferView} view - The view to close
-	     * @param {Boolean} dispose - Dispose the buffer if this was the last view
-	     */
-	    value: function closeView(view) {
-	      var i = this.openViews.indexOf(view);
-	      if (i < 0) return;
-	      this.openViews.slice(i, 1);
-
-	      if (this.openViews.length === 0) {
-	        this.close();
-	      }
-	    }
-
-	    /**
-	     * Release the memory associated with this object
-	     */
-
-	  }, {
-	    key: "close",
-	    value: function close() {
-	      this.buffer = null;
-	    }
-
-	    /**
-	     * Return the index of the next item and advance offset by 1
-	     *
-	     * @returns {Number} Returns the new item offset
-	     */
-
-	  }, {
-	    key: "next",
-	    value: function next() {
-	      return this.itemOffset++;
-	    }
-
-	    /**
-	     * Return the index of the next item and advance offset by a number
-	     *
-	     * @param {Number} itemCount - The number of items to move forward
-	     * @returns {Number} Returns the new item offset
-	     */
-
-	  }, {
-	    key: "nextArray",
-	    value: function nextArray(itemCount) {
-	      var ofs = this.itemOffset;
-	      this.itemOffset += itemCount;
-	      return ofs;
-	    }
-	  }, {
-	    key: "byteOffset",
-	    get: function get() {
-	      return this.itemOffset * this.bytesPerElement;
-	    }
-
-	    /**
-	     * Convert the item offset to byte offset and return
-	     *
-	     * @param {Number} value - The new offset in bytes to set
-	     */
-	    ,
-	    set: function set(value) {
-	      this.itemOffset = Math.floor(value / this.bytesPerElement);
-	    }
-	  }]);
-
-	  return TypeBuffer;
-	}();
-
-	exports.default = TypeBuffer;
-	;
+	};
 
 /***/ }
 /******/ ]);
