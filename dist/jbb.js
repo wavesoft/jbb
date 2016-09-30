@@ -74,6 +74,8 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	var _ArrayAnalyser2 = _interopRequireDefault(_ArrayAnalyser);
 
+	var _legacy = __webpack_require__(5);
+
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	// import BundleReader from './bundles/BundleReader';
@@ -148,17 +150,96 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	// test_16();
 
-	console.log('wat=', _ArrayAnalyser2.default.isFloat32(3));
-	console.log('is=', _ArrayAnalyser2.default.isFloat32(3.14));
-	console.log('isNot=', _ArrayAnalyser2.default.isFloat32(Math.PI));
+	var ar_float = [];
+	var ar_int = [];
+	var ar_same = [];
+	var ar_zero = [];
 
-	console.time('isFloat32');
-	var count16 = 100000000;
-	var isFloat;
+	for (var i = 0; i < 10000; i++) {
+	  ar_float.push(i * 1024 * Math.random());
+	  ar_int.push(1024 * Math.random() | 0);
+	  ar_zero.push(0);
+	  ar_same.push(4.124512);
+	}
+
+	// ar_int[5000] = 3.14;
+
+	// console.log('wat=', ArrayAnalyser.isFloat32( 3 ));
+	// console.log('is=', ArrayAnalyser.isFloat32( 3.14 ));
+	// console.log('isNot=', ArrayAnalyser.isFloat32( Math.PI ));
+
+	console.time('analyzeNumericArray [float 1x]');
+	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_float));
+	console.timeEnd('analyzeNumericArray [float 1x]');
+	console.time('analyzeNumericArray [int 1x]');
+	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_int));
+	console.timeEnd('analyzeNumericArray [int 1x]');
+	console.time('analyzeNumericArray [zero 1x]');
+	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_zero));
+	console.timeEnd('analyzeNumericArray [zero 1x]');
+	console.time('analyzeNumericArray [same 1x]');
+	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_same));
+	console.timeEnd('analyzeNumericArray [same 1x]');
+
+	// console.time('benchmark');
+	// var counter = 100000;
+	// while (counter--) {
+	//   ArrayAnalyser.analyzeNumericArray2(ar_int);
+	// };
+	// console.timeEnd('benchmark');
+
+	// console.time('getNumericArrayMinType');
+	// var count16 = 100000;
+	// var isFloat;
+	// while (count16--) {
+	//   ArrayAnalyser.getNumericArrayMinType(ar);
+	// };
+	// console.timeEnd('getNumericArrayMinType');
+
+	console.time('analyzeNumericArray [float]');
+	var count16 = 100000;
 	while (count16--) {
-	  // isFloat = ArrayAnalyser.isFloat32( 3.14159265 );
+	  _ArrayAnalyser2.default.analyzeNumericArray(ar_float);
 	};
-	console.timeEnd('isFloat32');
+	console.timeEnd('analyzeNumericArray [float]');
+
+	console.time('analyzeNumericArray [int]');
+	var count16 = 100000;
+	while (count16--) {
+	  _ArrayAnalyser2.default.analyzeNumericArray(ar_int);
+	};
+	console.timeEnd('analyzeNumericArray [int]');
+
+	console.time('analyzeNumericArray [zero]');
+	var count16 = 100000;
+	while (count16--) {
+	  _ArrayAnalyser2.default.analyzeNumericArray(ar_zero);
+	};
+	console.timeEnd('analyzeNumericArray [zero]');
+
+	console.time('analyzeNumericArray [same]');
+	var count16 = 100000;
+	while (count16--) {
+	  _ArrayAnalyser2.default.analyzeNumericArray(ar_same);
+	};
+	console.timeEnd('analyzeNumericArray [same]');
+
+	// console.time('old_analyzeNumericArray');
+	// var count16 = 100000;
+	// var isFloat;
+	// while (count16--) {
+	//   analyzeNumericArray(ar_float, true);
+	// };
+	// console.timeEnd('old_analyzeNumericArray');
+
+	// console.time('analyzeNumericArray(false)');
+	// var count16 = 100000;
+	// var isFloat;
+	// while (count16--) {
+	//   ArrayAnalyser.analyzeNumericArray(ar, false);
+	// };
+	// console.timeEnd('analyzeNumericArray(false)');
+
 
 	// export {
 	//   BundleReader,
@@ -242,6 +323,10 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
 
+	var _NumericTypes = __webpack_require__(4);
+
+	var _NumericTypes2 = _interopRequireDefault(_NumericTypes);
+
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -266,12 +351,15 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  }
 
 	  _createClass(ArrayAnalyser, null, [{
-	    key: "isFloat32",
+	    key: 'isFloat32',
 
 
 	    /**
 	     * Test if the given float number fits in a 32-bit number representation.
 	     * if not it's assumed to fit in 64-bit number.
+	     *
+	     * @param {Number} floatNumber - A float number to test
+	     * @returns {Boolean} Returns true if the number can fit in 32-bits
 	     */
 	    value: function isFloat32(floatNumber) {
 	      var loss = 0.0;
@@ -286,11 +374,244 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	    }
 
 	    /**
+	     * Process the given numeric array and return it's metrics, including:
+	     *
+	     * - min : Minimum value
+	     * - max : Maximum value
+	     * - average : Average value
+	     * - dmin : Minimum difference between consecutive numbers
+	     * - dmax : Maximum difference between consecutive numbers
+	     * - same : true if all the values are the same
+	     * - isFloat : true if it contains at least 1 float number
+	     * - isZero : true if all items are zero
+	     *
+	     * From this values, other interesting metrics can be calculated:
+	     * - isInt : !isFloat && !isZero
+	     * - isSame : same === numericArray.length - 1
+	     *
+	     * @param {Array} numericArray - A numeric array to process
+	     * @returns {{min:Number, max:Number, average:Number, dmin:Number, dmax:Number, isFloat:Boolean, isZero:Boolean}} The array metrics
+	     */
+
+	  }, {
+	    key: 'analyzeNumericArray2',
+	    value: function analyzeNumericArray2(numericArray) {
+	      var value0 = numericArray[0];
+	      var result = {
+	        min: value0,
+	        max: value0,
+	        isInt: value0 === (value0 | 0),
+	        delta: 0,
+	        _prev: value0
+	      };
+
+	      for (var i = 1; i < numericArray.length; ++i) {
+	        var value = numericArray[i];
+
+	        // Test if it is not integer
+	        if (result.isInt && value !== (value | 0)) {
+	          result.isInt = false;
+	        }
+
+	        // Calculate bounds
+	        if (value < result.min) result.min = value;
+	        if (value > result.max) result.max = value;
+
+	        // Absolute difference
+	        var delta = Math.abs(value - result._prev);
+	        if (delta > result.delta) {
+	          result.delta = delta;
+	        }
+
+	        if (delta > result.delta) {
+	          result.delta = delta;
+	        }
+
+	        result._prev = value;
+	      }
+
+	      return result;
+	    }
+	  }, {
+	    key: 'analyzeNumericArray',
+	    value: function analyzeNumericArray(numericArray) {
+	      var value0 = numericArray[0];
+	      var results = {
+	        _prev: value0,
+	        average: 0,
+	        dmin: 0,
+	        dmax: 0,
+	        isFloat: value0 !== (value0 | 0),
+	        isInt: value0 !== 0 && value0 === (value0 | 0),
+	        isMixed: false,
+	        min: value0,
+	        max: value0,
+	        same: 0
+	      };
+
+	      for (var i = 1; i < numericArray.length; ++i) {
+	        var value = numericArray[i];
+
+	        // Float/Integer/Mixed type detection
+	        if (!results.isMixed) {
+	          if (value !== (value | 0)) {
+	            results.isFloat = true;
+	            results.isMixed = results.isInt;
+	          } else {
+	            if (!results.isInt && value !== 0) {
+	              results.isInt = true;
+	              results.isMixed = results.isFloat;
+	            }
+	          }
+	        }
+
+	        // Check for similarity
+	        if (results._prev === value) ++results.same;
+
+	        // Update bounds
+	        if (value < results.min) results.min = value;
+	        if (value > results.max) results.max = value;
+
+	        // Update delta bounds
+	        var diff = value - results._prev;
+	        if (diff < results.dmin) results.dmin = diff;
+	        if (diff > results.dmax) results.dmax = diff;
+
+	        // Update average
+	        results.average += value;
+
+	        // Keep track of previous value
+	        // (This is faster than accessing the previous element of the array)
+	        results._prev = value;
+	      }
+
+	      // Finalize and clean-up results
+	      results.average /= numericArray.length;
+	      results.isZero = !results.isInt && !results.isFloat;
+	      results.isSame = results.same === numericArray.length - 1;
+	      delete results._prev;
+
+	      return results;
+	    }
+	  }, {
+	    key: 'analyzeNumericArray3',
+	    value: function analyzeNumericArray3(numericArray) {
+	      var prev = numericArray[0];
+	      var average = 0;
+	      var dmin = 0;
+	      var dmax = 0;
+	      var max = prev;
+	      var min = prev;
+	      var isFloat = prev !== (prev | 0);
+	      var isInt = !isFloat && prev !== 0;
+	      var isMixed = isFloat && isInt;
+	      var same = 0;
+
+	      for (var i = 1; i < numericArray.length; ++i) {
+	        var value = numericArray[i];
+	        // let floatTest = (value !== (value|0));
+
+	        if (!isMixed) {
+	          if (value !== (value | 0)) {
+	            isFloat = true;
+	            isMixed = isInt;
+	          } else {
+	            if (!isInt && value !== 0) {
+	              isInt = true;
+	              isMixed = isFloat;
+	            }
+	          }
+	        }
+
+	        // Check for float numbers
+	        // if (!isFloat && floatTest) {
+	        //   isFloat = true;
+	        // }
+	        // if (!isInt && !floatTest && (value !== 0)) {
+	        //   isInt = true;
+	        // }
+
+	        // Check for similarity
+	        if (prev === value) ++same;
+
+	        // Update bounds
+	        if (value < min) min = value;
+	        if (value > max) max = value;
+
+	        // Update average
+	        average += value;
+
+	        // Update delta
+	        var diff = value - prev;
+	        if (diff < dmin) dmin = diff;
+	        if (diff > dmax) dmax = diff;
+
+	        // Keep track of previous value
+	        prev = value;
+	      }
+
+	      // Finalize average calculation
+	      average /= numericArray.length;
+
+	      return {
+	        average: average,
+	        dmin: dmin,
+	        dmax: dmax,
+	        isFloat: isFloat,
+	        isInt: isInt,
+	        isZero: !isInt && !isFloat,
+	        isMixed: isMixed,
+	        isSame: same === numericArray.length - 1,
+	        max: max,
+	        min: min,
+	        same: same };
+	    }
+
+	    /**
+	     * Get the minimum possible type that can hold the numerical values
+	     * of all items in the given array.
+	     *
+	     *
+	     */
+
+	  }, {
+	    key: 'getNumericArrayMinType',
+	    value: function getNumericArrayMinType(numericArray) {
+	      var type = _NumericTypes2.default.UNKNOWN;
+
+	      for (var i = 0; i < numericArray.length; ++i) {
+	        var value = numericArray[i];
+
+	        // Check if this is a float, or if the float type needs to be upgraded
+	        if (type === _NumericTypes2.default.FLOAT32 || value % 1 !== 0) {
+	          if (!ArrayAnalyser.isFloat32(value)) return _NumericTypes2.default.FLOAT64;
+	          continue;
+	        }
+
+	        // Check if number is within bounds
+	        if (type !== _NumericTypes2.default.UNKNOWN && value >= type.min && value <= type.max) {
+	          continue;
+	        }
+
+	        // Check for type upgrade
+	        for (var j = 0; j < type.upscale.length; ++j) {
+	          var nextType = type.upscale[j];
+	          if (value >= nextType.min && value <= nextType.max) {
+	            type = nextType;
+	            break;
+	          }
+	        }
+	      }
+
+	      return type;
+	    }
+
+	    /**
 	     * @param {TypedArray} typedArray - The typed array to get the
 	     */
 
 	  }, {
-	    key: "getNumericType",
+	    key: 'getNumericType',
 	    value: function getNumericType(typedArray) {}
 	  }]);
 
@@ -352,6 +673,699 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	};
 
 	exports.default = NumericBounds;
+
+/***/ },
+/* 4 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _NumericBounds = __webpack_require__(3);
+
+	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	/**
+	 * Constants specific to the JBB file format
+	 */
+	var NumericTypes = {
+
+	  // Base numeric constants
+	  UINT8: { id: 0, signed: false, min: _NumericBounds2.default.UINT8_MIN, max: _NumericBounds2.default.UINT8_MAX, upscale: [] },
+	  INT8: { id: 1, signed: true, min: _NumericBounds2.default.INT8_MIN, max: _NumericBounds2.default.INT8_MAX, upscale: [] },
+	  UINT16: { id: 2, signed: false, min: _NumericBounds2.default.UINT16_MIN, max: _NumericBounds2.default.UINT16_MAX, upscale: [] },
+	  INT16: { id: 3, signed: true, min: _NumericBounds2.default.INT16_MIN, max: _NumericBounds2.default.INT16_MAX, upscale: [] },
+	  UINT32: { id: 4, signed: false, min: _NumericBounds2.default.UINT32_MIN, max: _NumericBounds2.default.UINT32_MAX, upscale: [] },
+	  INT32: { id: 5, signed: true, min: _NumericBounds2.default.INT32_MIN, max: _NumericBounds2.default.INT32_MAX, upscale: [] },
+	  FLOAT32: { id: 6, signed: true },
+	  FLOAT64: { id: 7, signed: true },
+
+	  // General numeric constants
+	  NUMERIC: { id: 8, unsigned: true, min: -Infinity, max: Infinity, upscale: [] },
+	  UNKNOWN: { id: 9, unsigned: true, min: -Infinity, max: Infinity, upscale: [] },
+	  NAN: { id: 10 }
+
+	};
+
+	/**
+	 * Define upscaling candidates
+	 */
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT8);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT8);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT16);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT16);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT32);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT32);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.FLOAT32);
+	NumericTypes.UNKNOWN.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT8);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT8);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT16);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT16);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT32);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT32);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.FLOAT32);
+	NumericTypes.NUMERIC.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.UINT8.upscale.push(NumericTypes.INT8);
+	NumericTypes.UINT8.upscale.push(NumericTypes.UINT16);
+	NumericTypes.UINT8.upscale.push(NumericTypes.INT16);
+	NumericTypes.UINT8.upscale.push(NumericTypes.UINT32);
+	NumericTypes.UINT8.upscale.push(NumericTypes.INT32);
+	NumericTypes.UINT8.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.INT8.upscale.push(NumericTypes.INT16);
+	NumericTypes.INT8.upscale.push(NumericTypes.INT32);
+	NumericTypes.INT8.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.UINT16.upscale.push(NumericTypes.INT16);
+	NumericTypes.UINT16.upscale.push(NumericTypes.UINT32);
+	NumericTypes.UINT16.upscale.push(NumericTypes.INT32);
+	NumericTypes.UINT16.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.INT16.upscale.push(NumericTypes.INT32);
+	NumericTypes.INT16.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.UINT32.upscale.push(NumericTypes.INT32);
+	NumericTypes.UINT32.upscale.push(NumericTypes.FLOAT64);
+
+	NumericTypes.INT32.upscale.push(NumericTypes.FLOAT64);
+
+	exports.default = NumericTypes;
+
+/***/ },
+/* 5 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * DELETE ME - DELETE ME - DELETE ME - DELETE ME - DELETE ME - DELETE ME
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.analyzeNumericArray = analyzeNumericArray;
+	var FLOAT32_POS = 3.40282347e+38; // largest positive number in float32
+	var FLOAT32_NEG = -3.40282346e+38; // largest negative number in float32
+	var FLOAT32_SMALL = 1.175494350e-38; // smallest number in float32
+
+	/* Note that all these values are exclusive, for positive test (ex v < UING8_MAX) */
+
+	var UINT8_MAX = 256; // largest positive unsigned integer on 8-bit
+	var UINT16_MAX = 65536; // largest positive unsigned integer on 16-bit
+	var UINT32_MAX = 4294967296; // largest positive unsigned integer on 32-bit
+
+	var INT8_MIN = -129; // largest negative signed integer on 8-bit
+	var INT8_MAX = 128; // largest positive signed integer on 8-bit
+	var INT16_MIN = -32769; // largest negative signed integer on 16-bit
+	var INT16_MAX = 32768; // largest positive signed integer on 16-bit
+	var INT32_MIN = -2147483649; // largest negative signed integer on 16-bit
+	var INT32_MAX = 2147483648; // largest positive signed integer on 16-bit
+
+	/* Version of binary bundle */
+
+	var VERSION = 1 /* Major */ << 8 | 2 /* Minor */;
+
+	/**
+	 * If this constant is true, the packing functions will do sanity checks,
+	 * which might increase the build time.
+	 */
+	var SAFE = 1;
+
+	/**
+	 * Numerical types
+	 */
+	var NUMTYPE = {
+	  // For protocol use
+	  UINT8: 0, INT8: 1,
+	  UINT16: 2, INT16: 3,
+	  UINT32: 4, INT32: 5,
+	  FLOAT32: 6, FLOAT64: 7,
+	  // For internal use
+	  NUMERIC: 8, UNKNOWN: 9, NAN: 10
+	};
+
+	/**
+	 * Numerical length types
+	 */
+	var NUMTYPE_LN = {
+	  UINT16: 0,
+	  UINT32: 1
+	};
+	var NUMTYPE_LEN = {
+	  UINT8: 0,
+	  UINT16: 1,
+	  UINT32: 2,
+	  FLOAT64: 3
+	};
+
+	/**
+	 * Log flags
+	 */
+	var LOG = {
+	  PRM: 0x0001, // Primitive messages
+	  ARR: 0x0002, // Array messages
+	  CHU: 0x0004, // Array Chunk
+	  STR: 0x0008, // String buffer
+	  IREF: 0x0010, // Internal reference
+	  XREF: 0x0020, // External reference
+	  OBJ: 0x0040, // Object messages
+	  EMB: 0x0080, // Embedded resource
+	  PLO: 0x0100, // Simple objects
+	  BULK: 0x0200, // Bulk-encoded objects
+	  SUMM: 0x2000, // Log summary
+	  WRT: 0x4000, // Debug writes
+	  PDBG: 0x8000 };
+
+	/**
+	 * Log prefix chunks
+	 */
+	var LOG_PREFIX_STR = {
+	  0x0001: 'PRM',
+	  0x0002: 'ARR',
+	  0x0004: 'CHU',
+	  0x0008: 'STR',
+	  0x0010: 'IRF',
+	  0x0020: 'XRF',
+	  0x0040: 'OBJ',
+	  0x0080: 'EMB',
+	  0x0100: 'PLO',
+	  0x0200: 'BLK',
+	  0x2000: 'SUM',
+	  0x8000: 'DBG'
+	};
+
+	/**
+	 * Numerical type classes
+	 */
+	var NUMTYPE_CLASS = [Uint8Array, Int8Array, Uint16Array, Int16Array, Uint32Array, Int32Array, Float32Array, Float64Array];
+
+	/**
+	 * Downscaling numtype conversion table from/to
+	 */
+	var NUMTYPE_DOWNSCALE = {
+	  FROM: [NUMTYPE.UINT16, NUMTYPE.INT16, NUMTYPE.UINT32, NUMTYPE.INT32, NUMTYPE.UINT32, NUMTYPE.INT32, NUMTYPE.FLOAT32, NUMTYPE.FLOAT32, NUMTYPE.FLOAT32, NUMTYPE.FLOAT32, NUMTYPE.FLOAT64, NUMTYPE.FLOAT64, NUMTYPE.FLOAT64, NUMTYPE.FLOAT64, NUMTYPE.FLOAT64],
+	  TO: [NUMTYPE.UINT8, NUMTYPE.INT8, NUMTYPE.UINT8, NUMTYPE.INT8, NUMTYPE.UINT16, NUMTYPE.INT16, NUMTYPE.UINT8, NUMTYPE.INT8, NUMTYPE.UINT16, NUMTYPE.INT16, NUMTYPE.UINT8, NUMTYPE.INT8, NUMTYPE.UINT16, NUMTYPE.INT16, NUMTYPE.FLOAT32]
+	};
+
+	/**
+	 * Delta-Encoding for integers
+	 */
+	var NUMTYPE_DELTA_INT = {
+	  FROM: [NUMTYPE.UINT16, NUMTYPE.INT16, NUMTYPE.UINT32, NUMTYPE.INT32, NUMTYPE.UINT32, NUMTYPE.INT32],
+	  TO: [NUMTYPE.INT8, NUMTYPE.INT8, NUMTYPE.INT8, NUMTYPE.INT8, NUMTYPE.INT16, NUMTYPE.INT16]
+	};
+
+	/**
+	 * Delta-Encoding for floats
+	 */
+	var NUMTYPE_DELTA_FLOAT = {
+	  FROM: [NUMTYPE.FLOAT32, NUMTYPE.FLOAT32, NUMTYPE.FLOAT64, NUMTYPE.FLOAT64],
+	  TO: [NUMTYPE.INT8, NUMTYPE.INT16, NUMTYPE.INT8, NUMTYPE.INT16]
+	};
+
+	/**
+	 * Delta encoding scale factor
+	 */
+	var DELTASCALE = {
+	  S_001: 1, // Divide by 100 the value
+	  S_1: 2, // Keep value as-is
+	  S_R: 3, // Multiply by 127 on 8-bit and by 32768 on 16-bit
+	  S_R00: 4 };
+
+	/**
+	 * Control Op-Codes
+	 */
+	var CTRL_OP = {
+	  ATTRIB: 0x80, // Attribute
+	  EXPORT: 0xF8, // External Export
+	  EMBED: 0xF9 };
+
+	/**
+	 * Primitive Op-Codes
+	 */
+	var PRIM_OP = {
+	  ARRAY: 0x00, // Array
+	  OBJECT: 0x80, // Object / Plain Object [ID=0]
+	  BUFFER: 0xC0, // Buffer
+	  REF: 0xE0, // Internal Reference
+	  NUMBER: 0xF0, // Number
+	  SIMPLE: 0xF8, // Simple
+	  SIMPLE_EX: 0xFC, // Extended simple primitive
+	  IMPORT: 0xFE };
+
+	/**
+	 * Object Op-Codes
+	 */
+	var OBJ_OP = {
+	  KNOWN_5: 0x00, // Known object (5-bit)
+	  KNOWN_12: 0x20, // Known object (12-bit)
+	  PLAIN_LOOKUP: 0x30, // A plain object from lookup table
+	  PLAIN_NEW: 0x3F, // A new plain object that will define a lookup entry
+	  PRIMITIVE: 0x38, // Primitive object
+	  PRIM_DATE: 0x38
+	};
+
+	/**
+	 * Primitive object op-codes
+	 */
+	var OBJ_PRIM = {
+	  DATE: 0x00 };
+
+	/**
+	 * Array Op-Codes
+	 */
+	var ARR_OP = {
+	  NUM_DWS: 0x00, // Downscaled Numeric Type
+	  NUM_DELTA_INT: 0x20, // Delta-Encoded Integer Array
+	  NUM_DELTA_FLOAT: 0x30, // Delta-Encoded Float Array
+	  NUM_REPEATED: 0x40, // Repeated Numeric Value
+	  NUM_RAW: 0x50, // Raw Numeric Value
+	  NUM_SHORT: 0x60, // Short Numeric Value
+	  PRIM_REPEATED: 0x68, // Repeated Primitive Value
+	  PRIM_RAW: 0x6A, // Raw Primitive Array
+	  PRIM_BULK_PLAIN: 0x6E, // Bulk Array of Plain Objects
+	  PRIM_SHORT: 0x6F, // Short Primitive Array
+	  PRIM_CHUNK: 0x78, // Chunked Primitive ARray
+	  PRIM_BULK_KNOWN: 0x7C, // Bulk Array of Known Objects
+	  EMPTY: 0x7E, // Empty Array
+	  PRIM_CHUNK_END: 0x7F };
+
+	/**
+	 * Array chunk types
+	 */
+	var ARR_CHUNK = {
+	  PRIMITIVES: 1, // Two or more primitives
+	  REPEAT: 2, // Repeated of the same primitive
+	  NUMERIC: 3, // A numeric TypedArray
+	  BULK_PLAIN: 4, // A bulk of many plain objects
+	  BULK_KNOWN: 5 };
+
+	var _ARR_CHUNK = [undefined, 'PRIMITIVES', 'REPEAT', 'NUMERIC', 'BULK_PLAIN', 'BULK_KNOWN'];
+
+	/**
+	 * Simple primitives
+	 */
+	var PRIM_SIMPLE = {
+	  UNDEFINED: 0,
+	  NULL: 1,
+	  FALSE: 2,
+	  TRUE: 3
+	};
+
+	/**
+	 * Extended simple primitives
+	 */
+	var PRIM_SIMPLE_EX = {
+	  NAN: 0
+	};
+
+	/**
+	 * Buffer primitive MIME Types
+	 */
+	var PRIM_BUFFER_TYPE = {
+	  STRING_LATIN: 0,
+	  STRING_UTF8: 1,
+	  BUF_IMAGE: 2,
+	  BUF_SCRIPT: 3,
+	  BUF_AUDIO: 4,
+	  BUF_VIDEO: 5,
+	  RESOURCE: 7
+	};
+
+	/**
+	 * BULK_KNOWN Array encoding operator codes
+	 */
+	var PRIM_BULK_KNOWN_OP = {
+	  LREF_7: 0x00, // Local reference up to 7bit
+	  LREF_11: 0xF0, // Local reference up to 11bit
+	  LREF_16: 0xFE, // Local reference up to 16bit
+	  IREF: 0xE0, // Internal reference up to 20bit
+	  XREF: 0xFF, // External reference
+	  DEFINE: 0x80, // Definition up to 5bit
+	  REPEAT: 0xC0 };
+
+	/**
+	 * String representation of numerical type for debug messages
+	 */
+	var _NUMTYPE = ['UINT8', 'INT8', 'UINT16', 'INT16', 'UINT32', 'INT32', 'FLOAT32', 'FLOAT64', 'NUMERIC', 'UNKNOWN', 'NaN'];
+	var _NUMTYPE_DOWNSCALE_DWS = ['UINT16 -> UINT8', 'INT16 -> INT8', 'UINT32 -> UINT8', 'INT32 -> INT8', 'UINT32 -> UINT16', 'INT32 -> INT16', 'FLOAT32 -> UINT8', 'FLOAT32 -> INT8', 'FLOAT32 -> UINT16', 'FLOAT32 -> INT16', 'FLOAT64 -> UINT8', 'FLOAT64 -> INT8', 'FLOAT64 -> UINT16', 'FLOAT64 -> INT16', 'FLOAT64 -> FLOAT32'];
+	var _NUMTYPE_DOWNSCALE_DELTA_INT = ['UINT16 -> INT8', 'INT16 -> INT8', 'UINT32 -> INT8', 'INT32 -> INT8', 'UINT32 -> INT16', 'INT32 -> INT16'];
+	var _NUMTYPE_DOWNSCALE_DELTA_FLOAT = ['FLOAT32 -> INT8', 'FLOAT32 -> INT16', 'FLOAT64 -> INT8', 'FLOAT64 -> INT16 '];
+
+	/**
+	 * Calculate and return the numerical type and the scale to
+	 * apply to the float values given in order to minimize the error.
+	 */
+	function getFloatScale(values, min, max, error) {
+	  var mid = (min + max) / 2,
+	      range = mid - min,
+	      norm_8 = range / INT8_MAX,
+	      norm_16 = range / INT16_MAX,
+	      ok_8 = true,
+	      ok_16 = true,
+	      er_8 = 0,
+	      er_16 = 0,
+	      v,
+	      uv,
+	      er;
+
+	  // For the values given, check if 8-bit or 16-bit
+	  // scaling brings smaller error value
+	  for (var i = 0, l = values.length; i < l; ++i) {
+
+	    // Test 8-bit scaling
+	    if (ok_8) {
+	      v = Math.round((values[i] - mid) / norm_8);
+	      uv = v * norm_8 + mid;
+	      er = (uv - v) / v;
+	      if (er > er_8) er_8 = er;
+	      if (er >= error) {
+	        ok_8 = false;
+	      }
+	    }
+
+	    // Test 16-bit scaling
+	    if (ok_16) {
+	      v = Math.round((values[i] - mid) / norm_16);
+	      uv = v * norm_16 + mid;
+	      er = (uv - v) / v;
+	      if (er > er_16) er_16 = er;
+	      if (er >= error) {
+	        ok_16 = false;
+	      }
+	    }
+
+	    if (!ok_8 && !ok_16) return [0, NUMTYPE.UNKNOWN];
+	  }
+
+	  // Pick most appropriate normalization factor
+	  if (ok_8 && ok_16) {
+	    if (er_8 < er_16) {
+	      return [norm_8, NUMTYPE.INT8];
+	    } else {
+	      return [norm_16, NUMTYPE.INT16];
+	    }
+	  } else if (ok_8) {
+	    return [norm_8, NUMTYPE.INT8];
+	  } else if (ok_16) {
+	    return [norm_16, NUMTYPE.INT16];
+	  } else {
+	    return [0, NUMTYPE.UNKNOWN];
+	  }
+	}
+
+	/**
+	 * Get the smallest possible numeric type fits this numberic bounds
+	 *
+	 * @param {number} vmin - The minimum number to check
+	 * @param {number} vmax - The maximum number to check
+	 * @param {boolean} is_float - Set to 'true' to assume that the numbers are float
+	 * @return {NUMTYPE} - The numerical type to rerutn
+	 */
+	function getNumType(vmin, vmax, is_float) {
+	  if (typeof vmin !== "number") return NUMTYPE.NAN;
+	  if (typeof vmax !== "number") return NUMTYPE.NAN;
+	  if (isNaN(vmin) || isNaN(vmax)) return NUMTYPE.NAN;
+
+	  // If float, test only-floats
+	  if (is_float) {
+
+	    // Try to find smallest value for float32 minimum tests
+	    var smallest;
+	    if (vmin === 0) {
+	      // vmin is 0, which makes vmax positive, so
+	      // test vmax for smallest
+	      smallest = vmax;
+	    } else if (vmax === 0) {
+	      // if vmax is 0, it makes vmin negative, which
+	      // means we should test it's positive version
+	      smallest = -vmax;
+	    } else {
+	      // if vmin is positive, both values are positive
+	      // so get the smallest for small test (vmin)
+	      if (vmin > 0) {
+	        smallest = vmin;
+
+	        // if vmax is negative, both values are negative
+	        // so get the biggest for small test (vmax)
+	      } else if (vmax < 0) {
+	        smallest = -vmax;
+
+	        // if vmin is negative and vmax positive, get the
+	        // smallest of their absolute values
+	      } else if (vmin < 0 && vmax > 0) {
+	        smallest = -vmin;
+	        if (vmax < smallest) smallest = vmax;
+	      }
+	    }
+
+	    // Test if float number fits on 32 or 64 bits
+	    if (vmin > FLOAT32_NEG && vmax < FLOAT32_POS && smallest > FLOAT32_SMALL) {
+	      return NUMTYPE.FLOAT32;
+	    } else {
+	      return NUMTYPE.FLOAT64;
+	    }
+	  }
+
+	  // If we have a negative value, switch to signed tests
+	  if (vmax < 0 || vmin < 0) {
+
+	    // Get absolute maximum of bound values
+	    var amax = -vmin;
+	    if (vmax < 0) {
+	      if (-vmax > amax) amax = -vmax;
+	    } else {
+	      if (vmax > amax) amax = vmax;
+	    }
+
+	    // Test for integer bounds
+	    if (amax < INT8_MAX) {
+	      return NUMTYPE.INT8;
+	    } else if (amax < INT16_MAX) {
+	      return NUMTYPE.INT16;
+	    } else if (amax < INT32_MAX) {
+	      return NUMTYPE.INT32;
+	    } else {
+	      return NUMTYPE.FLOAT64;
+	    }
+
+	    // Otherwise perform unsigned tests
+	  } else {
+
+	    // Check for unsigned cases
+	    if (vmax < UINT8_MAX) {
+	      return NUMTYPE.UINT8;
+	    } else if (vmax < UINT16_MAX) {
+	      return NUMTYPE.UINT16;
+	    } else if (vmax < UINT32_MAX) {
+	      return NUMTYPE.UINT32;
+	    } else {
+	      return NUMTYPE.FLOAT64;
+	    }
+	  }
+	}
+
+	/**
+	 * Analyze the specified numeric array and return analysis details
+	 *
+	 * @param {Array} v - The array to analyze
+	 * @param {Boolean} include_costly - Include additional (costly) operations
+	 * @return {object} - Return an object with the analysis results
+	 */
+	function analyzeNumericArray(v, include_costly) {
+	  var min = v[0],
+	      max = min,
+	      is_int = false,
+	      is_float = false,
+	      is_same = true,
+	      dmin = 0,
+	      dmax = 0,
+	      is_dfloat = false,
+	      mean = 0,
+	      n_type = 0,
+	      d_mode = 0,
+	      f_type = [0, NUMTYPE.UNKNOWN],
+	      c_same = 0,
+	      same = 0,
+	      s_min = [min, min, min, min, min],
+	      s_min_i = 0,
+	      s_max = [min, min, min, min, min],
+	      s_max_i = 0,
+	      samples,
+	      a,
+	      b,
+	      d_type,
+	      cd,
+	      cv,
+	      lv = v[0];
+
+	  // Anlyze array items
+	  for (var i = 0, l = v.length; i < l; ++i) {
+	    cv = v[i];
+
+	    // Exit on non-numeric cases
+	    if (typeof cv !== 'number') return null;
+
+	    // Update mean
+	    mean += cv;
+
+	    // Include costly calculations if enabled
+	    if (include_costly) {
+
+	      // Update delta
+	      if (i !== 0) {
+	        cd = lv - cv;if (cd < 0) cd = -cd;
+	        if (i === 1) {
+	          dmin = cd;
+	          dmax = cd;
+	        } else {
+	          if (cd < dmin) dmin = cd;
+	          if (cd > dmax) dmax = cd;
+	        }
+
+	        // Check if delta is float
+	        if (cd !== 0 && cd % 1 !== 0) is_dfloat = true;
+	      }
+
+	      // Update bounds & Keep samples
+	      if (cv < min) {
+	        min = cv;
+	        s_min[s_min_i] = cv;
+	        if (++s_min_i > 5) s_min_i = 0;
+	      }
+	      if (cv > max) {
+	        max = cv;
+	        s_max[s_max_i] = cv;
+	        if (++s_max_i > 5) s_max_i = 0;
+	      }
+	    } else {
+
+	      // Update bounds
+	      if (cv < min) min = cv;
+	      if (cv > max) max = cv;
+	    }
+
+	    // Check for same values
+	    if (cv === lv) {
+	      c_same++;
+	    } else {
+	      if (c_same > same) same = c_same;
+	      is_same = false;
+	      c_same = 0;
+	    }
+
+	    // Keep last value
+	    lv = cv;
+
+	    // Skip zeros from further analysis
+	    if (cv === 0) continue;
+
+	    // Update integer/float
+	    if (cv % 1 !== 0) {
+	      is_float = true;
+	    } else {
+	      is_int = true;
+	    }
+	  }
+
+	  // Finalize counters
+	  if (c_same > same) same = c_same;
+	  mean /= v.length;
+
+	  // Guess numerical type
+	  n_type = getNumType(min, max, is_float);
+
+	  // Calculate delta-encoding details
+	  d_type = NUMTYPE.UNKNOWN;
+	  if (include_costly) {
+	    if (!is_float && is_int) {
+
+	      // INTEGERS : Use Delta-Encoding (d_mode=1)
+
+	      if (dmin > INT8_MIN && dmax < INT8_MAX) {
+	        d_type = NUMTYPE.INT8;
+	        d_mode = 1;
+	      } else if (dmin > INT16_MIN && dmax < INT16_MAX) {
+	        d_type = NUMTYPE.INT16;
+	        d_mode = 1;
+	      } else if (dmin > INT32_MIN && dmax < INT32_MAX) {
+	        d_type = NUMTYPE.INT32;
+	        d_mode = 1;
+	      }
+	    } else if (is_float) {
+
+	      // FLOATS : Use Rebase Encoding (d_mode=2)
+
+	      // Get a couple more samples
+	      samples = [].concat(s_min, s_max, [v[Math.floor(Math.random() * v.length)], v[Math.floor(Math.random() * v.length)], v[Math.floor(Math.random() * v.length)], v[Math.floor(Math.random() * v.length)], v[Math.floor(Math.random() * v.length)]]);
+
+	      // Calculate float scale
+	      f_type = getFloatScale(v, min, max, 0.01);
+	      if (f_type[1] != NUMTYPE.UNKNOWN) {
+	        d_type = f_type[1];
+	        d_mode = 2;
+	      }
+	    }
+	  }
+
+	  // Based on information detected so far, populate
+	  // the analysis results
+	  return {
+
+	    // Get numeric type
+	    'type': n_type,
+	    'delta_type': d_type,
+
+	    // Percentage of same items
+	    'psame': same / v.length,
+
+	    // Log numeric bounds
+	    'min': min,
+	    'max': max,
+	    'mean': mean,
+
+	    // Log delta bounds
+	    'dmin': dmin,
+	    'dmax': dmax,
+
+	    // Delta mode
+	    'dmode': d_mode,
+	    'fscale': f_type[0],
+
+	    // Expose information details
+	    'integer': is_int && !is_float,
+	    'float': is_float && !is_int,
+	    'mixed': is_float && is_int,
+	    'same': is_same && v.length > 1
+
+	  };
+	}
 
 /***/ }
 /******/ ]);

@@ -54,7 +54,7 @@ const VERSION 		= (( 1 /* Major */ )<<8)|( 2 /* Minor */ );
 
 Known Limitations
 
-* A TypedArray cannot have more than 4,294,967,296 items 
+* A TypedArray cannot have more than 4,294,967,296 items
 * There cannot be more than 65,536 string literals in the bundle (dictionary keys, import/export labels)
 
 */
@@ -487,13 +487,13 @@ var packBuffer = new ArrayBuffer(8),
 	pack1b = function( num, signed ) {
 		var n = new Buffer(1);
 		if (SAFE) { if (signed) {
-			if (num < INT8_MIN) 
+			if (num < INT8_MIN)
 				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
-			else if (num > INT8_MAX) 
+			else if (num > INT8_MAX)
 				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
 		} else {
 			if (num < 0) throw  new Errors.PackError('Packing negative number on unsigned 8-bit ('+num+')!');
-			else if (num > UINT8_MAX) 
+			else if (num > UINT8_MAX)
 				throw new Errors.PackError('Packing number bigger than 8-bits ('+num+')!');
 		} }
 		if (signed) packViewI8[0] = num;
@@ -504,14 +504,14 @@ var packBuffer = new ArrayBuffer(8),
 	pack2b = function( num, signed ) {
 		var n = new Buffer(2);
 		if (SAFE) { if (signed) {
-			if (num < INT16_MIN) 
+			if (num < INT16_MIN)
 				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
-			else if (num > INT16_MAX) 
+			else if (num > INT16_MAX)
 				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
 		} else {
-			if (num < 0) 
+			if (num < 0)
 				throw new Errors.PackError('Packing negative integer on unsigned 16-bit ('+num+')!');
-			else if (num > UINT16_MAX) 
+			else if (num > UINT16_MAX)
 				throw new Errors.PackError('Packing integer bigger than 16-bits ('+num+')!');
 		} }
 		if (signed) packViewI16[0] = num;
@@ -522,14 +522,14 @@ var packBuffer = new ArrayBuffer(8),
 	pack4b = function( num, signed ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (signed) {
-			if (num < INT32_MIN) 
+			if (num < INT32_MIN)
 				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
-			else if (num > INT32_MAX) 
+			else if (num > INT32_MAX)
 				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
 		} else {
-			if (num < 0) 
+			if (num < 0)
 				throw new Errors.PackError('Packing negative integer on unsigned 32-bit ('+num+')!');
-			else if (num > UINT32_MAX) 
+			else if (num > UINT32_MAX)
 				throw new Errors.PackError('Packing integer bigger than 32-bits ('+num+')!');
 		} }
 		if (signed) packViewI32[0] = num;
@@ -540,7 +540,7 @@ var packBuffer = new ArrayBuffer(8),
 	pack4f = function( num ) {
 		var n = new Buffer(4);
 		if (SAFE) { if (num == 0.0) { }
-		else if ((Math.abs(num) < FLOAT32_SMALL) || (num < FLOAT32_NEG) || (num > FLOAT32_POS)) 
+		else if ((Math.abs(num) < FLOAT32_SMALL) || (num < FLOAT32_NEG) || (num > FLOAT32_POS))
 			throw new Errors.PackError('Packing float bigger than 32-bits ('+num+')!');
 		}
 		packViewF32[0] = num;
@@ -550,9 +550,9 @@ var packBuffer = new ArrayBuffer(8),
 	pack8f = function( num ) {
 		var n = new Buffer(8);
 		if (SAFE) { if (num == 0.0) { }
-		else if (Math.abs(num) < 1.7E-108) 
+		else if (Math.abs(num) < 1.7E-108)
 			throw new Errors.PackError('Packing float bigger than 64-bits ('+num+')!');
-		else if (Math.abs(num) > 1.7E+108) 
+		else if (Math.abs(num) > 1.7E+108)
 			throw new Errors.PackError('Packing float bigger than 64-bits ('+num+')!');
 		}
 		packViewF64[0] = num;
@@ -593,7 +593,7 @@ function fds( v_min, v_max ) {
 /**
  * Get the scale factor for the specified float-based delta encoding
  * using the NUMTYPE_DOWNSCALE and DELTASCALE provided.
- * 
+ *
  * @param {int} t - The NUMTYPE_DOWNSCALE used in the encoding
  * @param {int} scale - The DELTASCALE used in the encoding
  * @return {float} - Return the scale factor
@@ -632,7 +632,7 @@ function isEmptyArray(v) {
 /**
  * Check if the specified type is float
  *
- * Works also on downscaled types because the last two 'FROM' 
+ * Works also on downscaled types because the last two 'FROM'
  * conversions are FLOAT32.
  *
  * @param {int} t - The NUMTYPE or NUMTYPE_DOWNSCALE type to check
@@ -837,7 +837,7 @@ function getNumType( vmin, vmax, is_float ) {
 		// Try to find smallest value for float32 minimum tests
 		var smallest;
 		if (vmin === 0) {
-			// vmin is 0, which makes vmax positive, so 
+			// vmin is 0, which makes vmax positive, so
 			// test vmax for smallest
 			smallest = vmax;
 		} else if (vmax === 0) {
@@ -1000,7 +1000,7 @@ function getDownscaleType( n_type, analysis ) {
 
 				// Anything else is equal to or bigger than 2 bytes
 				default:
-					return NUMTYPE.UNKNOWN;					
+					return NUMTYPE.UNKNOWN;
 			}
 
 		case NUMTYPE.INT16:
@@ -1020,7 +1020,7 @@ function getDownscaleType( n_type, analysis ) {
 
 				// Anything else is equal to or bigger than 2 bytes
 				default:
-					return NUMTYPE.UNKNOWN;					
+					return NUMTYPE.UNKNOWN;
 			}
 
 		case NUMTYPE.UINT32:
@@ -1038,7 +1038,7 @@ function getDownscaleType( n_type, analysis ) {
 
 				// Anything else is equal to or bigger than 4 bytes
 				default:
-					return NUMTYPE.UNKNOWN;					
+					return NUMTYPE.UNKNOWN;
 
 			}
 
@@ -1071,7 +1071,7 @@ function getDownscaleType( n_type, analysis ) {
 
 				// Anything else is equal to or bigger than 4 bytes
 				default:
-					return NUMTYPE.UNKNOWN;					
+					return NUMTYPE.UNKNOWN;
 
 			}
 
@@ -1128,7 +1128,7 @@ function getDownscaleType( n_type, analysis ) {
 function analyzeNumericArray( v, include_costly ) {
 	var min = v[0], max = min, is_int = false, is_float = false, is_same = true,
 		dmin=0, dmax=0, is_dfloat = false,
-		mean=0, n_type=0, d_mode=0, f_type=[0, NUMTYPE.UNKNOWN], 
+		mean=0, n_type=0, d_mode=0, f_type=[0, NUMTYPE.UNKNOWN],
 		c_same=0, same=0,
 		s_min = [min,min,min,min,min], s_min_i=0, s_max = [min,min,min,min,min], s_max_i=0, samples,
 		a, b, d_type, cd, cv, lv = v[0];
@@ -1309,7 +1309,7 @@ function getBestBinFit( start, len, blocks ) {
 			// Find the common region of block-scan frame
 			if ( ((s >= start) && (s < end-1)) ||	// Start in bounds
 				 ((e >= start) && (e < end-1)) ||	// End in bounds
-				 ((s <= start) && (e >= end)) )		// 
+				 ((s <= start) && (e >= end)) )		//
 			{
 
 				// Check bounds
@@ -1396,11 +1396,11 @@ function analyzePrimitiveArray( encoder, array ) {
 	var BF_PRIM 	= 0x01,
 		  BF_REP	= 0x02,
 		  BF_NUM 	= 0x04,
-		  BF_PLAIN 	= 0x08,	
+		  BF_PLAIN 	= 0x08,
 		  BF_KNOWN  = 0x10;
 
 	var v, v_type, handled, id, ans, debug_str, enc,
-		
+
 		t_mode, t_numtype, t_constr, t_keys,
 
 		new_keys, old_keys, some_overlap, n_repeat=0,
@@ -1514,7 +1514,7 @@ function analyzePrimitiveArray( encoder, array ) {
 					blocks_num.push( b_num );
 				}
 				b_num = null;
-			} 
+			}
 		} else {
 
 			// Check for first encounter
@@ -1773,7 +1773,7 @@ function analyzePrimitiveArray( encoder, array ) {
 	for (var i=1, l=ans.length; i<l; ++i) {
 		if ( (ans[i-1][2] === ans[i][2]) &&  // Same Type
 			 (ans[i-1][3] === ans[i][3]) ) { // Same Sub-Type
-			
+
 			// Left engulfs right
 			ans[i-1][1] += ans[i][1];
 			ans.splice(i,1);
@@ -1811,7 +1811,7 @@ function analyzePrimitiveArray( encoder, array ) {
 function downscaleType( fromType, toType ) {
 	// Lookup conversion on the downscale table
 	for (var i=0; i<NUMTYPE_DOWNSCALE.FROM.length; ++i) {
-		if ( (NUMTYPE_DOWNSCALE.FROM[i] === fromType) && 
+		if ( (NUMTYPE_DOWNSCALE.FROM[i] === fromType) &&
 			 (NUMTYPE_DOWNSCALE.TO[i] === toType) )
 			return i;
 	}
@@ -1825,7 +1825,7 @@ function downscaleType( fromType, toType ) {
 function deltaEncTypeInt( fromType, toType ) {
 	// Lookup conversion on the downscale table
 	for (var i=0; i<NUMTYPE_DELTA_INT.FROM.length; ++i) {
-		if ( (NUMTYPE_DELTA_INT.FROM[i] === fromType) && 
+		if ( (NUMTYPE_DELTA_INT.FROM[i] === fromType) &&
 			 (NUMTYPE_DELTA_INT.TO[i] === toType) )
 			return i;
 	}
@@ -1839,7 +1839,7 @@ function deltaEncTypeInt( fromType, toType ) {
 function deltaEncTypeFloat( fromType, toType ) {
 	// Lookup conversion on the downscale table
 	for (var i=0; i<NUMTYPE_DELTA_FLOAT.FROM.length; ++i) {
-		if ( (NUMTYPE_DELTA_FLOAT.FROM[i] === fromType) && 
+		if ( (NUMTYPE_DELTA_FLOAT.FROM[i] === fromType) &&
 			 (NUMTYPE_DELTA_FLOAT.TO[i] === toType) )
 			return i;
 	}
@@ -1865,7 +1865,7 @@ function deltaEncodeIntegers( array, numType ) {
 
 /**
  * Convert input array to the type specified
- * 
+ *
  * @param {array} array - The source array
  * @param {int} downscale_type - The downscaling conversion
  */
@@ -2093,7 +2093,7 @@ function encodeArray_NUM_REPEATED( encoder, data, n_type ) {
 	// 0100 [TYPE] [LN]    [16bit/32bit]
 	//
 
-	encoder.counters.arr_num_repeated+=1;		
+	encoder.counters.arr_num_repeated+=1;
 	encoder.log(LOG.ARR, "array.numeric.repeated, len="+data.length+
 		", type="+_NUMTYPE[n_type]+" ("+n_type+")");
 
@@ -2304,7 +2304,7 @@ function encodeArray_PRIM_BULK_KNOWN( encoder, data, meta ) {
 		object = data[j];
 
 		// Check if same to previous
-		if ( use_same && ((object === last) || 
+		if ( use_same && ((object === last) ||
 			 (encoder.optimize.cfwa_object_byval
 			&& deepEqual(last, object, {strict:true}))) ) {
 
@@ -2686,7 +2686,7 @@ function encodeArray_Chunk( encoder, data, chunk ) {
 			// Check if the repeated items are numeric or primitivie
 			if ( n_type <= NUMTYPE.NUMERIC ) {
 
-				/* If that's numeric, perform fast numeric analysis to 
+				/* If that's numeric, perform fast numeric analysis to
 				   find it's type. */
 				if (n_type === NUMTYPE.NUMERIC) {
 					na = analyzeNumericArray( data, false );
@@ -2888,7 +2888,7 @@ function encodeArray_Primitive( encoder, data ) {
  */
 function encodeArray( encoder, data ) {
 	encoder.log(LOG.PRM, "array, len="+data.length+", peek="+data[0]);
-	
+
 	// Check for empty array
 	if (data.length === 0) {
 		encodeArray_EMPTY( encoder );
@@ -2941,7 +2941,7 @@ function encodeBuffer( encoder, buffer_type, mime_type, buffer ) {
 
 		// NOTE: UTF-8 is a special case. For optimisation
 		// purposes it's better to use the 16-bit stream
-		// rather than downcasting to 8-bit and then 
+		// rather than downcasting to 8-bit and then
 		// re-constructing the 16-bit stream at decoding time.
 		encoder.stream16.write( packTypedArray(buffer) );
 
@@ -3025,7 +3025,7 @@ function encodeIREF( encoder, id ) {
 	var hi = (id & 0xF0000) >> 16,
 		lo = (id & 0xFFFF)
 
-	// Write opcode splitted inti 8-bit and 16-bit 
+	// Write opcode splitted inti 8-bit and 16-bit
 	encoder.log(LOG.IREF, "iref="+id);
 	encoder.stream8.write( pack1b( PRIM_OP.REF | hi, false ) );
 	encoder.stream16.write( pack2b( lo, false ) );
@@ -3038,7 +3038,7 @@ function encodeIREF( encoder, id ) {
  */
 function encodeXREF( encoder, id ) {
 
-	// Write opcode for 16-bit lookup 
+	// Write opcode for 16-bit lookup
 	encoder.log(LOG.XREF, "xref="+id+" [" + encoder.stringLookup[id] + "]")
 	encoder.stream8.write( pack1b( PRIM_OP.IMPORT, false ) );
 	encoder.stream16.write( pack2b( id, false ) );
@@ -3070,7 +3070,7 @@ function encodeObject( encoder, object ) {
 
 	// Check ByVal ref
 	id = encoder.lookupIVal( propertyTable, eid );
-	if (id > -1) 
+	if (id > -1)
 		{ encodeIREF( encoder, id ); return; }
 
 	// Keep this object for internal cross-refferencing
@@ -3413,7 +3413,7 @@ var BinaryEncoder = function( filename, config ) {
 	};
 
 	// Check if this is sparse
-	this.sparse = ( this.config['sparse'] === undefined ) ? 
+	this.sparse = ( this.config['sparse'] === undefined ) ?
 			false : this.config['sparse'];
 
 	// If we are requested to use sparse bundless, add some space for header in the stream8
@@ -3571,11 +3571,11 @@ BinaryEncoder.prototype = {
 			// TODO: Separate stream8 in two in order to load them in parallel
 
 			// Close streams
-			this.stream8.close();  this.stream16.close(); 
-			this.stream32.close(); this.stream64.close(); 
+			this.stream8.close();  this.stream16.close();
+			this.stream32.close(); this.stream64.close();
 
 			// Calculate total size
-			totalSize = this.stream8.offset +  this.stream16.offset + 
+			totalSize = this.stream8.offset +  this.stream16.offset +
 						this.stream32.offset + this.stream64.offset;
 
 			// Update filename
@@ -3702,7 +3702,7 @@ BinaryEncoder.prototype = {
 		if (key === undefined) return -1;
 
 		// Return stringID of the key
-		return this.stringID( key );		
+		return this.stringID( key );
 
 	},
 
@@ -3834,7 +3834,7 @@ BinaryEncoder.prototype = {
 
 			// Encode to the 16-bit stream
 			this.plainObjectSignatureTable.push( Buffer.concat( sigbuf ) );
-			this.plainObjectSignatureLookup[lookupString] 
+			this.plainObjectSignatureLookup[lookupString]
 				= i = this.plainObjectSignatureTable.length - 1;
 		}
 
@@ -3847,7 +3847,7 @@ BinaryEncoder.prototype = {
 	 */
 	'getSignatureID': function( keys ) {
 		var lookupString = keys.toString();
-		var id = this.plainObjectSignatureLookup[lookupString];			
+		var id = this.plainObjectSignatureLookup[lookupString];
 		if (id === undefined) {
 
 			// Create new signature buffer
@@ -3859,7 +3859,7 @@ BinaryEncoder.prototype = {
 
 			// Keep on table
 			this.plainObjectSignatureTable.push( Buffer.concat( sigbuf ) );
-			this.plainObjectSignatureLookup[lookupString] 
+			this.plainObjectSignatureLookup[lookupString]
 				= id = this.plainObjectSignatureTable.length - 1;
 
 		}
@@ -3949,7 +3949,7 @@ BinaryEncoder.prototype = {
 		this.counters.ref_str+=2;
 		// Encode primitive
 		encodePrimitive( this, new FileResource( filename, mime_type) );
-		
+
 	},
 
 	/**
@@ -3965,7 +3965,7 @@ BinaryEncoder.prototype = {
 		this.counters.ref_str+=2;
 		// Encode primitive
 		encodePrimitive( this, new BlobResource( buffer, mime_type) );
-		
+
 	},
 
 	/**
@@ -3994,8 +3994,8 @@ BinaryEncoder.prototype = {
 
 		// Log
 		console.log(
-			LOG_PREFIX_STR[subsystem].blue + 
-			(" @"+this.stream8.offset).bold.blue + ":" + this.logPrefix + " " + text 
+			LOG_PREFIX_STR[subsystem].blue +
+			(" @"+this.stream8.offset).bold.blue + ":" + this.logPrefix + " " + text
 		);
 
 	},
@@ -4015,7 +4015,7 @@ BinaryEncoder.prototype = {
 };
 
 /**
- * Expose FileResource class 
+ * Expose FileResource class
  */
 BinaryEncoder.FileResource = FileResource;
 BinaryEncoder.BlobResource = BlobResource;
@@ -4025,7 +4025,9 @@ BinaryEncoder.BlobResource = BlobResource;
  */
 BinaryEncoder.LogFlags = LOG;
 
+BinaryEncoder.analyzeNumericArray = analyzeNumericArray;
+
 /**
  * Export binary encoder
  */
-module.exports = BinaryEncoder;	
+module.exports = BinaryEncoder;
