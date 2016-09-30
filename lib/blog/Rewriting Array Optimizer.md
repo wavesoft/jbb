@@ -5,7 +5,7 @@ The very core of JBB is built upon performance, and performance is something not
 
 Since a while ago, I started [rewriting the JBB core]() in order to make it more readable and to further optimize it. One of it's core components is the numeric array optimizer, so today I am going to spend some time rewriting it and share my optimization experience with you. I hope it's going to be an interesting reading to you, as it was an experience to me.
 
-To start, I follow by heart the [Optimization Killers]() document by XXX, in order to exploit the optimizations in the V8 engine. Even though I think not all cases are covered, it's a very good reference. In addition, the latest ES6/ES7 language extensions are supposed to help towards performance, so I decided to give them a try.
+To start, I follow by heart the [Optimization Killers](https://github.com/petkaantonov/bluebird/wiki/Optimization-killers) document by Petka Antonov, in order to exploit the optimizations in the V8 engine. Even though I think not all cases are covered, it's a very good reference. In addition, the latest ES6/ES7 language extensions are supposed to help towards performance, so I decided to give them a try.
 
 For reference, I am using node v5.4.1, that uses the v4.6.85.31 version of the V8 engine. So expect a slight difference from your numbers if you try the examples with a different node version.
 

@@ -376,68 +376,29 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	    /**
 	     * Process the given numeric array and return it's metrics, including:
 	     *
-	     * - min : Minimum value
-	     * - max : Maximum value
 	     * - average : Average value
-	     * - dmin : Minimum difference between consecutive numbers
-	     * - dmax : Maximum difference between consecutive numbers
-	     * - same : true if all the values are the same
+	     * - dmin    : Minimum difference between consecutive numbers
+	     * - dmax    : Maximum difference between consecutive numbers
+	     * - min     : Minimum value
+	     * - max     : Maximum value
+	     * - sameMax : The maximum number of consecutively same items encountered
 	     * - isFloat : true if it contains at least 1 float number
-	     * - isZero : true if all items are zero
-	     *
-	     * From this values, other interesting metrics can be calculated:
-	     * - isInt : !isFloat && !isZero
-	     * - isSame : same === numericArray.length - 1
+	     * - isInt   : ture if all items are integer
+	     * - isMixed : true if contains both float and integer items
+	     * - isSame  : true if all items are the same
+	     * - isZero  : true if all items are zero
 	     *
 	     * @param {Array} numericArray - A numeric array to process
-	     * @returns {{min:Number, max:Number, average:Number, dmin:Number, dmax:Number, isFloat:Boolean, isZero:Boolean}} The array metrics
+	     * @returns {Object} The array metrics (see above for the fields)
 	     */
 
-	  }, {
-	    key: 'analyzeNumericArray2',
-	    value: function analyzeNumericArray2(numericArray) {
-	      var value0 = numericArray[0];
-	      var result = {
-	        min: value0,
-	        max: value0,
-	        isInt: value0 === (value0 | 0),
-	        delta: 0,
-	        _prev: value0
-	      };
-
-	      for (var i = 1; i < numericArray.length; ++i) {
-	        var value = numericArray[i];
-
-	        // Test if it is not integer
-	        if (result.isInt && value !== (value | 0)) {
-	          result.isInt = false;
-	        }
-
-	        // Calculate bounds
-	        if (value < result.min) result.min = value;
-	        if (value > result.max) result.max = value;
-
-	        // Absolute difference
-	        var delta = Math.abs(value - result._prev);
-	        if (delta > result.delta) {
-	          result.delta = delta;
-	        }
-
-	        if (delta > result.delta) {
-	          result.delta = delta;
-	        }
-
-	        result._prev = value;
-	      }
-
-	      return result;
-	    }
 	  }, {
 	    key: 'analyzeNumericArray',
 	    value: function analyzeNumericArray(numericArray) {
 	      var value0 = numericArray[0];
 	      var results = {
 	        _prev: value0,
+	        _same: 1,
 	        average: 0,
 	        dmin: 0,
 	        dmax: 0,
@@ -446,7 +407,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	        isMixed: false,
 	        min: value0,
 	        max: value0,
-	        same: 0
+	        sameMax: 0
 	      };
 
 	      for (var i = 1; i < numericArray.length; ++i) {
@@ -466,7 +427,15 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	        }
 
 	        // Check for similarity
-	        if (results._prev === value) ++results.same;
+	        if (results._prev === value) {
+	          ++results._same;
+	        } else {
+	          var same = results._same;
+	          if (same > results.sameMax) {
+	            results.sameMax = same;
+	          }
+	          results._same = 1;
+	        }
 
 	        // Update bounds
 	        if (value < results.min) results.min = value;
@@ -486,85 +455,14 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	      }
 
 	      // Finalize and clean-up results
+	      if (results._same > results.sameMax) results.sameMax = results._same;
 	      results.average /= numericArray.length;
 	      results.isZero = !results.isInt && !results.isFloat;
-	      results.isSame = results.same === numericArray.length - 1;
+	      results.isSame = results.sameMax === numericArray.length;
 	      delete results._prev;
+	      delete results._same;
 
 	      return results;
-	    }
-	  }, {
-	    key: 'analyzeNumericArray3',
-	    value: function analyzeNumericArray3(numericArray) {
-	      var prev = numericArray[0];
-	      var average = 0;
-	      var dmin = 0;
-	      var dmax = 0;
-	      var max = prev;
-	      var min = prev;
-	      var isFloat = prev !== (prev | 0);
-	      var isInt = !isFloat && prev !== 0;
-	      var isMixed = isFloat && isInt;
-	      var same = 0;
-
-	      for (var i = 1; i < numericArray.length; ++i) {
-	        var value = numericArray[i];
-	        // let floatTest = (value !== (value|0));
-
-	        if (!isMixed) {
-	          if (value !== (value | 0)) {
-	            isFloat = true;
-	            isMixed = isInt;
-	          } else {
-	            if (!isInt && value !== 0) {
-	              isInt = true;
-	              isMixed = isFloat;
-	            }
-	          }
-	        }
-
-	        // Check for float numbers
-	        // if (!isFloat && floatTest) {
-	        //   isFloat = true;
-	        // }
-	        // if (!isInt && !floatTest && (value !== 0)) {
-	        //   isInt = true;
-	        // }
-
-	        // Check for similarity
-	        if (prev === value) ++same;
-
-	        // Update bounds
-	        if (value < min) min = value;
-	        if (value > max) max = value;
-
-	        // Update average
-	        average += value;
-
-	        // Update delta
-	        var diff = value - prev;
-	        if (diff < dmin) dmin = diff;
-	        if (diff > dmax) dmax = diff;
-
-	        // Keep track of previous value
-	        prev = value;
-	      }
-
-	      // Finalize average calculation
-	      average /= numericArray.length;
-
-	      return {
-	        average: average,
-	        dmin: dmin,
-	        dmax: dmax,
-	        isFloat: isFloat,
-	        isInt: isInt,
-	        isZero: !isInt && !isFloat,
-	        isMixed: isMixed,
-	        isSame: same === numericArray.length - 1,
-	        max: max,
-	        min: min,
-	        same: same };
 	    }
 
 	    /**
