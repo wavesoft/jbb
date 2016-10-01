@@ -100,7 +100,14 @@ Almost 18 seconds? I can't say I am surprised. We are frequently accessing objec
 benchmark: 1751.028ms
 ```
 
-Ok, we are definitely on the right path here. **Note to self: Avoid using any of the high-level array operations.**
+Ok, we are definitely on the right path here.
+
+### Notes to self
+
+* Avoid using any of the high-level array methods if you care more about performance than readability.
+
+
+## Scope variables
 
 Since we are at it, let's try to optimize the current situation event more. Let's see what happens if we try to avoid accessing object properties and use scope variables instead.
 
@@ -128,6 +135,9 @@ benchmark: 1997.671ms
 ```
 
 Wow, so this actually made things worse. Ok, **Note to self: Try to avoid scope variables, use object references instead!**
+
+
+
 
 ## Absolute values
 
@@ -223,12 +233,16 @@ benchmark: 3761.592ms
 
 You GOT to be kidding! Well, I would say that it makes sense, since this call passes down to the C library, to the OS, or even possibly to the hardware if there is such support. So apparently, **Note to self: use `Math.abs` wherever possible!**
 
+
+
+
 ## Testing for floats
 
 We also want to check if an array contains only integers, only floats, or a combination of these two. Knowing this we can correctly pick the optimization algorithm to use in a next step.
 
 I am aware of two ways of checking if a number is integer:
 
+* Using the built-in `Number.isInteger(x)`
 * If the remainder with 1 is zero : `x % 1 === 0`
 * If the result of the bitwise or with 0 (aka integer part) is equal to the number : `x === (x|0)`
 
@@ -238,70 +252,60 @@ I will add a constant check in the beginning of the loop and run some checks wit
     ...
     for (let i=1; i<numericArray.length; ++i) {
       let value = numericArray[i];
-
-      let isInt = value % 1 === 0;
-
+      let isInt = Number.isInteger(x);
       // or ..
-
+      let isInt = value % 1 === 0;
+      // or ..
       let isInt = value === (value|0);
       ...
     }
     ...
 ```
 
-The first solution seems quite costly:
+Running the benchmarks with the three above solutions we have the following results:
 
 ```
 ~$ node benchmark.js
+benchmark: 39121.737ms
+
+~$ node benchmark.js
 benchmark: 17753.562ms
-```
 
-However the second is surprisingly fast!
-
-```
 ~$ node benchmark.js
 benchmark: 6111.839ms
 ```
 
-That is clearly our winner, so **Note to self: Using `x === (x|0)` for testing for integer is the way to go**.
+It was a suprise to me to see the `Number.isInteger` failing so badly, judging from the performant results of `Math.abs` that we saw erlier. I am assuming that this function operates on floating-point numeric types, having some serious performance impact at type casting.
 
-However the test operation itself is a bit costly, so I am wondering if I can further optimize this. Since only one failed attempt is enough to detect if an array contains only integers I am going to use a flag to apply it only when it's needed:
+So, te option 3 is clearly our winner, right? I would say so, but but be aware that there is a catch. According to [ECMAScript specifications](http://www.ecma-international.org/ecma-262/5.1/#sec-11.10) the binary bitwise operation reults on a 32-bit signed integer. This means that if you are trying to test any number bigger than the positive 32-bit signed integer, this quirk will fail. For example:
+
+```
+~$ node
+> 0x7fffffff|0
+2147483647
+> 0x8fffffff|0
+-1879048193
+> 0xffffffffff|0
+-1
+```
+
+So we need a fast alternative for big numbers. But how can we avoid adding additional cost? I am going to rely on the V8 inline optimisations and create a utility function:
 
 ```javascript
-  static analyzeNumericArray2(numericArray) {
-    let value0 = numericArray[0];
-    let result = {
-      ...
-      isInt: value0 === (value0|0),
-      ...
-    };
-
-    for (let i=1; i<numericArray.length; ++i) {
-      let value = numericArray[i];
-
-      // Test if it is not integer
-      if (result.isInt && (value !== (value|0))) {
-        result.isInt = false;
-      }
-      ...
+  static isFloat(number) {
+    if ((number > 0x7FFFFFFF) || (number < -0x7FFFFFFE)) {
+      return number % 1 !== 0;
+    } else {
+      return number !== (number|0);
     }
-
-    return result;
   }
 ```
 
-```
-~$ node benchmark.js
-benchmark: 4167.521ms
-```
-
-It looks like we achieved something good! But before we brag about the outcome, let's make sure to feed some corner cases to the function. Judging by the way we constructed the array, all values are supposed to be floats. So the number above is an ideal case with all numbers being floats (and therefore the test fails early).
-
-What happens when the array consists of only integers?
+This function is small enough and not polymorphic, therefore it will get inlined by the compiler when used. So let's run the benchmarks again using our new function:
 
 ```
 ~$ node benchmark.js
-benchmark: 9026.548ms
+benchmark: 6597.833ms
 ```
 
-*Sigh*. I was afraid of that. So we gain 2s on best case, but we loose almost 3s on the worst case. But why this happens? Of course the extra flag testing does not come for free, but does this justify such a big performance penalty?
+That looks good. Our custom function is proven to be 6 times faster than the native implementtion. However I am expecting this to be addressed in the newer V8 versions. Till then, **Note

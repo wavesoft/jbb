@@ -151,6 +151,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	// test_16();
 
 	var ar_float = [];
+	var ar_bigint = [];
 	var ar_int = [];
 	var ar_same = [];
 	var ar_zero = [];
@@ -158,6 +159,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	for (var i = 0; i < 10000; i++) {
 	  ar_float.push(i * 1024 * Math.random());
 	  ar_int.push(1024 * Math.random() | 0);
+	  ar_bigint.push(Math.round(0xFFFFFFFFFFFFFFF * Math.random()));
 	  ar_zero.push(0);
 	  ar_same.push(4.124512);
 	}
@@ -168,23 +170,23 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	// console.log('is=', ArrayAnalyser.isFloat32( 3.14 ));
 	// console.log('isNot=', ArrayAnalyser.isFloat32( Math.PI ));
 
-	console.time('analyzeNumericArray [float 1x]');
-	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_float));
-	console.timeEnd('analyzeNumericArray [float 1x]');
-	console.time('analyzeNumericArray [int 1x]');
-	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_int));
-	console.timeEnd('analyzeNumericArray [int 1x]');
-	console.time('analyzeNumericArray [zero 1x]');
-	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_zero));
-	console.timeEnd('analyzeNumericArray [zero 1x]');
-	console.time('analyzeNumericArray [same 1x]');
-	console.log(_ArrayAnalyser2.default.analyzeNumericArray(ar_same));
-	console.timeEnd('analyzeNumericArray [same 1x]');
+	// console.time('analyzeNumericArray [float 1x]');
+	// console.log( ArrayAnalyser.analyzeNumericArray(ar_float) );
+	// console.timeEnd('analyzeNumericArray [float 1x]');
+	// console.time('analyzeNumericArray [int 1x]');
+	// console.log( ArrayAnalyser.analyzeNumericArray(ar_int) );
+	// console.timeEnd('analyzeNumericArray [int 1x]');
+	// console.time('analyzeNumericArray [zero 1x]');
+	// console.log( ArrayAnalyser.analyzeNumericArray(ar_zero) );
+	// console.timeEnd('analyzeNumericArray [zero 1x]');
+	// console.time('analyzeNumericArray [same 1x]');
+	// console.log( ArrayAnalyser.analyzeNumericArray(ar_same) );
+	// console.timeEnd('analyzeNumericArray [same 1x]');
 
 	// console.time('benchmark');
 	// var counter = 100000;
 	// while (counter--) {
-	//   ArrayAnalyser.analyzeNumericArray2(ar_int);
+	//   ArrayAnalyser.analyzeNumericArrayX(ar_int);
 	// };
 	// console.timeEnd('benchmark');
 
@@ -193,6 +195,13 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	// var isFloat;
 	// while (count16--) {
 	//   ArrayAnalyser.getNumericArrayMinType(ar);
+	// };
+	// console.timeEnd('getNumericArrayMinType');
+
+	// console.time('getNumericArrayMinType');
+	// var count16 = 100000;
+	// while (count16--) {
+	//   ArrayAnalyser.getNumericArrayMinType(ar_float);
 	// };
 	// console.timeEnd('getNumericArrayMinType');
 
@@ -209,6 +218,13 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  _ArrayAnalyser2.default.analyzeNumericArray(ar_int);
 	};
 	console.timeEnd('analyzeNumericArray [int]');
+
+	console.time('analyzeNumericArray [bigint]');
+	var count16 = 100000;
+	while (count16--) {
+	  _ArrayAnalyser2.default.analyzeNumericArray(ar_bigint);
+	};
+	console.timeEnd('analyzeNumericArray [bigint]');
 
 	console.time('analyzeNumericArray [zero]');
 	var count16 = 100000;
@@ -336,6 +352,62 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 */
 	var float32_value = new Float32Array(1);
 
+	/**
+	 * Result object used by the `analyzeNumericArray` function when analyzing
+	 * the input data. Instead of using a plain object, creating a class actually
+	 * helps the compiler optimize the object even further.
+	 */
+
+	var AnalysisResults = function () {
+
+	  /**
+	   * Analysis results constructor.
+	   *
+	   * @param {Number} value0 - The first value in the array
+	   */
+	  function AnalysisResults(value0) {
+	    _classCallCheck(this, AnalysisResults);
+
+	    this._prev = value0;
+	    this._same = 1;
+
+	    // Note: The 0.1 is used to make javascript engine assume this is a float
+	    //       type and therefore do not de-optimize when it becomes float
+	    //       during finalizing phase.
+	    this.average = 0.1;
+
+	    this.dmin = 0;
+	    this.dmax = 0;
+	    this.min = +value0;
+	    this.max = +value0;
+	    this.sameMax = 0;
+
+	    this.isZero = false;
+	    this.isSame = false;
+	    this.isFloat = ArrayAnalyser.isFloat(value0);
+	    this.isInt = !this.isFloat && value0 !== 0;
+	    this.isMixed = false;
+	  }
+
+	  /**
+	   * Finalize metrics by calculating average, isSame and isZero flags.
+	   *
+	   * @param {Number} itemCount - The number of items processed
+	   */
+
+
+	  _createClass(AnalysisResults, [{
+	    key: 'finalize',
+	    value: function finalize(itemCount) {
+	      this.average = (this.average - 0.1) / itemCount;
+	      this.isZero = !this.isInt && !this.isFloat;
+	      this.isSame = this.sameMax === itemCount;
+	    }
+	  }]);
+
+	  return AnalysisResults;
+	}();
+
 	/**e
 	 * Analysis functions for detecting the nature of arrays and extracting
 	 * useful information for optimized encoding.
@@ -345,32 +417,81 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 *       to benefit from the V8 type optimizer.
 	 */
 
+
 	var ArrayAnalyser = function () {
 	  function ArrayAnalyser() {
 	    _classCallCheck(this, ArrayAnalyser);
 	  }
 
 	  _createClass(ArrayAnalyser, null, [{
-	    key: 'isFloat32',
+	    key: 'analyzeNumericArrayX',
+	    value: function analyzeNumericArrayX(numericArray) {
+	      var value0 = numericArray[0];
+	      var result = {
+	        min: value0,
+	        max: value0,
+	        delta: 0,
+	        _prev: value0
+	      };
 
+	      for (var i = 1; i < numericArray.length; ++i) {
+	        var value = numericArray[i];
+	        var isInt = ArrayAnalyser.isFloat(value);
+
+	        // Calculate bounds
+	        if (value < result.min) result.min = value;
+	        if (value > result.max) result.max = value;
+
+	        // Absolute difference
+	        var delta = Math.abs(value - result._prev);
+	        if (delta > result.delta) {
+	          result.delta = delta;
+	        }
+
+	        result._prev = value;
+	      }
+
+	      return result;
+	    }
+
+	    /**
+	     * Optimised function to test if a number is float.
+	     * It exploits a quirk for numbers smaller than 32-bit.
+	     *
+	     * @param {Number} number - The number to test
+	     * @return {Boolean} Returns true if the number is float
+	     */
+
+	  }, {
+	    key: 'isFloat',
+	    value: function isFloat(number) {
+	      if (number > 0x7FFFFFFF || number < -0x7FFFFFFE) {
+	        return number % 1 !== 0;
+	      } else {
+	        return number !== (number | 0);
+	      }
+	    }
 
 	    /**
 	     * Test if the given float number fits in a 32-bit number representation.
 	     * if not it's assumed to fit in 64-bit number.
 	     *
 	     * @param {Number} floatNumber - A float number to test
+	     * @param {Number} [tollerance] - The acceptable difference between original and casted number
 	     * @returns {Boolean} Returns true if the number can fit in 32-bits
 	     */
+
+	  }, {
+	    key: 'isFloat32',
 	    value: function isFloat32(floatNumber) {
-	      var loss = 0.0;
+	      var tollerance = arguments.length <= 1 || arguments[1] === undefined ? _NumericBounds2.default.FLOAT32_ACCEPTED_LOSS : arguments[1];
 
-	      // Cast number info float32 and get the absolute of the difference
+	      // Cast number info float32 and then read it back in order
+	      // to calculate the loss value
 	      float32_value[0] = floatNumber;
-	      loss = floatNumber - float32_value[0];
-	      if (loss < 0) loss = -loss;
 
-	      // If the loss is acceptable, assume it can fit on 32 bits
-	      return loss < _NumericBounds2.default.FLOAT32_ACCEPTED_LOSS;
+	      // If the loss is acceptable, assume we can use Float32 for representing it
+	      return Math.abs(floatNumber - float32_value[0]) < tollerance;
 	    }
 
 	    /**
@@ -395,27 +516,16 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  }, {
 	    key: 'analyzeNumericArray',
 	    value: function analyzeNumericArray(numericArray) {
-	      var value0 = numericArray[0];
-	      var results = {
-	        _prev: value0,
-	        _same: 1,
-	        average: 0,
-	        dmin: 0,
-	        dmax: 0,
-	        isFloat: value0 !== (value0 | 0),
-	        isInt: value0 !== 0 && value0 === (value0 | 0),
-	        isMixed: false,
-	        min: value0,
-	        max: value0,
-	        sameMax: 0
-	      };
+	      var itemCount = +numericArray.length;
+	      var results = new AnalysisResults(numericArray[0]);
 
-	      for (var i = 1; i < numericArray.length; ++i) {
+	      for (var i = 1; i < itemCount; ++i) {
 	        var value = numericArray[i];
 
 	        // Float/Integer/Mixed type detection
-	        if (!results.isMixed) {
-	          if (value !== (value | 0)) {
+	        if (results.isMixed === false) {
+	          // if (value !== (value|0)) {
+	          if (ArrayAnalyser.isFloat(value)) {
 	            results.isFloat = true;
 	            results.isMixed = results.isInt;
 	          } else {
@@ -455,13 +565,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	      }
 
 	      // Finalize and clean-up results
-	      if (results._same > results.sameMax) results.sameMax = results._same;
-	      results.average /= numericArray.length;
-	      results.isZero = !results.isInt && !results.isFloat;
-	      results.isSame = results.sameMax === numericArray.length;
-	      delete results._prev;
-	      delete results._same;
-
+	      results.finalize(itemCount);
 	      return results;
 	    }
 
@@ -483,6 +587,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	        // Check if this is a float, or if the float type needs to be upgraded
 	        if (type === _NumericTypes2.default.FLOAT32 || value % 1 !== 0) {
 	          if (!ArrayAnalyser.isFloat32(value)) return _NumericTypes2.default.FLOAT64;
+	          type = _NumericTypes2.default.FLOAT32;
 	          continue;
 	        }
 
@@ -607,71 +712,66 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	/**
+	 * Shorthand to create an integer type object
+	 *
+	 * @param {Number} id - The encoded type ID
+	 * @param {String} name - The encoded type ID
+	 * @param {Boolean} signed - The number is signed
+	 * @param {Number} min - The minimum number
+	 * @param {Number} max - The maximum possible number
+	 */
+	function integerType(id, name) {
+	  var signed = arguments.length <= 2 || arguments[2] === undefined ? false : arguments[2];
+	  var min = arguments.length <= 3 || arguments[3] === undefined ? -Infinity : arguments[3];
+	  var max = arguments.length <= 4 || arguments[4] === undefined ? Infinity : arguments[4];
+
+	  return {
+	    id: id, signed: signed, min: min, max: max,
+	    upscale: [],
+	    toJSON: function toJSON() {
+	      return name;
+	    }
+	  };
+	}
+
+	/**
 	 * Constants specific to the JBB file format
 	 */
 	var NumericTypes = {
 
-	  // Base numeric constants
-	  UINT8: { id: 0, signed: false, min: _NumericBounds2.default.UINT8_MIN, max: _NumericBounds2.default.UINT8_MAX, upscale: [] },
-	  INT8: { id: 1, signed: true, min: _NumericBounds2.default.INT8_MIN, max: _NumericBounds2.default.INT8_MAX, upscale: [] },
-	  UINT16: { id: 2, signed: false, min: _NumericBounds2.default.UINT16_MIN, max: _NumericBounds2.default.UINT16_MAX, upscale: [] },
-	  INT16: { id: 3, signed: true, min: _NumericBounds2.default.INT16_MIN, max: _NumericBounds2.default.INT16_MAX, upscale: [] },
-	  UINT32: { id: 4, signed: false, min: _NumericBounds2.default.UINT32_MIN, max: _NumericBounds2.default.UINT32_MAX, upscale: [] },
-	  INT32: { id: 5, signed: true, min: _NumericBounds2.default.INT32_MIN, max: _NumericBounds2.default.INT32_MAX, upscale: [] },
-	  FLOAT32: { id: 6, signed: true },
-	  FLOAT64: { id: 7, signed: true },
+	  UINT8: integerType(0, 'UINT8', false, _NumericBounds2.default.UINT8_MIN, _NumericBounds2.default.UINT8_MAX),
+	  INT8: integerType(1, 'INT8', false, _NumericBounds2.default.INT8_MIN, _NumericBounds2.default.INT8_MAX),
+	  UINT16: integerType(2, 'UINT16', false, _NumericBounds2.default.UINT16_MIN, _NumericBounds2.default.UINT16_MAX),
+	  INT16: integerType(3, 'INT16', false, _NumericBounds2.default.INT16_MIN, _NumericBounds2.default.INT16_MAX),
+	  UINT32: integerType(4, 'UINT32', false, _NumericBounds2.default.UINT32_MIN, _NumericBounds2.default.UINT32_MAX),
+	  INT32: integerType(5, 'INT32', false, _NumericBounds2.default.INT32_MIN, _NumericBounds2.default.INT32_MAX),
+	  FLOAT32: integerType(6, 'FLOAT32', false),
+	  FLOAT64: integerType(7, 'FLOAT64', false),
 
-	  // General numeric constants
-	  NUMERIC: { id: 8, unsigned: true, min: -Infinity, max: Infinity, upscale: [] },
-	  UNKNOWN: { id: 9, unsigned: true, min: -Infinity, max: Infinity, upscale: [] },
-	  NAN: { id: 10 }
+	  NUMERIC: integerType(8, 'NUMERIC'),
+	  UNKNOWN: integerType(9, 'UNKNOWN'),
+	  NAN: integerType(10, 'NAN')
 
 	};
 
 	/**
 	 * Define upscaling candidates
 	 */
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT8);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT8);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT16);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT16);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.UINT32);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.INT32);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.FLOAT32);
-	NumericTypes.UNKNOWN.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.UNKNOWN.upscale = [NumericTypes.UINT8, NumericTypes.INT8, NumericTypes.UINT16, NumericTypes.INT16, NumericTypes.UINT32, NumericTypes.INT32, NumericTypes.FLOAT32, NumericTypes.FLOAT64];
 
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT8);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT8);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT16);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT16);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.UINT32);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.INT32);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.FLOAT32);
-	NumericTypes.NUMERIC.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.NUMERIC.upscale = [NumericTypes.UINT8, NumericTypes.INT8, NumericTypes.UINT16, NumericTypes.INT16, NumericTypes.UINT32, NumericTypes.INT32, NumericTypes.FLOAT32, NumericTypes.FLOAT64];
 
-	NumericTypes.UINT8.upscale.push(NumericTypes.INT8);
-	NumericTypes.UINT8.upscale.push(NumericTypes.UINT16);
-	NumericTypes.UINT8.upscale.push(NumericTypes.INT16);
-	NumericTypes.UINT8.upscale.push(NumericTypes.UINT32);
-	NumericTypes.UINT8.upscale.push(NumericTypes.INT32);
-	NumericTypes.UINT8.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.UINT8.upscale = [NumericTypes.INT8, NumericTypes.UINT16, NumericTypes.INT16, NumericTypes.UINT32, NumericTypes.INT32, NumericTypes.FLOAT64];
 
-	NumericTypes.INT8.upscale.push(NumericTypes.INT16);
-	NumericTypes.INT8.upscale.push(NumericTypes.INT32);
-	NumericTypes.INT8.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.INT8.upscale = [NumericTypes.INT16, NumericTypes.INT32, NumericTypes.FLOAT64];
 
-	NumericTypes.UINT16.upscale.push(NumericTypes.INT16);
-	NumericTypes.UINT16.upscale.push(NumericTypes.UINT32);
-	NumericTypes.UINT16.upscale.push(NumericTypes.INT32);
-	NumericTypes.UINT16.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.UINT16.upscale = [NumericTypes.INT16, NumericTypes.UINT32, NumericTypes.INT32, NumericTypes.FLOAT64];
 
-	NumericTypes.INT16.upscale.push(NumericTypes.INT32);
-	NumericTypes.INT16.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.INT16.upscale = [NumericTypes.INT32, NumericTypes.FLOAT64];
 
-	NumericTypes.UINT32.upscale.push(NumericTypes.INT32);
-	NumericTypes.UINT32.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.UINT32.upscale = [NumericTypes.INT32, NumericTypes.FLOAT64];
 
-	NumericTypes.INT32.upscale.push(NumericTypes.FLOAT64);
+	NumericTypes.INT32.upscale = [NumericTypes.FLOAT64];
 
 	exports.default = NumericTypes;
 
