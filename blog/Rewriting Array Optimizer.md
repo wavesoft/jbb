@@ -134,7 +134,9 @@ Since we are at it, let's try to optimize the current situation event more. Let'
 benchmark: 1997.671ms
 ```
 
-Wow, so this actually made things worse. Ok, **Note to self: Try to avoid scope variables, use object references instead!**
+Wow, so this actually made things worse. We could make things event
+
+ Ok, **Note to self: Try to avoid scope variables, use object references instead!**
 
 
 

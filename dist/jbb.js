@@ -70,11 +70,11 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	var _Header2 = _interopRequireDefault(_Header);
 
-	var _ArrayAnalyser = __webpack_require__(2);
+	var _NumericArray = __webpack_require__(2);
 
-	var _ArrayAnalyser2 = _interopRequireDefault(_ArrayAnalyser);
+	var _NumericArray2 = _interopRequireDefault(_NumericArray);
 
-	var _legacy = __webpack_require__(5);
+	var _legacy = __webpack_require__(8);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -166,27 +166,27 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	// ar_int[5000] = 3.14;
 
-	// console.log('wat=', ArrayAnalyser.isFloat32( 3 ));
-	// console.log('is=', ArrayAnalyser.isFloat32( 3.14 ));
-	// console.log('isNot=', ArrayAnalyser.isFloat32( Math.PI ));
+	// console.log('wat=', NumericArray.isFloat32( 3 ));
+	// console.log('is=', NumericArray.isFloat32( 3.14 ));
+	// console.log('isNot=', NumericArray.isFloat32( Math.PI ));
 
 	// console.time('analyzeNumericArray [float 1x]');
-	// console.log( ArrayAnalyser.analyzeNumericArray(ar_float) );
+	// console.log( NumericArray.analyzeNumericArray(ar_float) );
 	// console.timeEnd('analyzeNumericArray [float 1x]');
 	// console.time('analyzeNumericArray [int 1x]');
-	// console.log( ArrayAnalyser.analyzeNumericArray(ar_int) );
+	// console.log( NumericArray.analyzeNumericArray(ar_int) );
 	// console.timeEnd('analyzeNumericArray [int 1x]');
 	// console.time('analyzeNumericArray [zero 1x]');
-	// console.log( ArrayAnalyser.analyzeNumericArray(ar_zero) );
+	// console.log( NumericArray.analyzeNumericArray(ar_zero) );
 	// console.timeEnd('analyzeNumericArray [zero 1x]');
 	// console.time('analyzeNumericArray [same 1x]');
-	// console.log( ArrayAnalyser.analyzeNumericArray(ar_same) );
+	// console.log( NumericArray.analyzeNumericArray(ar_same) );
 	// console.timeEnd('analyzeNumericArray [same 1x]');
 
 	// console.time('benchmark');
 	// var counter = 100000;
 	// while (counter--) {
-	//   ArrayAnalyser.analyzeNumericArrayX(ar_int);
+	//   NumericArray.analyzeNumericArrayX(ar_int);
 	// };
 	// console.timeEnd('benchmark');
 
@@ -194,49 +194,49 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	// var count16 = 100000;
 	// var isFloat;
 	// while (count16--) {
-	//   ArrayAnalyser.getNumericArrayMinType(ar);
+	//   NumericArray.getNumericArrayMinType(ar);
 	// };
 	// console.timeEnd('getNumericArrayMinType');
 
 	// console.time('getNumericArrayMinType');
 	// var count16 = 100000;
 	// while (count16--) {
-	//   ArrayAnalyser.getNumericArrayMinType(ar_float);
+	//   NumericArray.getNumericArrayMinType(ar_float);
 	// };
 	// console.timeEnd('getNumericArrayMinType');
 
 	console.time('analyzeNumericArray [float]');
 	var count16 = 100000;
 	while (count16--) {
-	  _ArrayAnalyser2.default.analyzeNumericArray(ar_float);
+	  _NumericArray2.default.analyzeNumericArray(ar_float);
 	};
 	console.timeEnd('analyzeNumericArray [float]');
 
 	console.time('analyzeNumericArray [int]');
 	var count16 = 100000;
 	while (count16--) {
-	  _ArrayAnalyser2.default.analyzeNumericArray(ar_int);
+	  _NumericArray2.default.analyzeNumericArray(ar_int);
 	};
 	console.timeEnd('analyzeNumericArray [int]');
 
 	console.time('analyzeNumericArray [bigint]');
 	var count16 = 100000;
 	while (count16--) {
-	  _ArrayAnalyser2.default.analyzeNumericArray(ar_bigint);
+	  _NumericArray2.default.analyzeNumericArray(ar_bigint);
 	};
 	console.timeEnd('analyzeNumericArray [bigint]');
 
 	console.time('analyzeNumericArray [zero]');
 	var count16 = 100000;
 	while (count16--) {
-	  _ArrayAnalyser2.default.analyzeNumericArray(ar_zero);
+	  _NumericArray2.default.analyzeNumericArray(ar_zero);
 	};
 	console.timeEnd('analyzeNumericArray [zero]');
 
 	console.time('analyzeNumericArray [same]');
 	var count16 = 100000;
 	while (count16--) {
-	  _ArrayAnalyser2.default.analyzeNumericArray(ar_same);
+	  _NumericArray2.default.analyzeNumericArray(ar_same);
 	};
 	console.timeEnd('analyzeNumericArray [same]');
 
@@ -252,7 +252,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	// var count16 = 100000;
 	// var isFloat;
 	// while (count16--) {
-	//   ArrayAnalyser.analyzeNumericArray(ar, false);
+	//   NumericArray.analyzeNumericArray(ar, false);
 	// };
 	// console.timeEnd('analyzeNumericArray(false)');
 
@@ -335,38 +335,36 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-	var _NumericBounds = __webpack_require__(3);
+	var _EncodingContext = __webpack_require__(3);
 
-	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
+	var _EncodingContext2 = _interopRequireDefault(_EncodingContext);
 
-	var _NumericTypes = __webpack_require__(4);
+	var _NumericTypes = __webpack_require__(6);
 
 	var _NumericTypes2 = _interopRequireDefault(_NumericTypes);
+
+	var _NumberUtil = __webpack_require__(7);
+
+	var _NumberUtil2 = _interopRequireDefault(_NumberUtil);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 	/**
-	 * Local helper to cast a value to 32-bit float
-	 */
-	var float32_value = new Float32Array(1);
-
-	/**
 	 * Result object used by the `analyzeNumericArray` function when analyzing
 	 * the input data. Instead of using a plain object, creating a class actually
 	 * helps the compiler optimize the object even further.
 	 */
-
-	var AnalysisResults = function () {
+	var NumericAnalysisResults = function () {
 
 	  /**
 	   * Analysis results constructor.
 	   *
 	   * @param {Number} value0 - The first value in the array
 	   */
-	  function AnalysisResults(value0) {
-	    _classCallCheck(this, AnalysisResults);
+	  function NumericAnalysisResults(value0) {
+	    _classCallCheck(this, NumericAnalysisResults);
 
 	    this._prev = value0;
 	    this._same = 1;
@@ -374,17 +372,17 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	    // Note: The 0.1 is used to make javascript engine assume this is a float
 	    //       type and therefore do not de-optimize when it becomes float
 	    //       during finalizing phase.
-	    this.average = 0.1;
+	    this.average = value0 + 0.1;
 
-	    this.dmin = 0;
-	    this.dmax = 0;
+	    this.dmin = Infinity;
+	    this.dmax = -Infinity;
 	    this.min = +value0;
 	    this.max = +value0;
 	    this.sameMax = 0;
 
 	    this.isZero = false;
 	    this.isSame = false;
-	    this.isFloat = ArrayAnalyser.isFloat(value0);
+	    this.isFloat = _NumberUtil2.default.isFloat(value0);
 	    this.isInt = !this.isFloat && value0 !== 0;
 	    this.isMixed = false;
 	  }
@@ -396,20 +394,21 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	   */
 
 
-	  _createClass(AnalysisResults, [{
+	  _createClass(NumericAnalysisResults, [{
 	    key: 'finalize',
 	    value: function finalize(itemCount) {
+	      this.sameMax = this._same > this.sameMax ? this._same : this.sameMax;
 	      this.average = (this.average - 0.1) / itemCount;
 	      this.isZero = !this.isInt && !this.isFloat;
 	      this.isSame = this.sameMax === itemCount;
 	    }
 	  }]);
 
-	  return AnalysisResults;
+	  return NumericAnalysisResults;
 	}();
 
-	/**e
-	 * Analysis functions for detecting the nature of arrays and extracting
+	/**
+	 * Analysis functions for detecting the nature of numeric arrays and extracting
 	 * useful information for optimized encoding.
 	 *
 	 * NOTE: Since we are going to receive any number of different function
@@ -418,81 +417,14 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	 */
 
 
-	var ArrayAnalyser = function () {
-	  function ArrayAnalyser() {
-	    _classCallCheck(this, ArrayAnalyser);
+	var NumericArray = function () {
+	  function NumericArray() {
+	    _classCallCheck(this, NumericArray);
 	  }
 
-	  _createClass(ArrayAnalyser, null, [{
-	    key: 'analyzeNumericArrayX',
-	    value: function analyzeNumericArrayX(numericArray) {
-	      var value0 = numericArray[0];
-	      var result = {
-	        min: value0,
-	        max: value0,
-	        delta: 0,
-	        _prev: value0
-	      };
+	  _createClass(NumericArray, null, [{
+	    key: 'analyzeNumericArray',
 
-	      for (var i = 1; i < numericArray.length; ++i) {
-	        var value = numericArray[i];
-	        var isInt = ArrayAnalyser.isFloat(value);
-
-	        // Calculate bounds
-	        if (value < result.min) result.min = value;
-	        if (value > result.max) result.max = value;
-
-	        // Absolute difference
-	        var delta = Math.abs(value - result._prev);
-	        if (delta > result.delta) {
-	          result.delta = delta;
-	        }
-
-	        result._prev = value;
-	      }
-
-	      return result;
-	    }
-
-	    /**
-	     * Optimised function to test if a number is float.
-	     * It exploits a quirk for numbers smaller than 32-bit.
-	     *
-	     * @param {Number} number - The number to test
-	     * @return {Boolean} Returns true if the number is float
-	     */
-
-	  }, {
-	    key: 'isFloat',
-	    value: function isFloat(number) {
-	      if (number > 0x7FFFFFFF || number < -0x7FFFFFFE) {
-	        return number % 1 !== 0;
-	      } else {
-	        return number !== (number | 0);
-	      }
-	    }
-
-	    /**
-	     * Test if the given float number fits in a 32-bit number representation.
-	     * if not it's assumed to fit in 64-bit number.
-	     *
-	     * @param {Number} floatNumber - A float number to test
-	     * @param {Number} [tollerance] - The acceptable difference between original and casted number
-	     * @returns {Boolean} Returns true if the number can fit in 32-bits
-	     */
-
-	  }, {
-	    key: 'isFloat32',
-	    value: function isFloat32(floatNumber) {
-	      var tollerance = arguments.length <= 1 || arguments[1] === undefined ? _NumericBounds2.default.FLOAT32_ACCEPTED_LOSS : arguments[1];
-
-	      // Cast number info float32 and then read it back in order
-	      // to calculate the loss value
-	      float32_value[0] = floatNumber;
-
-	      // If the loss is acceptable, assume we can use Float32 for representing it
-	      return Math.abs(floatNumber - float32_value[0]) < tollerance;
-	    }
 
 	    /**
 	     * Process the given numeric array and return it's metrics, including:
@@ -512,24 +444,20 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	     * @param {Array} numericArray - A numeric array to process
 	     * @returns {Object} The array metrics (see above for the fields)
 	     */
-
-	  }, {
-	    key: 'analyzeNumericArray',
 	    value: function analyzeNumericArray(numericArray) {
-	      var itemCount = +numericArray.length;
-	      var results = new AnalysisResults(numericArray[0]);
+	      var itemCount = Number(numericArray.length);
+	      var results = new NumericAnalysisResults(numericArray[0]);
 
 	      for (var i = 1; i < itemCount; ++i) {
 	        var value = numericArray[i];
 
 	        // Float/Integer/Mixed type detection
 	        if (results.isMixed === false) {
-	          // if (value !== (value|0)) {
-	          if (ArrayAnalyser.isFloat(value)) {
+	          if (_NumberUtil2.default.isFloat(value)) {
 	            results.isFloat = true;
 	            results.isMixed = results.isInt;
 	          } else {
-	            if (!results.isInt && value !== 0) {
+	            if (results.isInt === false && value !== 0) {
 	              results.isInt = true;
 	              results.isMixed = results.isFloat;
 	            }
@@ -573,12 +501,15 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	     * Get the minimum possible type that can hold the numerical values
 	     * of all items in the given array.
 	     *
-	     *
+	     * @param {EncodingContext} encodingContext - The current encoding context
 	     */
 
 	  }, {
 	    key: 'getNumericArrayMinType',
 	    value: function getNumericArrayMinType(numericArray) {
+	      var encodingContext = arguments.length <= 1 || arguments[1] === undefined ? _EncodingContext2.default.DEFAULT : arguments[1];
+
+	      var tollerance = encodingContext.options.num_float_tollerance;
 	      var type = _NumericTypes2.default.UNKNOWN;
 
 	      for (var i = 0; i < numericArray.length; ++i) {
@@ -586,7 +517,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	        // Check if this is a float, or if the float type needs to be upgraded
 	        if (type === _NumericTypes2.default.FLOAT32 || value % 1 !== 0) {
-	          if (!ArrayAnalyser.isFloat32(value)) return _NumericTypes2.default.FLOAT64;
+	          if (!_NumberUtil2.default.isFloat32(value, tollerance)) return _NumericTypes2.default.FLOAT64;
 	          type = _NumericTypes2.default.FLOAT32;
 	          continue;
 	        }
@@ -608,23 +539,160 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 
 	      return type;
 	    }
-
-	    /**
-	     * @param {TypedArray} typedArray - The typed array to get the
-	     */
-
-	  }, {
-	    key: 'getNumericType',
-	    value: function getNumericType(typedArray) {}
 	  }]);
 
-	  return ArrayAnalyser;
+	  return NumericArray;
 	}();
 
-	exports.default = ArrayAnalyser;
+	exports.default = NumericArray;
 
 /***/ },
 /* 3 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+	var _KnownObjects = __webpack_require__(4);
+
+	var _KnownObjects2 = _interopRequireDefault(_KnownObjects);
+
+	var _NumericBounds = __webpack_require__(5);
+
+	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	/**
+	 * The context available to all encoding functions during encoding phase
+	 */
+	var EncodingContext = function () {
+	  _createClass(EncodingContext, null, [{
+	    key: 'DEFAULT',
+
+
+	    /**
+	     * Default encoding context
+	     */
+	    get: function get() {
+	      return DEFAULT_INST;
+	    }
+	  }]);
+
+	  /**
+	   * Encoding context constructor
+	   */
+	  function EncodingContext() {
+	    _classCallCheck(this, EncodingContext);
+
+	    this.options = {
+	      obj_byval_comparision: true,
+	      num_float_tollerance: _NumericBounds2.default.FLOAT32_ACCEPTED_LOSS
+	    };
+
+	    this.knownObjects = new _KnownObjects2.default();
+	  }
+
+	  return EncodingContext;
+	}();
+
+	/**
+	 * Create a singleton, used with the default encoding context
+	 */
+
+
+	exports.default = EncodingContext;
+	var DEFAULT_INST = new EncodingContext();
+
+/***/ },
+/* 4 */
+/***/ function(module, exports) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	/**
+	 * The context available to all encoding functions during encoding phase
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	var KnownObjects = function () {
+
+	  /**
+	   * Table of known objects
+	   */
+	  function KnownObjects() {
+	    _classCallCheck(this, KnownObjects);
+	  }
+
+	  /**
+	   *
+	   */
+
+
+	  _createClass(KnownObjects, [{
+	    key: "lookup",
+	    value: function lookup(object) {
+	      return 0;
+	    }
+	  }]);
+
+	  return KnownObjects;
+	}();
+
+	exports.default = KnownObjects;
+
+/***/ },
+/* 5 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -678,7 +746,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	exports.default = NumericBounds;
 
 /***/ },
-/* 4 */
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -705,7 +773,7 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	  value: true
 	});
 
-	var _NumericBounds = __webpack_require__(3);
+	var _NumericBounds = __webpack_require__(5);
 
 	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
 
@@ -776,7 +844,106 @@ var JBB = JBB || {}; JBB["BinaryLoader"] =
 	exports.default = NumericTypes;
 
 /***/ },
-/* 5 */
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	/**
+	 * JBB - Javascript Binary Bundles - Binary Stream Class
+	 * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
+	 *
+	 * Licensed under the Apache License, Version 2.0 (the "License");
+	 * you may not use this file except in compliance with the License.
+	 * You may obtain a copy of the License at
+	 *
+	 *     http://www.apache.org/licenses/LICENSE-2.0
+	 *
+	 * Unless required by applicable law or agreed to in writing, software
+	 * distributed under the License is distributed on an "AS IS" BASIS,
+	 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	 * See the License for the specific language governing permissions and
+	 * limitations under the License.
+	 *
+	 * @author Ioannis Charalampidis / https://github.com/wavesoft
+	 */
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+	var _NumericBounds = __webpack_require__(5);
+
+	var _NumericBounds2 = _interopRequireDefault(_NumericBounds);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	/**
+	 * Local helper to cast a value to 32-bit float
+	 */
+	var float32_value = new Float32Array(1);
+
+	/**
+	 * Number-related utilities
+	 */
+
+	var NumberUtil = function () {
+	  function NumberUtil() {
+	    _classCallCheck(this, NumberUtil);
+	  }
+
+	  _createClass(NumberUtil, null, [{
+	    key: "isFloat",
+
+
+	    /**
+	     * Optimised function to test if a number is float.
+	     * It exploits a quirk for numbers smaller than 32-bit.
+	     *
+	     * @param {Number} number - The number to test
+	     * @return {Boolean} Returns true if the number is float
+	     */
+	    value: function isFloat(number) {
+	      if (number > 0x7FFFFFFF || number < -0x7FFFFFFE) {
+	        return number % 1 !== 0;
+	      } else {
+	        return number !== (number | 0);
+	      }
+	    }
+
+	    /**
+	     * Test if the given float number fits in a 32-bit number representation.
+	     * if not it's assumed to fit in 64-bit number.
+	     *
+	     * @param {Number} floatNumber - A float number to test
+	     * @param {Number} [tollerance] - The acceptable difference between original and casted number
+	     * @returns {Boolean} Returns true if the number can fit in 32-bits
+	     */
+
+	  }, {
+	    key: "isFloat32",
+	    value: function isFloat32(floatNumber) {
+	      var tollerance = arguments.length <= 1 || arguments[1] === undefined ? _NumericBounds2.default.FLOAT32_ACCEPTED_LOSS : arguments[1];
+
+	      // Cast number info float32 and then read it back in order
+	      // to calculate the loss value
+	      float32_value[0] = floatNumber;
+
+	      // If the loss is acceptable, assume we can use Float32 for representing it
+	      return Math.abs(floatNumber - float32_value[0]) < tollerance;
+	    }
+	  }]);
+
+	  return NumberUtil;
+	}();
+
+	exports.default = NumberUtil;
+
+/***/ },
+/* 8 */
 /***/ function(module, exports) {
 
 	"use strict";
