@@ -1,6 +1,6 @@
 "use strict";
 /**
- * JBB - Javascript Binary Bundles - Binary Stream Class
+ * JBB - Javascript Binary Bundles - Known Objects Utilities
  * Copyright (C) 2015 Ioannis Charalampidis <ioannis.charalampidis@cern.ch>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +19,7 @@
  */
 
 /**
- * The context available to all encoding functions during encoding phase
+ * The shared known object information
  */
 export default class KnownObjects {
 

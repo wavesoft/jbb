@@ -303,11 +303,11 @@ So we need a fast alternative for big numbers. But how can we avoid adding addit
   }
 ```
 
-This function is small enough and not polymorphic, therefore it will get inlined by the compiler when used. So let's run the benchmarks again using our new function:
+This function is small enough and not polymorphic, therefore it will get inlined by the interpreter when used. So let's run the benchmarks again using our new function:
 
 ```
 ~$ node benchmark.js
 benchmark: 6597.833ms
 ```
 
-That looks good. Our custom function is proven to be 6 times faster than the native implementtion. However I am expecting this to be addressed in the newer V8 versions. Till then, **Note
+That looks good. Our custom function is proven to be 6 times faster than the native implementtion. However I am expecting this to be addressed in the newer V8 versions. Till then, **Note to self: Avoid using `Number.isInteger` to detect integers. Use `value|0` or `value % 1 === 0` if you are expecting big numbers**

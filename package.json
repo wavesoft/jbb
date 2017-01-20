@@ -32,11 +32,13 @@
     "gulp-jbb-profile": "^1.0.2",
     "jbb-profile-three": "^1.0.1",
     "jest": "^15.1.1",
+    "js-inline-loader": "^0.1.0",
     "json-loader": "^0.5.4",
     "mocha": "^2.3.4",
     "mute": "^2.0.6",
     "node-getopt": "^0.2.3",
     "seed-random": "^2.2.0",
+    "webpack": "^1.13.3",
     "webpack-stream": "^3.1.0"
   },
   "dependencies": {

@@ -15,10 +15,7 @@ gulp.task('jbb/lib', function() {
           {
             test: /\.js$/,
             exclude: /(node_modules|bower_components)/,
-            loader: 'babel',
-            query: {
-              presets: [ 'es2015' ]
-            }
+            loader: './webpack/inline-require-loader!babel?presets[]=es2015'
           }
         ],
         },
